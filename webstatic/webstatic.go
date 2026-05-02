@@ -24,18 +24,13 @@ func ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	} else if path == "" || path == "/" {
 		path = "index.html"
 	} else {
-		if path[0:7] == "static/" {
-			path = strings.TrimPrefix(path, "static/")
-		} else {
-			http.Error(w, "Page not found.", http.StatusNotFound)
-			return
-		}
+		path = strings.TrimPrefix(path, "static/")
 	}
 	
 	File, err := WebStaticContent.Open(fmt.Sprintf("static/%s", path))
 	if err != nil {
 		fmt.Printf("Cannot find file: %s\n", path)
-		http.Error(w, "File not found.", http.StatusNotFound)
+		http.Error(w, "Page not found.", http.StatusNotFound)
 		return
 	}
 	defer File.Close()
