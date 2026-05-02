@@ -35,7 +35,7 @@ func ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	}
 	defer File.Close()
 	
-	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Header().Set("Cache-Control", "public, max-age=86400")	// Cache for 24 hours.
 	w.Header().Set("ETag", ETag)
 	if r.Header.Get("If-None-Match") == ETag {
 		w.WriteHeader(http.StatusNotModified)
