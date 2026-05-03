@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+	"sync"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -31,8 +32,8 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 );
 
 CREATE TABLE IF NOT EXISTS Videos (
-	FromChannel TEXT NOT NULL,
 	Id    TEXT PRIMARY KEY,
+	FromChannel TEXT NOT NULL,
 	Title TEXT NOT NULL,
 	Url   TEXT NOT NULL,
 	Duration FLOAT,
@@ -60,6 +61,7 @@ const (
 )
 
 var GDB *sql.DB
+var VideoDBLock sync.RWMutex
 
 func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	_, err := GDB.Exec(`
@@ -97,6 +99,8 @@ func DB_RemoveChannel(ChannelId string) error {
 }
 
 func DB_UpdateVideoInfo(Video *VideoInfo) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
 	_, err := GDB.Exec(`
 	INSERT INTO Videos(Id, FromChannel, Title, Url, ReleaseDate, Duration, UpdatedAt)
 	VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
@@ -118,6 +122,8 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 }
 
 func DB_UpdateVideoStatus(Video *VideoInfo, Status int) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
 	Video.Status = Status
 	_, err := GDB.Exec(`
 	UPDATE Videos SET Status = ?, UpdatedAt = ? WHERE Id = ?
@@ -126,6 +132,8 @@ func DB_UpdateVideoStatus(Video *VideoInfo, Status int) error {
 }
 
 func DB_GetVideo(VideoId string) (*VideoInfo, error) {
+	VideoDBLock.RLock()
+	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
 	SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos WHERE Id = ?
@@ -145,12 +153,19 @@ func DB_LoadChannels(WD *WatchingBundle) error {
 	}
 	WD.ChannelsLock.Lock()
 	defer WD.ChannelsLock.Unlock()
+	var i int64
 	for Rows.Next() {
 		Channel := &ArchiveChannel{}
 		err := Rows.Scan(&Channel.Id, &Channel.Name, &Channel.Url, &Channel.DownloadDir, &Channel.OutputTemplate, &Channel.QualitySelect, &Channel.Type, &Channel.CheckInterval, &Channel.Enabled)
 		if err != nil {
 			return err
 		}
+		
+		Channel.NextFullChannelCheckMSEC = time.Now().UnixMilli() + (i*1000 * 60*2)
+		
+		WD.Channels = append(WD.Channels, Channel)
+		
+		i += 1
 	}
 	
 	return nil

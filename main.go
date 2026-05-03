@@ -39,19 +39,6 @@ func main() {
 		panic(err)
 	}
 	
-	NewChannel := &ArchiveChannel{
-		Name: "TEST!",
-		Url: "https://www.youtube.com/@Freddiebeans101/streams",
-		CheckInterval: 60,
-		QualitySelect: 480,
-		Type: ACHANNEL_TYPE_LIVE,
-		Enabled: true,
-	}
-	err = AddArchiveChannel(&WatchedDownloading, NewChannel)
-	if err != nil {
-		panic(err)
-	}
-	
 	go StartDownloading()
 	
 	StartServer(SERVER_PORT)

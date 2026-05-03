@@ -30,7 +30,8 @@ type ArchiveChannel struct {
 	Enabled        bool   `json:"enabled"`
 	IsBeingChecked bool
 	
-	NextTimeCheckMSEC int64 `json:"nextTimeCheckMsec"`
+	NextCheckMSEC int64        `json:"_nextCheckMsec"`
+	NextFullChannelCheckMSEC int64 `json:"_nextFullChannelCheckMsec"`
 }
 
 type WatchingBundle struct {
@@ -79,7 +80,6 @@ func CheckIsVideoDownloaded(v VideoInfo) bool {
 		return false
 	}
 	if DB_VideoInfo != nil {
-		fmt.Printf("%+v\n", DB_VideoInfo)
 		if DB_VideoInfo.Status == VIDEO_STATUS_DOWNLOADED || DB_VideoInfo.Status == VIDEO_STATUS_DOWNLOADING {
 			return true
 		}
@@ -95,24 +95,27 @@ func DownloadVideo(AChannel *ArchiveChannel, v *VideoInfo) {
 	err := yt_dlp_DownloadVideo(*AChannel, v)
 	if err != nil {
 		DB_UpdateVideoStatus(v, VIDEO_STATUS_FAILED)
+		return
 	}
 	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADED)
 }
 
 func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 	if CheckIsVideoDownloaded(*v) {
-		fmt.Printf("Video already exists: %s\n", v.Url)
 		return
 	}
+	
+	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADING)
 	
 	err := RequestVideoInfo(v.Url, v)
 	if err != nil {
 		fmt.Printf("Failed to grab video info... err: %v\n", err)
+		DB_UpdateVideoStatus(v, VIDEO_STATUS_FAILED)
 		return
 	}
 	
 	DB_UpdateVideoInfo(v)
-	DB_UpdateVideoStatus(v, VIDEO_STATUS_QUEUED)
+	//DB_UpdateVideoStatus(v, VIDEO_STATUS_QUEUED)
 	
 	switch v.VideoType {
 	case VIDEO_TYPE_ISLIVE:
@@ -137,15 +140,20 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	AChannel.IsBeingChecked = true
 	defer func() {AChannel.IsBeingChecked = false}()
 	
-	AChannel.NextTimeCheckMSEC = time.Now().UnixMilli() + (AChannel.CheckInterval*1000)
+	TimeNow := time.Now().UnixMilli()
+	
+	AChannel.NextCheckMSEC = TimeNow + (AChannel.CheckInterval*1000)
 	
 	AChannel.Lock.RLock()
 	Url := AChannel.Url
 	AChannel.Lock.RUnlock()
 	
-	PlaylistEnd := -1
-	if AChannel.Type == ACHANNEL_TYPE_LIVE {
-		PlaylistEnd = 6
+	PlaylistEnd := 6
+	if TimeNow > AChannel.NextFullChannelCheckMSEC {
+		PlaylistEnd = -1
+		// Every 24 hours, check the entire channel for new videos.
+		AChannel.NextFullChannelCheckMSEC = TimeNow + (1000 * 60 * 60 * 24)
+		fmt.Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
 	}
 	
 	VideoList, err := ListVideos(Url, PlaylistEnd)
@@ -157,7 +165,10 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	// Add the videos to the queued list.
 	for _, v := range(VideoList) {
 		v.FromChannel = AChannel.Id
-		DB_UpdateVideoInfo(&v)
+		Exists, err := DB_GetVideo(v.Id)
+		if Exists == nil && err != nil {
+			DB_UpdateVideoInfo(&v)
+		}
 		//DB_UpdateVideoStatus(&v, VIDEO_STATUS_QUEUED)
 	}
 	
@@ -173,7 +184,7 @@ func CheckChannels(WD *WatchingBundle) {
 	WD.ChannelsLock.RLock()
 	
 	for _, AChannel := range(WD.Channels) {
-		if time.Now().UnixMilli() < AChannel.NextTimeCheckMSEC {
+		if time.Now().UnixMilli() < AChannel.NextCheckMSEC {
 			continue
 		}
 		go CheckChannel(AChannel)
