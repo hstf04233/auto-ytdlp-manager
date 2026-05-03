@@ -1,31 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path"
-	"strings"
 	"strconv"
-	"encoding/json"
+	"strings"
+	"time"
 )
-
-/*
-	Name string `json:"name"`
-	Url  string `json:"url"`
-	
-	DownloadDir    string `json:"download_dir"`
-	OutputTemplate string `json:"output_template"`
-	QualitySelect  int    `json:"quality_select"`
-	Type           int32  `json:"type"`
-	CheckInterval  int64  `json:"check_interval"`
-	FullCheckInterval int64 `json:"full_check_interval"`
-	
-	Enabled        bool `json:"enabled"`
-	IsBeingChecked bool
-	
-	NextCheckMSEC            int64 `json:"_nextCheckMsec"`
-	NextFullChannelCheckMSEC int64 `json:"_nextFullChannelCheckMsec"`
-*/
 
 const API_MAX_URL_LENGTH = 1 << 14
 
@@ -91,9 +74,9 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 		CheckInterval: body.CheckInterval,
 		FullCheckInterval: body.FullCheckInterval,
 	}
-	if body.Enabled != nil {
-		NewChannel.Enabled = *body.Enabled
-	}
+	// This is intended behavior. I want all newly created channels to be paused by default ! (Even if the request wants it to be enabled...)
+	NewChannel.Enabled = false
+	
 	err := AddArchiveChannel(&WatchedDownloading, NewChannel)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -155,6 +138,9 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Enabled != nil {
 		AChannel.Enabled = *body.Enabled
+		if AChannel.Enabled {
+			AChannel.NextCheckMSEC = time.Now().UnixMilli() + (1000 * 4)
+		}
 	}
 	err := DB_UpdateArchiveChannel(AChannel)
 	if err != nil {
@@ -176,6 +162,9 @@ func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte("{\"Success\":true}"))
 }
 
 func API_GetChannels(w http.ResponseWriter, r *http.Request) {
@@ -197,15 +186,15 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 	
 	Channels := WatchedDownloading.Channels
 	if len(Channels) <= 0 {
-		// This fixes the json encode to be {} instead of null
+		// This fixes an issue where an empty list might be null instead of {}
 		Channels = []*ArchiveChannel{}
 	}
 	
 	defer WatchedDownloading.ChannelsLock.RUnlock()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"Count": len(WatchedDownloading.Channels),
-		"Channels": WatchedDownloading.Channels,
+		"count": len(WatchedDownloading.Channels),
+		"channels": WatchedDownloading.Channels,
 	})
 }
 
@@ -228,17 +217,34 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	FromChannel := ""
+	Status := -1
 	Limit := 50
 	Offset := 0
+	if fc := r.URL.Query().Get("from_channel"); fc != "" {
+		FromChannel = fc
+		AChannel := GetArchiveChannelFromId(&WatchedDownloading, FromChannel)
+		if AChannel == nil {
+			http.Error(w, "Channel not found.", http.StatusNotFound)
+			return
+		}
+	}
+	if s := r.URL.Query().Get("status"); s != "" {
+		Status, _ = strconv.Atoi(s)
+	}
 	if l := r.URL.Query().Get("limit"); l != "" {
 		Limit, _ = strconv.Atoi(l)
+		if Limit == -1 {
+			Limit = -1
+		} else if Limit < 0 {
+			Limit = 50
+		}
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
 		Offset, _ = strconv.Atoi(o)
 	}
 	
-	
-	VideosList, err := DB_ListVideos(fmt.Sprintf("ORDER BY AddedAt DESC LIMIT %d OFFSET %d", Limit, Offset))
+	VideosList, err := DB_ListVideos(Limit, Offset, Status, FromChannel)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -246,8 +252,8 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"Count": len(VideosList),
-		"Videos": VideosList,
+		"count": len(VideosList),
+		"videos": VideosList,
 	})
 }
 
@@ -267,7 +273,7 @@ func API_GetVideoStatus(w http.ResponseWriter, r *http.Request) {
 		
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"Status": VideoInfo.Status,
+			"status": VideoInfo.Status,
 		})
 		return
 	}
@@ -282,16 +288,31 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	Method := r.Method
 	
 	if Path == "channels" && Method == "POST" {
+		// POSTing to api/channels will create a new channel.
 		API_NewChannel(w, r)
 	} else if strings.HasPrefix(Path, "channels/") && Method == "PUT" {
+		// PUTing to api/channels/{channel_id} will update a channel.
 		API_UpdateChannel(w, r)
 	} else if strings.HasPrefix(Path, "channels/") && Method == "DELETE" {
+		// DELETE-ing to api/channels/{channel_id} will delete a channel.
 		API_DeleteChannel(w, r)
 	} else if (Path == "channels" || strings.HasPrefix(Path, "channels/")) && Method == "GET" {
+		// api/channels will give the entire list of channels !
+		// api/channels/{channel_id} will give you a specific channel.
 		API_GetChannels(w, r)
 	} else if (Path == "videos" || strings.HasPrefix(Path, "videos/")) && Method == "GET" {
+		/*
+		  api/video?limit={int}&offset={int}&status={int}&from_channel={channel_id} Will return a list of videos,
+		  status and from_channel are optional.
+		  
+		  api/video/{video_id} will give you a specific video.
+		*/
 		API_GetVideos(w, r)
 	} else if (strings.HasPrefix(Path, "get-video-status/")) && Method == "GET" {
+		// api/get-video-status/{video_id} will return just the status of the video and nothing else.
+		// Returns as json (example: {status: 0})
+		
+		// This is to grab the video status without refreshing the entire list with the api/videos list api.
 		API_GetVideoStatus(w, r)
 	} else {
 		http.NotFound(w, r)

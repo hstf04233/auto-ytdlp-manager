@@ -197,7 +197,10 @@ func CheckChannel(AChannel *ArchiveChannel) {
 		CheckVideoAndDownload(AChannel, &v)
 	}
 	
-	QueuedVideosList, err := DB_ListVideos(fmt.Sprintf("WHERE FromChannel = %s AND Status = 0", AChannel.Id))
+	QueuedVideosList, err := DB_ListVideos(-1, 0, 0, AChannel.Id)
+	if err != nil {
+		fmt.Printf("DB_ListVideos err: %v\n", err)
+	}
 	if len(QueuedVideosList) > 0 {
 		for _, v := range(QueuedVideosList) {
 			if !AChannel.Enabled { break }

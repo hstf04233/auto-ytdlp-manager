@@ -18,15 +18,15 @@ const (
 )
 
 type VideoInfo struct {
-	FromChannel string
-	Title string
-	Url   string
-	Id    string
-	ReleaseDate int64
-	Duration float64
-	Status   int
+	FromChannel string  `json:"from_channel"`	// Channel id
+	Title       string  `json:"title"`
+	Url         string  `json:"url"`
+	Id          string  `json:"id"`
+	ReleaseDate int64   `json:"release_date"`
+	Duration    float64 `json:"duration"`
+	Status      int     `json:"status"`
 	
-	VideoType int32
+	VideoType   int32   `json:"video_type"`
 }
 
 type YT_DLP_OUTVIDEO struct {
@@ -200,7 +200,7 @@ func ytarchive_DownloadLive(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		QualityString = "360p/best"
 	} else if QualitySelect >= 240 {
 		QualityString = "240p/best"
-	} else if QualitySelect == 0 {
+	} else if QualitySelect <= 0 {
 		QualityString = "best"
 	}
 	

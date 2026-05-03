@@ -108,7 +108,7 @@ func DB_RemoveChannel(ChannelId string) error {
 
 func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 	if Condition == "" {
-		Condition = "ORDER BY CreatedAt DESC"
+		Condition = "ORDER BY CreatedAt ASC"
 	}
 	Rows, err := GDB.Query(fmt.Sprintf(`SELECT
 	Id,
@@ -210,14 +210,32 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	return VideoInfo, nil
 }
 
-func DB_ListVideos(Condition string) ([]*VideoInfo, error) {
-	if Condition == "" {
-		Condition = "ORDER BY ReleaseDate DESC"
+func DB_ListVideos(Limit int, Offset int, Status int, FromChannel string) ([]*VideoInfo, error) {
+	Args := []interface{}{}
+	
+	// ORDER BY ReleaseDate DESC
+	Statement := "SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos"
+	if Status != -1 || FromChannel != "" {
+		Statement += " WHERE "
+		AddAnd := false
+		if Status != -1 {
+			Statement += " Status = ?"
+			Args = append(Args, Status)
+			AddAnd = true
+		}
+		if FromChannel != "" {
+			if AddAnd {
+				Statement += " AND "
+			}
+			Statement += " FromChannel = ?"
+			Args = append(Args, FromChannel)
+			AddAnd = true
+		}
 	}
 	
-	//SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos WHERE Id = ?
-	Rows, err := GDB.Query(fmt.Sprintf(`SELECT
-	FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos %s`, Condition))
+	Statement = Statement + " ORDER BY AddedAt DESC LIMIT ? OFFSET ?"
+	Args = append(Args, Limit, Offset)
+	Rows, err := GDB.Query(Statement, Args...)
 	if err != nil {
 		return nil, err
 	}

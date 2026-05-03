@@ -18,7 +18,7 @@ var ETag string
 
 func ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/")
-	fmt.Printf("Serving \"%s\"\n", path)
+	//fmt.Printf("Serving \"%s\"\n", path)
 	if path == "favicon.ico" {
 		path = "favicon.png"
 	} else if path == "" || path == "/" {
@@ -35,8 +35,8 @@ func ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	}
 	defer File.Close()
 	
-	w.Header().Set("Cache-Control", "public, max-age=86400")	// Cache for 24 hours.
-	w.Header().Set("ETag", ETag)
+	//w.Header().Set("Cache-Control", "public, max-age=86400")	// Cache for 24 hours.
+	//w.Header().Set("ETag", ETag)
 	if r.Header.Get("If-None-Match") == ETag {
 		w.WriteHeader(http.StatusNotModified)
 		return

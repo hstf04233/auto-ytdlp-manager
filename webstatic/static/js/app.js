@@ -29,13 +29,23 @@ const API = {
     }
     return res.json();
   },
+  async del(url) {
+    const res = await fetch(url, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API DELETE ${url}: ${res.status} - ${text}`);
+    }
+    return res.json();
+  },
 };
 
 // ========== State ==========
 let allChannels = [];
 let allVideos = [];
 let videoPage = 0;
-const VIDEO_PAGE_SIZE = 20;
+const VIDEO_PAGE_SIZE = 50;
 
 // ========== Navigation ==========
 document.querySelectorAll('.sidebar nav a').forEach(link => {
@@ -61,8 +71,8 @@ function showToast(message, type = 'info') {
 }
 
 // ========== Channel helpers ==========
-function statusBadge(status) {
-  return status ? '<span class="badge badge-type-live">Live</span>' : '<span class="badge badge-type-videos">Videos</span>';
+function statusBadge(type) {
+  return type ? '<span class="badge badge-type-live">Live</span>' : '<span class="badge badge-type-videos">Videos</span>';
 }
 
 function qualityLabel(q) {
@@ -78,17 +88,17 @@ function intervalLabel(s) {
 }
 
 function formatDate(ts) {
-  if (!ts) return '—';
+  if (!ts) return '\u2014';
   return new Date(ts * 1000).toLocaleDateString();
 }
 
 function formatDuration(sec) {
-  if (!sec || sec <= 0) return '—';
+  if (!sec || sec <= 0) return '\u2014';
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = Math.floor(sec % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-  return `${m}:${String(s).padStart(2,'0')}`;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function videoStatusBadge(status) {
@@ -116,8 +126,7 @@ function videoTypeBadge(vtype) {
 async function loadChannels() {
   try {
     const data = await API.get('/api/channels');
-    // The API returns { Count, Channels } — handle both formats
-    allChannels = data.Channels || data;
+    allChannels = data.channels || data;
     renderChannels();
   } catch (err) {
     showToast(`Failed to load channels: ${err.message}`, 'error');
@@ -129,7 +138,7 @@ function renderChannels() {
   const statsContainer = document.getElementById('channelStats');
 
   const total = allChannels.length;
-  const enabled = allChannels.filter(c => c.Enabled).length;
+  const enabled = allChannels.filter(c => c.enabled).length;
   const disabled = total - enabled;
 
   statsContainer.innerHTML = `
@@ -146,23 +155,23 @@ function renderChannels() {
   container.innerHTML = allChannels.map(ch => `
     <div class="card channel-card">
       <div class="channel-info">
-        <h3>${escHtml(ch.Name)}</h3>
-        <p>${escHtml(ch.Url)}</p>
+        <h3>${escHtml(ch.name)}</h3>
+        <p>${escHtml(ch.url)}</p>
         <div class="channel-meta">
-          ${statusBadge(ch.Type)}
-          <span>Quality: ${qualityLabel(ch.QualitySelect)}</span>
-          <span>Check: ${intervalLabel(ch.CheckInterval)}</span>
-          <span>Full: ${intervalLabel(ch.FullCheckInterval)}</span>
-          ${ch.DownloadDir ? `<span>Dir: ${escHtml(ch.DownloadDir)}</span>` : ''}
+          ${statusBadge(ch.type)}
+          <span>Quality: ${qualityLabel(ch.quality_select)}</span>
+          <span>Check: ${intervalLabel(ch.check_interval)}</span>
+          <span>Full: ${intervalLabel(ch.full_check_interval)}</span>
+          ${ch.download_dir ? `<span>Dir: ${escHtml(ch.download_dir)}</span>` : ''}
         </div>
       </div>
       <div class="video-actions">
         <label class="toggle">
-          <input type="checkbox" ${ch.Enabled ? 'checked' : ''} onchange="toggleChannel('${ch.Id}', this.checked)">
+          <input type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="toggleChannel('${ch.id}', this.checked)">
           <span class="toggle-slider"></span>
         </label>
-        <button class="btn btn-secondary btn-sm" onclick="openEditChannelModal('${ch.Id}')">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.Id}')">Delete</button>
+        <button class="btn btn-secondary btn-sm" onclick="openEditChannelModal('${ch.id}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}')">Delete</button>
       </div>
     </div>
   `).join('');
@@ -179,11 +188,13 @@ async function toggleChannel(id, enabled) {
 
 async function deleteChannel(id) {
   if (!confirm('Delete this channel?')) return;
-  // No DELETE endpoint exists, we need to remove it via the server
-  // The backend doesn't have a delete endpoint, so we'll use a workaround
-  // Actually looking at webapis.go, there's no DELETE handler.
-  // We need to handle this differently — let's just show a toast
-  showToast('Delete not available via API yet. Use the server directly.', 'error');
+  try {
+    await API.del(`/api/channels/${id}`);
+    showToast('Channel deleted!', 'success');
+    loadChannels();
+  } catch (err) {
+    showToast(`Failed to delete: ${err.message}`, 'error');
+  }
 }
 
 // ========== Channel Modal ==========
@@ -203,19 +214,19 @@ function openAddChannelModal() {
 }
 
 function openEditChannelModal(id) {
-  const ch = allChannels.find(c => c.Id === id);
+  const ch = allChannels.find(c => c.id === id);
   if (!ch) return;
 
   document.getElementById('channelModalTitle').textContent = 'Edit Channel';
-  document.getElementById('channelId').value = ch.Id;
-  document.getElementById('channelName').value = ch.Name;
-  document.getElementById('channelUrl').value = ch.Url;
-  document.getElementById('channelType').value = ch.Type;
-  document.getElementById('channelQuality').value = ch.QualitySelect;
-  document.getElementById('channelDownloadDir').value = ch.DownloadDir || '';
-  document.getElementById('channelOutputTemplate').value = ch.OutputTemplate || '';
-  document.getElementById('channelCheckInterval').value = ch.CheckInterval || '';
-  document.getElementById('channelFullCheckInterval').value = ch.FullCheckInterval || '';
+  document.getElementById('channelId').value = ch.id;
+  document.getElementById('channelName').value = ch.name;
+  document.getElementById('channelUrl').value = ch.url;
+  document.getElementById('channelType').value = ch.type;
+  document.getElementById('channelQuality').value = ch.quality_select;
+  document.getElementById('channelDownloadDir').value = ch.download_dir || '';
+  document.getElementById('channelOutputTemplate').value = ch.output_template || '';
+  document.getElementById('channelCheckInterval').value = ch.check_interval || '';
+  document.getElementById('channelFullCheckInterval').value = ch.full_check_interval || '';
   document.getElementById('channelSubmitBtn').textContent = 'Save Changes';
   document.getElementById('channelModal').classList.add('active');
 }
@@ -249,7 +260,7 @@ async function saveChannel(e) {
 
   try {
     if (id) {
-      // Edit — only send non-empty fields (matching backend defaults logic)
+      // Edit
       const patch = {};
       if (name) patch.name = name;
       if (url) patch.url = url;
@@ -275,8 +286,17 @@ async function saveChannel(e) {
 // ========== Videos ==========
 async function loadVideos() {
   try {
-    const data = await API.get(`/api/videos?limit=${VIDEO_PAGE_SIZE}&offset=${videoPage * VIDEO_PAGE_SIZE}`);
-    allVideos = data.Videos || data;
+    const statusFilter = document.getElementById('videoStatusFilter').value;
+    const channelFilter = document.getElementById('videoChannelFilter').value;
+    let url = `/api/videos?limit=${VIDEO_PAGE_SIZE}&offset=${videoPage * VIDEO_PAGE_SIZE}`;
+    if (statusFilter !== '') {
+      url += `&status=${statusFilter}`;
+    }
+    if (channelFilter !== '') {
+      url += `&from_channel=${channelFilter}`;
+    }
+    const data = await API.get(url);
+    allVideos = data.videos || data;
     renderVideos();
     renderVideoPagination();
     updateVideoStats();
@@ -295,22 +315,22 @@ function renderVideos() {
   }
 
   container.innerHTML = filtered.map(v => {
-    const thumbUrl = `https://img.youtube.com/vi/${v.Id}/mqdefault.jpg`;
-    const channel = allChannels.find(c => c.Id === v.FromChannel);
+    const thumbUrl = `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
+    const channel = allChannels.find(c => c.id === v.from_channel);
     return `
       <div class="card video-card">
         <div class="video-thumb">
           <img src="${thumbUrl}" alt="" onerror="this.style.display='none';this.parentElement.textContent='No thumbnail'">
         </div>
         <div class="video-info">
-          <h3 title="${escHtml(v.Title)}">${escHtml(v.Title)}</h3>
-          <p>${channel ? escHtml(channel.Name) : 'Unknown Channel'}</p>
-          <p>Released: ${formatDate(v.ReleaseDate)} · ${formatDuration(v.Duration)}</p>
+          <h3 title="${escHtml(v.title)}">${escHtml(v.title)}</h3>
+          <p>${channel ? escHtml(channel.name) : 'Unknown Channel'}</p>
+          <p>Released: ${formatDate(v.releaseDate)} \u00b7 ${formatDuration(v.duration)}</p>
         </div>
         <div class="video-actions">
-          ${videoStatusBadge(v.Status)}
-          ${v.VideoType !== undefined ? videoTypeBadge(v.VideoType) : ''}
-          <a href="${escHtml(v.Url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open on YouTube">Open</a>
+          ${videoStatusBadge(v.status)}
+          ${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}
+          <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open on YouTube">Open</a>
         </div>
       </div>
     `;
@@ -323,9 +343,9 @@ function getFilteredVideos() {
   const channelFilter = document.getElementById('videoChannelFilter').value;
 
   return allVideos.filter(v => {
-    if (search && !v.Title.toLowerCase().includes(search)) return false;
-    if (statusFilter !== '' && String(v.Status) !== statusFilter) return false;
-    if (channelFilter && v.FromChannel !== channelFilter) return false;
+    if (search && !v.title.toLowerCase().includes(search)) return false;
+    //if (statusFilter !== '' && String(v.status) !== statusFilter) return false;
+    if (channelFilter && v.from_channel !== channelFilter) return false;
     return true;
   });
 }
@@ -347,11 +367,12 @@ function renderVideoPagination() {
 
 function updateVideoStats() {
   const container = document.getElementById('videoStats');
+  
   const total = allVideos.length;
-  const queued = allVideos.filter(v => v.Status === 0).length;
-  const downloading = allVideos.filter(v => v.Status === 1).length;
-  const downloaded = allVideos.filter(v => v.Status === 2).length;
-  const failed = allVideos.filter(v => v.Status === 3).length;
+  const queued      = allVideos.filter(v => v.status === 0).length;
+  const downloading = allVideos.filter(v => v.status === 1).length;
+  const downloaded  = allVideos.filter(v => v.status === 2).length;
+  const failed      = allVideos.filter(v => v.status === 3).length;
 
   container.innerHTML = `
     <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Showing</div></div>
@@ -369,9 +390,9 @@ function updateChannelFilter() {
   select.innerHTML = '<option value="">All Channels</option>';
   allChannels.forEach(ch => {
     const opt = document.createElement('option');
-    opt.value = ch.Id;
-    opt.textContent = ch.Name;
-    if (ch.Id === current) opt.selected = true;
+    opt.value = ch.id;
+    opt.textContent = ch.name;
+    if (ch.id === current) opt.selected = true;
     select.appendChild(opt);
   });
 }
