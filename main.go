@@ -2,7 +2,6 @@ package main
 
 import (
 	"yt-stream-manager/webstatic"
-	"yt-stream-manager/yt_dlp"
 	//"yt-stream-manager/database"
 	"fmt"
 	"net/http"
@@ -12,6 +11,7 @@ const (
 	SERVER_PORT = 8867
 	CMD_YT_DLP = "yt-dlp"
 	CMD_YT_ARCHIVE = "ytarchive"
+	DEFAULT_DOWNLOAD_DIR = "./downloads"
 )
 
 func StartServer(ServerPort int) {
@@ -33,8 +33,10 @@ func StartServer(ServerPort int) {
 }
 
 func main() {
+	OpenDB()
+	
 	go StartDownloading()
 	
-	yt_dlp.ListVideos("https://www.youtube.com/@iAbuodee/streams", 10)
+	ListVideos("https://www.youtube.com/@iAbuodee/streams", 10)
 	StartServer(SERVER_PORT)
 }
