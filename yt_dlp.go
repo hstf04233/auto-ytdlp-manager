@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"bufio"
 	"os"
 	"os/exec"
+	"time"
+	"fmt"
+	"bufio"
 	"strings"
 	"encoding/json"
 )
@@ -64,6 +65,7 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 func RequestVideoInfo(VideoUrl string, v *VideoInfo) (error) {
 	Cmd := exec.Command(
 		CMD_YT_DLP,
+		VideoUrl,
 		"--ignore-config",
 		"--dump-json",
 		"--skip-download",
@@ -85,7 +87,7 @@ func RequestVideoInfo(VideoUrl string, v *VideoInfo) (error) {
 	return nil
 }
 
-func ListVideos(ChannelUrl string, PlaylistEnd int64) ([]VideoInfo, error) {
+func ListVideos(ChannelUrl string, PlaylistEnd int) ([]VideoInfo, error) {
 	fmt.Printf("ChannelUrl: %s\n", ChannelUrl)
 	Args := []string{
 		ChannelUrl,
@@ -98,8 +100,6 @@ func ListVideos(ChannelUrl string, PlaylistEnd int64) ([]VideoInfo, error) {
 	if PlaylistEnd > 0 {
 		Args = append(Args, "--playlist-end", fmt.Sprintf("%d", PlaylistEnd))
 	}
-	
-	fmt.Printf("%v\n", Args)
 	
 	Cmd := exec.Command(CMD_YT_DLP, Args...)
 	
@@ -136,20 +136,84 @@ func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		DownloadDir = DEFAULT_DOWNLOAD_DIR
 	}
 	
+	OutputTemplate := AChannel.OutputTemplate
+	if OutputTemplate == "" {
+		OutputTemplate = DEFAULT_YT_DLP_OUTPUT_TEMPLATE
+	}
+	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
 		fmt.Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
+	}
+	
+	if v.VideoType == VIDEO_TYPE_ISLIVE || v.VideoType == VIDEO_TYPE_WASLIVE {
+		DateAndTime := time.Unix(v.ReleaseDate, 0).Format("2006-01-02")
+		OutputTemplate = fmt.Sprintf("%s %s", DateAndTime, OutputTemplate)
 	}
 	
 	Cmd := exec.Command(
 		CMD_YT_DLP,
 		v.Url,
 		"--ignore-config",
-		"-s", fmt.Sprintf("res:%d", AChannel.QualitySelect),
+		"-S", fmt.Sprintf("res:%d", AChannel.QualitySelect),
+		"-o", OutputTemplate,
 	)
-	Cmd.Dir = AChannel.DownloadDir
+	Cmd.Dir = DownloadDir
 	Out, err := Cmd.CombinedOutput()
 	if err != nil {
+		fmt.Printf("%s\n", Out)
+		fmt.Printf("Failed to download video from url: %s, Error: %v\n", v.Url, err)
+		return err
+	}
+	fmt.Printf("Output: %s\n", Out)
+	
+	return nil
+}
+func ytarchive_DownloadLive(AChannel ArchiveChannel, v *VideoInfo) (error) {
+	DownloadDir := AChannel.DownloadDir
+	if DownloadDir == "" {
+		DownloadDir = DEFAULT_DOWNLOAD_DIR
+	}
+	
+	err := os.MkdirAll(DownloadDir, 0755)
+	if err != nil {
+		fmt.Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
+	}
+	
+	//144p, 240p, 360p, 480p, 720p, 720p60, 1080p, 1080p60, 1440p, 1440p60, 2160p, 2160p60, best
+	QualitySelect := AChannel.QualitySelect
+	QualityString := "144p/best"
+	if QualitySelect >= 2160 {
+		QualityString = "2160p60/2160p/best"
+	} else if QualitySelect >= 1440 {
+		QualityString = "1440p60/1440p/best"
+	} else if QualitySelect >= 1080 {
+		QualityString = "1080p60/1080p/best"
+	} else if QualitySelect >= 720 {
+		QualityString = "720p60/720p/best"
+	} else if QualitySelect >= 480 {
+		QualityString = "480p/best"
+	} else if QualitySelect >= 360 {
+		QualityString = "360p/best"
+	} else if QualitySelect >= 240 {
+		QualityString = "240p/best"
+	}
+	
+	DateAndTime := time.Unix(v.ReleaseDate, 0).Format("2006-01-02")
+	
+	Cmd := exec.Command(
+		CMD_YT_ARCHIVE,
+		"--no-wait",
+		"--add-metadata",
+		"-o", fmt.Sprintf("%s %%(title)s %%(id)s", DateAndTime),
+		
+		v.Url,
+		QualityString,
+	)
+	Cmd.Dir = DownloadDir
+	Out, err := Cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("%s\n", Out)
 		fmt.Printf("Failed to download video from url: %s, Error: %v\n", v.Url, err)
 		return err
 	}

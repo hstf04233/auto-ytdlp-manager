@@ -16,12 +16,15 @@ PRAGMA busy_timeout = 5000;
 PRAGMA synchronous = normal;
 
 CREATE TABLE IF NOT EXISTS ArchiveChannels (
-	Id   TEXT PRIMARY KEY UNIQUE,
-	Name TEXT NOT NULL,
-	Url  TEXT NOT NULL,
-	DownloadDir TEXT NOT NULL,
-	Type    INTEGER NOT NULL,
-	Enabled INTEGER
+	Id             TEXT PRIMARY KEY UNIQUE,
+	Name           TEXT NOT NULL,
+	Url            TEXT NOT NULL,
+	DownloadDir    TEXT NOT NULL,
+	OutputTemplate TEXT NOT NULL,
+	QualitySelect  INTEGER NOT NULL,
+	Type           INTEGER NOT NULL,
+	CheckInterval  INTEGER NOT NULL,
+	Enabled BOOLEAN,
 	
 	CreatedAt BIGINT NOT NULL DEFAULT (unixepoch()),
 	UpdatedAt BIGINT
@@ -29,15 +32,24 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 
 CREATE TABLE IF NOT EXISTS Videos (
 	FromChannel TEXT NOT NULL,
-	Id    TEXT PRIMARY KEY AUTOINCREMENT,
+	Id    TEXT PRIMARY KEY,
 	Title TEXT NOT NULL,
 	Url   TEXT NOT NULL,
+	Duration FLOAT,
 	
-	Status INTEGER NOT NULL DEFAULT 0
+	Status INTEGER NOT NULL DEFAULT 0,
 	
-	ReleaseDate BIGINT NOT NULL
+	ReleaseDate BIGINT NOT NULL,
 	UpdatedAt   BIGINT
 );
+
+/*
+	Set all videos that were previously "downloading" videos to queued.
+*/
+UPDATE Videos
+SET Status = 0
+WHERE Status = 1;
+
 `
 
 const (
@@ -51,10 +63,18 @@ var GDB *sql.DB
 
 func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	_, err := GDB.Exec(`
-	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, Type, Enabled, UpdatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
-	DO UPDATE SET Name=excluded.Name, Url=excluded.Url, DownloadDir=excluded.DownloadDir, Type=excluded.Type, Enabled=excluded.Enabled, UpdatedAt=excluded.UpdatedAt
-	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.Type, AChannel.Enabled, time.Now().UTC().Unix())
+	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, Type, CheckInterval, Enabled, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	DO UPDATE SET
+	Name=excluded.Name,
+	Url=excluded.Url,
+	DownloadDir=excluded.DownloadDir,
+	QualitySelect=excluded.QualitySelect,
+	Type=excluded.Type,
+	CheckInterval=excluded.CheckInterval,
+	Enabled=excluded.Enabled,
+	UpdatedAt=excluded.UpdatedAt
+	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.Type, AChannel.CheckInterval, AChannel.Enabled, time.Now().UTC().Unix())
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
@@ -78,10 +98,16 @@ func DB_RemoveChannel(ChannelId string) error {
 
 func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	_, err := GDB.Exec(`
-	INSERT INTO Videos(Id, FromChannel, Title, Url, ReleaseDate, UpdatedAt)
+	INSERT INTO Videos(Id, FromChannel, Title, Url, ReleaseDate, Duration, UpdatedAt)
 	VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
-	DO UPDATE SET FromChannel=excluded.FromChannel, Title=excluded.Title, Url=excluded.Url, ReleaseDate=excluded.ReleaseDate, UpdatedAt=excluded.UpdatedAt
-	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.ReleaseDate, time.Now().UTC().Unix())
+	DO UPDATE SET
+	FromChannel=excluded.FromChannel,
+	Title=excluded.Title,
+	Url=excluded.Url,
+	ReleaseDate=excluded.ReleaseDate,
+	Duration=excluded.Duration,
+	UpdatedAt=excluded.UpdatedAt
+	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.ReleaseDate, Video.Duration, time.Now().UTC().Unix())
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateVideoInfo ERR: %v\n", err)
@@ -102,14 +128,32 @@ func DB_UpdateVideoStatus(Video *VideoInfo, Status int) error {
 func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Url, Status, ReleaseDate FROM Videos WHERE Id = ?
+	SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos WHERE Id = ?
 	`, VideoId)
-	err := VideoRow.Scan(&VideoInfo.FromChannel, &VideoInfo.Id, &VideoInfo.Title, &VideoInfo.Url, &VideoInfo.Status, &VideoInfo.Status, &VideoInfo.ReleaseDate)
+	err := VideoRow.Scan(&VideoInfo.FromChannel, &VideoInfo.Id, &VideoInfo.Title, &VideoInfo.Url, &VideoInfo.Status, &VideoInfo.ReleaseDate, &VideoInfo.Duration)
 	if err != nil {
 		return nil, err
 	}
 	
 	return VideoInfo, nil
+}
+
+func DB_LoadChannels(WD *WatchingBundle) error {
+	Rows, err := GDB.Query(`SELECT Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, Type, CheckInterval, Enabled FROM ArchiveChannels ORDER BY CreatedAt DESC`)
+	if err != nil {
+		return err
+	}
+	WD.ChannelsLock.Lock()
+	defer WD.ChannelsLock.Unlock()
+	for Rows.Next() {
+		Channel := &ArchiveChannel{}
+		err := Rows.Scan(&Channel.Id, &Channel.Name, &Channel.Url, &Channel.DownloadDir, &Channel.OutputTemplate, &Channel.QualitySelect, &Channel.Type, &Channel.CheckInterval, &Channel.Enabled)
+		if err != nil {
+			return err
+		}
+	}
+	
+	return nil
 }
 
 func OpenDB() error {

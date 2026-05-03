@@ -12,6 +12,7 @@ const (
 	CMD_YT_DLP = "yt-dlp"
 	CMD_YT_ARCHIVE = "ytarchive"
 	DEFAULT_DOWNLOAD_DIR = "./downloads"
+	DEFAULT_YT_DLP_OUTPUT_TEMPLATE = "%(title)s %(id)s.%(ext)s"
 )
 
 func StartServer(ServerPort int) {
@@ -33,10 +34,25 @@ func StartServer(ServerPort int) {
 }
 
 func main() {
-	OpenDB()
+	err := OpenDB()
+	if err != nil {
+		panic(err)
+	}
+	
+	NewChannel := &ArchiveChannel{
+		Name: "TEST!",
+		Url: "https://www.youtube.com/@Freddiebeans101/streams",
+		CheckInterval: 60,
+		QualitySelect: 480,
+		Type: ACHANNEL_TYPE_LIVE,
+		Enabled: true,
+	}
+	err = AddArchiveChannel(&WatchedDownloading, NewChannel)
+	if err != nil {
+		panic(err)
+	}
 	
 	go StartDownloading()
 	
-	ListVideos("https://www.youtube.com/@iAbuodee/streams", 10)
 	StartServer(SERVER_PORT)
 }

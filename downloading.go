@@ -26,6 +26,7 @@ type ArchiveChannel struct {
 	OutputTemplate string `json:"output_template"`
 	QualitySelect  int    `json:"quality_select"`
 	Type           int32  `json:"type"`
+	CheckInterval  int64  `json:"check_interval"`
 	Enabled        bool   `json:"enabled"`
 	IsBeingChecked bool
 	
@@ -73,10 +74,12 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) {
 
 func CheckIsVideoDownloaded(v VideoInfo) bool {
 	DB_VideoInfo, err := DB_GetVideo(v.Id)
-	if err == sql.ErrNoRows {
+	if err == sql.ErrNoRows || err != nil {
+		fmt.Printf("CheckIsVideoDownloaded err: %v\n", err)
 		return false
 	}
 	if DB_VideoInfo != nil {
+		fmt.Printf("%+v\n", DB_VideoInfo)
 		if DB_VideoInfo.Status == VIDEO_STATUS_DOWNLOADED || DB_VideoInfo.Status == VIDEO_STATUS_DOWNLOADING {
 			return true
 		}
@@ -116,7 +119,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 		// TODO:
 		if v.Url[0:19] == "https://youtube.com" {
 			// use ytarchive
-			
+			go ytarchive_DownloadLive(*AChannel, v)
 			break
 		}
 		fallthrough
@@ -128,36 +131,39 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 }
 
 func CheckChannel(AChannel *ArchiveChannel) {
+	if AChannel.Url == "" { return }
 	if AChannel.IsBeingChecked { return }
+	
 	AChannel.IsBeingChecked = true
 	defer func() {AChannel.IsBeingChecked = false}()
+	
+	AChannel.NextTimeCheckMSEC = time.Now().UnixMilli() + (AChannel.CheckInterval*1000)
 	
 	AChannel.Lock.RLock()
 	Url := AChannel.Url
 	AChannel.Lock.RUnlock()
 	
-	switch AChannel.Type {
-	case ACHANNEL_TYPE_LIVE:
-		VideoList, err := ListVideos(Url, 10)
-		if err != nil {
-			fmt.Printf("Error when grabbing videos: %v\n", err)
-			return
-		}
-		
-		// Add the videos to the queued list.
-		for _, v := range(VideoList) {
-			DB_UpdateVideoInfo(&v)
-			//DB_UpdateVideoStatus(&v, VIDEO_STATUS_QUEUED)
-		}
-		
-		for _, v := range(VideoList) {
-			v.FromChannel = AChannel.Id
-			CheckVideoAndDownload(AChannel, &v)
-		}
-	case ACHANNEL_TYPE_VIDEOS: fallthrough
-	default:
-		
-		break
+	PlaylistEnd := -1
+	if AChannel.Type == ACHANNEL_TYPE_LIVE {
+		PlaylistEnd = 6
+	}
+	
+	VideoList, err := ListVideos(Url, PlaylistEnd)
+	if err != nil {
+		fmt.Printf("Error when grabbing videos: %v\n", err)
+		return
+	}
+	
+	// Add the videos to the queued list.
+	for _, v := range(VideoList) {
+		v.FromChannel = AChannel.Id
+		DB_UpdateVideoInfo(&v)
+		//DB_UpdateVideoStatus(&v, VIDEO_STATUS_QUEUED)
+	}
+	
+	for _, v := range(VideoList) {
+		v.FromChannel = AChannel.Id
+		CheckVideoAndDownload(AChannel, &v)
 	}
 	
 	
@@ -167,6 +173,9 @@ func CheckChannels(WD *WatchingBundle) {
 	WD.ChannelsLock.RLock()
 	
 	for _, AChannel := range(WD.Channels) {
+		if time.Now().UnixMilli() < AChannel.NextTimeCheckMSEC {
+			continue
+		}
 		go CheckChannel(AChannel)
 	}
 	
@@ -174,7 +183,14 @@ func CheckChannels(WD *WatchingBundle) {
 }
 
 func StartDownloading() {
+	err := DB_LoadChannels(&WatchedDownloading)
+	if err != nil {
+		panic(err)
+	}
+	
 	for true {
 		time.Sleep(1 * time.Second)
+		
+		CheckChannels(&WatchedDownloading)
 	}
 }
