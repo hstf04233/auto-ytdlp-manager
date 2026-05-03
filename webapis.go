@@ -27,7 +27,7 @@ import (
 	NextFullChannelCheckMSEC int64 `json:"_nextFullChannelCheckMsec"`
 */
 
-const API_MAX_URL_LENGTH = 2^14
+const API_MAX_URL_LENGTH = 1 << 14
 
 type API_RequestChannelBody struct{
 	Name string `json:"name"`
@@ -164,6 +164,19 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(AChannel)
 }
+func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
+	Id := path.Base(r.URL.Path)
+	AChannel := GetArchiveChannelFromId(&WatchedDownloading, Id)
+	if AChannel == nil {
+		http.Error(w, "Channel not found.", http.StatusNotFound)
+		return
+	}
+	err := RemoveArchiveChannel(&WatchedDownloading, Id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
 
 func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
@@ -181,9 +194,15 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	WatchedDownloading.ChannelsLock.RLock()
+	
+	Channels := WatchedDownloading.Channels
+	if len(Channels) <= 0 {
+		// This fixes the json encode to be {} instead of null
+		Channels = []*ArchiveChannel{}
+	}
+	
 	defer WatchedDownloading.ChannelsLock.RUnlock()
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(WatchedDownloading.Channels)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"Count": len(WatchedDownloading.Channels),
 		"Channels": WatchedDownloading.Channels,
@@ -266,6 +285,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		API_NewChannel(w, r)
 	} else if strings.HasPrefix(Path, "channels/") && Method == "PUT" {
 		API_UpdateChannel(w, r)
+	} else if strings.HasPrefix(Path, "channels/") && Method == "DELETE" {
+		API_DeleteChannel(w, r)
 	} else if (Path == "channels" || strings.HasPrefix(Path, "channels/")) && Method == "GET" {
 		API_GetChannels(w, r)
 	} else if (Path == "videos" || strings.HasPrefix(Path, "videos/")) && Method == "GET" {

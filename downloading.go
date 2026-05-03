@@ -70,7 +70,12 @@ func AddArchiveChannel(WD *WatchingBundle, AChannel *ArchiveChannel) error {
 	
 	return nil
 }
-func RemoveArchiveChannel(WD *WatchingBundle, Id string) {
+func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
+	err := DB_RemoveChannel(Id)
+	if err != nil {
+		fmt.Printf("Could not remove channel from database err: %v\n", err)
+		return err
+	}
 	WD.ChannelsLock.Lock()
 	NewChannels := make([]*ArchiveChannel, 0, len(WD.Channels))
 	
@@ -83,6 +88,8 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) {
 	
 	WD.Channels = NewChannels
 	WD.ChannelsLock.Unlock()
+	
+	return nil
 }
 
 func CheckIsVideoDownloaded(v VideoInfo) bool {

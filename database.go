@@ -222,7 +222,7 @@ func DB_ListVideos(Condition string) ([]*VideoInfo, error) {
 		return nil, err
 	}
 	
-	var VideosList []*VideoInfo
+	VideosList := []*VideoInfo{}
 	
 	for Rows.Next() {
 		VideoInfo := &VideoInfo{}

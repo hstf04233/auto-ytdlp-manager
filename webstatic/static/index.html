@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YT Stream Archiver</title>
+  <link rel="icon" href="/favicon.ico" type="image/png">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <div class="sidebar">
+    <h1>YT Stream Archiver</h1>
+    <nav>
+      <a href="#" data-page="channels" class="active">
+        <span>&#9776;</span> <span>Channels</span>
+      </a>
+      <a href="#" data-page="videos">
+        <span>&#9654;</span> <span>Videos</span>
+      </a>
+    </nav>
+  </div>
+
+  <div class="main-content">
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- CHANNELS PAGE -->
+    <div class="page active" id="page-channels">
+      <div class="page-header">
+        <h2>Channels</h2>
+        <button class="btn btn-primary" onclick="openAddChannelModal()">+ Add Channel</button>
+      </div>
+
+      <div class="stats-row" id="channelStats"></div>
+
+      <div id="channelsList">
+        <div class="loading">Loading channels...</div>
+      </div>
+    </div>
+
+    <!-- VIDEOS PAGE -->
+    <div class="page" id="page-videos">
+      <div class="page-header">
+        <h2>Videos</h2>
+      </div>
+
+      <div class="stats-row" id="videoStats"></div>
+
+      <div class="filter-bar">
+        <input type="text" id="videoSearch" placeholder="Search videos..." oninput="filterVideos()">
+        <select id="videoStatusFilter" onchange="filterVideos()">
+          <option value="">All Statuses</option>
+          <option value="0">Queued</option>
+          <option value="1">Downloading</option>
+          <option value="2">Downloaded</option>
+          <option value="3">Failed</option>
+        </select>
+        <select id="videoChannelFilter" onchange="filterVideos()">
+          <option value="">All Channels</option>
+        </select>
+      </div>
+
+      <div id="videosList">
+        <div class="loading">Loading videos...</div>
+      </div>
+
+      <div class="pagination" id="videoPagination"></div>
+    </div>
+  </div>
+
+  <!-- ADD/EDIT CHANNEL MODAL -->
+  <div class="modal-overlay" id="channelModal">
+    <div class="modal">
+      <h2 id="channelModalTitle">Add Channel</h2>
+      <form id="channelForm" onsubmit="saveChannel(event)">
+        <input type="hidden" id="channelId">
+
+        <div class="form-group">
+          <label for="channelName">Channel Name *</label>
+          <input type="text" id="channelName" placeholder="My Favorite Channel" required>
+        </div>
+
+        <div class="form-group">
+          <label for="channelUrl">Channel / Playlist URL *</label>
+          <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/UC..." required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="channelType">Type</label>
+            <select id="channelType">
+              <option value="0">Videos Only</option>
+              <option value="1">Live Streams</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="channelQuality">Quality</label>
+            <select id="channelQuality">
+              <option value="0">Best</option>
+              <option value="144">144p</option>
+              <option value="240">240p</option>
+              <option value="360">360p</option>
+              <option value="480">480p</option>
+              <option value="720">720p</option>
+              <option value="1080">1080p</option>
+              <option value="1440">1440p</option>
+              <option value="2160">2160p (4K)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="channelDownloadDir">Download Directory</label>
+          <input type="text" id="channelDownloadDir" placeholder="./downloads">
+        </div>
+
+        <div class="form-group">
+          <label for="channelOutputTemplate">Output Template</label>
+          <input type="text" id="channelOutputTemplate" placeholder="%(title)s %(id)s.%(ext)s">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="channelCheckInterval">Check Interval (seconds)</label>
+            <input type="number" id="channelCheckInterval" placeholder="3600" min="0">
+          </div>
+          <div class="form-group">
+            <label for="channelFullCheckInterval">Full Check Interval (seconds)</label>
+            <input type="number" id="channelFullCheckInterval" placeholder="86400" min="0">
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeChannelModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="channelSubmitBtn">Add Channel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
