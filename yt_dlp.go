@@ -24,7 +24,7 @@ type VideoInfo struct {
 	Id    string
 	ReleaseDate int64
 	Duration float64
-	Status int
+	Status   int
 	
 	VideoType int32
 }
@@ -151,13 +151,16 @@ func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		OutputTemplate = fmt.Sprintf("%s %s", DateAndTime, OutputTemplate)
 	}
 	
-	Cmd := exec.Command(
-		CMD_YT_DLP,
+	Args := []string{
 		v.Url,
 		"--ignore-config",
-		"-S", fmt.Sprintf("res:%d", AChannel.QualitySelect),
 		"-o", OutputTemplate,
-	)
+	}
+	if AChannel.QualitySelect > 0 {
+		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
+	}
+	
+	Cmd := exec.Command(CMD_YT_DLP, Args...)
 	Cmd.Dir = DownloadDir
 	Out, err := Cmd.CombinedOutput()
 	if err != nil {
@@ -197,6 +200,8 @@ func ytarchive_DownloadLive(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		QualityString = "360p/best"
 	} else if QualitySelect >= 240 {
 		QualityString = "240p/best"
+	} else if QualitySelect == 0 {
+		QualityString = "best"
 	}
 	
 	DateAndTime := time.Unix(v.ReleaseDate, 0).Format("2006-01-02")

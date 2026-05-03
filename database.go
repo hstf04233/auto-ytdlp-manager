@@ -9,6 +9,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const DATABASE_FILE = "yt_download_manager.db"
+
 const db_SQL_Header = `
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
@@ -17,18 +19,20 @@ PRAGMA busy_timeout = 5000;
 PRAGMA synchronous = normal;
 
 CREATE TABLE IF NOT EXISTS ArchiveChannels (
-	Id             TEXT PRIMARY KEY UNIQUE,
-	Name           TEXT NOT NULL,
-	Url            TEXT NOT NULL,
-	DownloadDir    TEXT NOT NULL,
-	OutputTemplate TEXT NOT NULL,
-	QualitySelect  INTEGER NOT NULL,
-	Type           INTEGER NOT NULL,
-	CheckInterval  INTEGER NOT NULL,
+	Id                TEXT PRIMARY KEY UNIQUE,
+	Name              TEXT NOT NULL,
+	Url               TEXT NOT NULL,
+	DownloadDir       TEXT NOT NULL,
+	OutputTemplate    TEXT NOT NULL,
+	QualitySelect     INTEGER NOT NULL,
+	CheckInterval     INTEGER NOT NULL,
+	FullCheckInterval INTEGER NOT NULL default 86400,
+	
+	Type    INTEGER NOT NULL,
 	Enabled BOOLEAN,
 	
-	CreatedAt BIGINT NOT NULL DEFAULT (unixepoch()),
-	UpdatedAt BIGINT
+	CreatedAt DATETIME NOT NULL DEFAULT (datetime('now')),
+	UpdatedAt DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS Videos (
@@ -41,7 +45,10 @@ CREATE TABLE IF NOT EXISTS Videos (
 	Status INTEGER NOT NULL DEFAULT 0,
 	
 	ReleaseDate BIGINT NOT NULL,
-	UpdatedAt   BIGINT
+	
+	AddedAt     DATETIME NOT NULL DEFAULT (datetime('now')),
+	UpdatedAt   DATETIME
+	
 );
 
 /*
@@ -65,18 +72,19 @@ var VideoDBLock sync.RWMutex
 
 func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	_, err := GDB.Exec(`
-	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, Type, CheckInterval, Enabled, UpdatedAt)
+	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, Type, Enabled, UpdatedAt)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
 	Url=excluded.Url,
 	DownloadDir=excluded.DownloadDir,
 	QualitySelect=excluded.QualitySelect,
-	Type=excluded.Type,
 	CheckInterval=excluded.CheckInterval,
+	FullCheckInterval=excluded.FullCheckInterval,
+	Type=excluded.Type,
 	Enabled=excluded.Enabled,
 	UpdatedAt=excluded.UpdatedAt
-	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.Type, AChannel.CheckInterval, AChannel.Enabled, time.Now().UTC().Unix())
+	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.Enabled, time.Now().UTC())
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
@@ -98,6 +106,59 @@ func DB_RemoveChannel(ChannelId string) error {
 	return nil
 }
 
+func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
+	if Condition == "" {
+		Condition = "ORDER BY CreatedAt DESC"
+	}
+	Rows, err := GDB.Query(fmt.Sprintf(`SELECT
+	Id,
+	Name,
+	Url,
+	DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval,
+	Type,
+	Enabled FROM ArchiveChannels %s`, Condition))
+	if err != nil {
+		return nil, err
+	}
+	var ChannelsList []*ArchiveChannel
+	for Rows.Next() {
+		Channel := &ArchiveChannel{}
+		err := Rows.Scan(
+			&Channel.Id,
+			&Channel.Name,
+			&Channel.Url,
+			&Channel.DownloadDir, &Channel.OutputTemplate, &Channel.QualitySelect, &Channel.CheckInterval, &Channel.FullCheckInterval,
+			&Channel.Type,
+			&Channel.Enabled)
+		if err != nil {
+			return nil, err
+		}
+		
+		ChannelsList = append(ChannelsList, Channel)
+	}
+	
+	return ChannelsList, nil
+}
+
+func DB_LoadChannels(WD *WatchingBundle) error {
+	ChannelsList, err := DB_ListChannels("")
+	if err != nil {
+		return err
+	}
+	WD.ChannelsLock.Lock()
+	defer WD.ChannelsLock.Unlock()
+	var i int64
+	for _, Channel := range(ChannelsList) {
+		Channel.NextFullChannelCheckMSEC = time.Now().UnixMilli() + (i*1000 * 60*2)
+		
+		WD.Channels = append(WD.Channels, Channel)
+		
+		i += 1
+	}
+	
+	return nil
+}
+
 func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
@@ -111,7 +172,7 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	ReleaseDate=excluded.ReleaseDate,
 	Duration=excluded.Duration,
 	UpdatedAt=excluded.UpdatedAt
-	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.ReleaseDate, Video.Duration, time.Now().UTC().Unix())
+	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.ReleaseDate, Video.Duration, time.Now().UTC())
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateVideoInfo ERR: %v\n", err)
@@ -127,7 +188,7 @@ func DB_UpdateVideoStatus(Video *VideoInfo, Status int) error {
 	Video.Status = Status
 	_, err := GDB.Exec(`
 	UPDATE Videos SET Status = ?, UpdatedAt = ? WHERE Id = ?
-	`, Status, time.Now().UTC().Unix(), Video.Id)
+	`, Status, time.Now().UTC(), Video.Id)
 	return err
 }
 
@@ -140,39 +201,52 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	`, VideoId)
 	err := VideoRow.Scan(&VideoInfo.FromChannel, &VideoInfo.Id, &VideoInfo.Title, &VideoInfo.Url, &VideoInfo.Status, &VideoInfo.ReleaseDate, &VideoInfo.Duration)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
 	
 	return VideoInfo, nil
 }
 
-func DB_LoadChannels(WD *WatchingBundle) error {
-	Rows, err := GDB.Query(`SELECT Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, Type, CheckInterval, Enabled FROM ArchiveChannels ORDER BY CreatedAt DESC`)
-	if err != nil {
-		return err
-	}
-	WD.ChannelsLock.Lock()
-	defer WD.ChannelsLock.Unlock()
-	var i int64
-	for Rows.Next() {
-		Channel := &ArchiveChannel{}
-		err := Rows.Scan(&Channel.Id, &Channel.Name, &Channel.Url, &Channel.DownloadDir, &Channel.OutputTemplate, &Channel.QualitySelect, &Channel.Type, &Channel.CheckInterval, &Channel.Enabled)
-		if err != nil {
-			return err
-		}
-		
-		Channel.NextFullChannelCheckMSEC = time.Now().UnixMilli() + (i*1000 * 60*2)
-		
-		WD.Channels = append(WD.Channels, Channel)
-		
-		i += 1
+func DB_ListVideos(Condition string) ([]*VideoInfo, error) {
+	if Condition == "" {
+		Condition = "ORDER BY ReleaseDate DESC"
 	}
 	
-	return nil
+	//SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos WHERE Id = ?
+	Rows, err := GDB.Query(fmt.Sprintf(`SELECT
+	FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos %s`, Condition))
+	if err != nil {
+		return nil, err
+	}
+	
+	var VideosList []*VideoInfo
+	
+	for Rows.Next() {
+		VideoInfo := &VideoInfo{}
+		err := Rows.Scan(
+			&VideoInfo.FromChannel,
+			&VideoInfo.Id,
+			&VideoInfo.Title,
+			&VideoInfo.Url,
+			&VideoInfo.Status,
+			&VideoInfo.ReleaseDate,
+			&VideoInfo.Duration,
+		)
+		if err != nil {
+			return nil, err
+		}
+		
+		VideosList = append(VideosList, VideoInfo)
+	}
+	
+	return VideosList, nil
 }
 
 func OpenDB() error {
-	db, err := sql.Open("sqlite3", "yt_live_manager.db")
+	db, err := sql.Open("sqlite3", DATABASE_FILE)
 	if err != nil {
 		return err
 	}

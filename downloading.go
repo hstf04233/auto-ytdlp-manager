@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"sync"
 	"time"
@@ -12,25 +11,28 @@ import (
 )
 
 const (
-	ACHANNEL_TYPE_LIVE = iota
-	ACHANNEL_TYPE_VIDEOS
+	ACHANNEL_TYPE_VIDEOS = 0
+	ACHANNEL_TYPE_LIVE   = 1
 )
 
 type ArchiveChannel struct {
-	Lock sync.RWMutex
+	Lock sync.RWMutex `json:"-"`
 	
 	Id   string `json:"id"`
 	Name string `json:"name"`
 	Url  string `json:"url"`
+	
 	DownloadDir    string `json:"download_dir"`
 	OutputTemplate string `json:"output_template"`
 	QualitySelect  int    `json:"quality_select"`
 	Type           int32  `json:"type"`
 	CheckInterval  int64  `json:"check_interval"`
-	Enabled        bool   `json:"enabled"`
-	IsBeingChecked bool
+	FullCheckInterval int64 `json:"full_check_interval"`
 	
-	NextCheckMSEC int64        `json:"_nextCheckMsec"`
+	Enabled        bool `json:"enabled"`
+	IsBeingChecked bool `json:"-"`
+	
+	NextCheckMSEC            int64 `json:"_nextCheckMsec"`
 	NextFullChannelCheckMSEC int64 `json:"_nextFullChannelCheckMsec"`
 }
 
@@ -41,20 +43,30 @@ type WatchingBundle struct {
 
 var WatchedDownloading WatchingBundle
 
+func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
+	for _, AChannel := range(WD.Channels) {
+		if AChannel.Id == Id {
+			return AChannel
+		}
+	}
+	
+	return  nil
+}
+
 func AddArchiveChannel(WD *WatchingBundle, AChannel *ArchiveChannel) error {
 	if AChannel.Id == "" {
 		AChannel.Id = uuid.New().String()
 	}
-	
-	WD.ChannelsLock.Lock()
-	WD.Channels = append(WD.Channels, AChannel)
-	WD.ChannelsLock.Unlock()
 	
 	err := DB_UpdateArchiveChannel(AChannel)
 	if err != nil {
 		fmt.Printf("!!! COULD NOT ADD CHANNEL: \"%s\" TO DATABASE ERR: %v !!!\n", AChannel.Url, err)
 		return err
 	}
+	
+	WD.ChannelsLock.Lock()
+	WD.Channels = append(WD.Channels, AChannel)
+	WD.ChannelsLock.Unlock()
 	
 	return nil
 }
@@ -75,7 +87,7 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) {
 
 func CheckIsVideoDownloaded(v VideoInfo) bool {
 	DB_VideoInfo, err := DB_GetVideo(v.Id)
-	if err == sql.ErrNoRows || err != nil {
+	if err != nil {
 		fmt.Printf("CheckIsVideoDownloaded err: %v\n", err)
 		return false
 	}
@@ -149,7 +161,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	AChannel.Lock.RUnlock()
 	
 	PlaylistEnd := 6
-	if TimeNow > AChannel.NextFullChannelCheckMSEC {
+	if AChannel.FullCheckInterval > 0 && TimeNow > AChannel.NextFullChannelCheckMSEC {
 		PlaylistEnd = -1
 		// Every 24 hours, check the entire channel for new videos.
 		AChannel.NextFullChannelCheckMSEC = TimeNow + (1000 * 60 * 60 * 24)
@@ -166,17 +178,26 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	for _, v := range(VideoList) {
 		v.FromChannel = AChannel.Id
 		Exists, err := DB_GetVideo(v.Id)
-		if Exists == nil && err != nil {
+		if Exists == nil && err == nil {
 			DB_UpdateVideoInfo(&v)
 		}
 		//DB_UpdateVideoStatus(&v, VIDEO_STATUS_QUEUED)
 	}
 	
 	for _, v := range(VideoList) {
+		if !AChannel.Enabled { break }
 		v.FromChannel = AChannel.Id
 		CheckVideoAndDownload(AChannel, &v)
 	}
 	
+	QueuedVideosList, err := DB_ListVideos(fmt.Sprintf("WHERE FromChannel = %s AND Status = 0", AChannel.Id))
+	if len(QueuedVideosList) > 0 {
+		for _, v := range(QueuedVideosList) {
+			if !AChannel.Enabled { break }
+			v.FromChannel = AChannel.Id
+			CheckVideoAndDownload(AChannel, v)
+		}
+	}
 	
 }
 
@@ -184,6 +205,9 @@ func CheckChannels(WD *WatchingBundle) {
 	WD.ChannelsLock.RLock()
 	
 	for _, AChannel := range(WD.Channels) {
+		if !AChannel.Enabled {
+			continue
+		}
 		if time.Now().UnixMilli() < AChannel.NextCheckMSEC {
 			continue
 		}
