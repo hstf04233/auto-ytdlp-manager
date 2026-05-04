@@ -76,7 +76,7 @@ function statusBadge(type) {
 }
 
 function qualityLabel(q) {
-  if (q === 0) return 'Best';
+  if (q === 0) return 'Highest';
   return `${q}p`;
 }
 
@@ -106,7 +106,7 @@ function formatDuration(sec) {
 function videoStatusBadge(status) {
   const map = {
     0: ['queued', 'Queued'],
-    1: ['downloading', 'Downloading'],
+    1: ['downloading', 'Downloading...'],
     2: ['downloaded', 'Downloaded'],
     3: ['failed', 'Failed'],
   };
@@ -174,7 +174,7 @@ function renderChannels() {
           <span class="toggle-slider"></span>
         </label>
         <button class="btn btn-secondary btn-sm" onclick="openEditChannelModal('${ch.id}')">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}')">Delete</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}', '${ch.name}')">Delete</button>
       </div>
     </div>
   `).join('');
@@ -189,11 +189,11 @@ async function toggleChannel(id, enabled) {
   }
 }
 
-async function deleteChannel(id) {
-  if (!confirm('Delete this channel?')) return;
+async function deleteChannel(id, name) {
+  if (!confirm("Delete channel \"" + name + "\"?")) return;
   try {
     await API.del(`/api/channels/${id}`);
-    showToast('Channel deleted!', 'success');
+    showToast("Channel \"" + name + "\" was deleted!", 'success');
     loadChannels();
   } catch (err) {
     showToast(`Failed to delete: ${err.message}`, 'error');
@@ -333,7 +333,7 @@ function renderVideos() {
         <div class="video-actions">
           ${videoStatusBadge(v.status)}
           ${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}
-          <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open on YouTube">Open</a>
+          <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video on YouTube">Open Video</a>
         </div>
       </div>
     `;

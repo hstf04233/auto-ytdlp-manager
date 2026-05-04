@@ -30,7 +30,7 @@ type VideoInfo struct {
 }
 
 type YT_DLP_OUTVIDEO struct {
-	Title        string    `json:"title"`
+	Title        string    `json:"fulltitle"`
 	Duration     float64   `json:"duration"`
 	Url          string    `json:"webpage_url"`
 	Id           string    `json:"id"`
@@ -47,7 +47,6 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	VideoInfo.Url      = OutVideo.Url
 	VideoInfo.Id       = OutVideo.Id
 	VideoInfo.Duration = OutVideo.Duration
-	fmt.Printf("%+v\n", OutVideo)
 	if OutVideo.IsLive {
 		VideoInfo.VideoType = VIDEO_TYPE_ISLIVE
 	} else if OutVideo.WasLive {
@@ -55,7 +54,6 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	} else {
 		VideoInfo.VideoType = VIDEO_TYPE_VIDEO
 	}
-	fmt.Printf("VideoType: %v\n", VideoInfo.VideoType)
 	
 	if OutVideo.ReleaseTimestamp != 0 {
 		VideoInfo.ReleaseDate = OutVideo.ReleaseTimestamp
@@ -77,9 +75,6 @@ func RequestVideoInfo(VideoUrl string, v *VideoInfo) (error) {
 		fmt.Printf("Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
 		return err
 	}
-	if v.Id == "7WiKbK5Qlis" {
-		fmt.Printf("%s\n", Out)
-	}
 	var OutVideo YT_DLP_OUTVIDEO
 	err = json.Unmarshal(Out, &OutVideo)
 	if err != nil {
@@ -93,7 +88,6 @@ func RequestVideoInfo(VideoUrl string, v *VideoInfo) (error) {
 }
 
 func ListVideos(ChannelUrl string, PlaylistEnd int) ([]VideoInfo, error) {
-	fmt.Printf("ChannelUrl: %s\n", ChannelUrl)
 	Args := []string{
 		ChannelUrl,
 		"--ignore-config",
@@ -215,6 +209,8 @@ func ytarchive_DownloadLive(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		CMD_YT_ARCHIVE,
 		"--no-wait",
 		"--add-metadata",
+		"--save-state",
+		"--threads", "2",
 		"-o", fmt.Sprintf("%s %%(title)s %%(id)s", DateAndTime),
 		
 		v.Url,

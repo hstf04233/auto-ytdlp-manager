@@ -9,7 +9,7 @@
   --text-secondary: #a0a0b0;
   --accent: #e94560;
   --accent-hover: #ff6b81;
-  --success: #2ecc71;
+  --success: #43b117;
   --warning: #f39c12;
   --danger: #e74c3c;
   --info: #3498db;
@@ -227,15 +227,15 @@ body {
   text-transform: uppercase;
 }
 
-.badge-queued { background: var(--info); color: white; }
+.badge-queued      { background: var(--info);    color: white; }
 .badge-downloading { background: var(--warning); color: #1a1a2e; }
-.badge-downloaded { background: var(--success); color: white; }
-.badge-failed { background: var(--danger); color: white; }
-.badge-live { background: var(--danger); color: white; animation: pulse 1.5s infinite; }
-.badge-waslive { background: var(--warning); color: #1a1a2e; }
-.badge-video { background: var(--info); color: white; }
-.badge-type-videos { background: var(--info); color: white; }
-.badge-type-live { background: var(--danger); color: white; }
+.badge-downloaded  { background: var(--success); color: white; }
+.badge-failed      { background: var(--danger);  color: white; }
+.badge-live        { background: var(--danger);  color: white; animation: pulse 1.5s infinite; }
+.badge-waslive     { background: var(--warning); color: #1a1a2e; }
+.badge-video       { background: var(--info);    color: white; }
+.badge-type-videos { background: var(--info);    color: white; }
+.badge-type-live   { background: var(--danger);  color: white; }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
@@ -458,15 +458,16 @@ body {
 /* Toast */
 .toast-container {
   position: fixed;
-  top: 20px;
+  bottom: 20px;
   right: 20px;
   z-index: 2000;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   gap: 10px;
 }
 
 .toast {
+  user-select: none;
   padding: 12px 20px;
   border-radius: 8px;
   color: white;
