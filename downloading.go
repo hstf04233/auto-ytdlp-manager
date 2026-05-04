@@ -118,6 +118,15 @@ func DownloadVideo(AChannel *ArchiveChannel, v *VideoInfo) {
 	}
 	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADED)
 }
+func DownloadYTLive(AChannel *ArchiveChannel, v *VideoInfo) {
+	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADING)
+	err := ytarchive_DownloadLive(*AChannel, v)
+	if err != nil {
+		DB_UpdateVideoStatus(v, VIDEO_STATUS_FAILED)
+		return
+	}
+	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADED)
+}
 
 func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 	if CheckIsVideoDownloaded(*v) {
@@ -142,7 +151,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 		//fmt.Printf(" THIS IS A LIVE VIDEO!!! TEST: '%s' %s\n", v.Url[0:19], v.Url)
 		if v.Url[0:23] == "https://www.youtube.com" {
 			// use ytarchive
-			go ytarchive_DownloadLive(*AChannel, v)
+			go DownloadYTLive(AChannel, v)
 			break
 		}
 		fallthrough
