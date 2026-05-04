@@ -36,20 +36,21 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 );
 
 CREATE TABLE IF NOT EXISTS Videos (
-	Id    TEXT PRIMARY KEY,
-	FromChannel TEXT NOT NULL,
-	Title TEXT NOT NULL,
-	Url   TEXT NOT NULL,
-	Duration FLOAT,
+	Id           TEXT PRIMARY KEY,
+	FromChannel  TEXT NOT NULL,
+	Title        TEXT NOT NULL,
+	Url          TEXT NOT NULL,
+	Availability TEXT NOT NULL,
+	Duration     FLOAT DEFAULT 0,
 	
-	Status    INTEGER NOT NULL DEFAULT 0,
-	VideoType INTEGER NOT NULL DEFAULT 0,
+	RefreshState INTEGER NOT NULL DEFAULT 0,
+	Status       INTEGER NOT NULL DEFAULT 0,
+	VideoType    INTEGER NOT NULL DEFAULT 0,
 	
 	ReleaseDate BIGINT NOT NULL,
 	
 	AddedAt     DATETIME NOT NULL DEFAULT (datetime('now')),
 	UpdatedAt   DATETIME
-	
 );
 
 /*
@@ -66,15 +67,19 @@ const (
 	VIDEO_STATUS_DOWNLOADING = 1
 	VIDEO_STATUS_DOWNLOADED  = 2
 	VIDEO_STATUS_FAILED      = 3
+	VIDEO_STATUS_IGNORED     = 4
 )
 
 var GDB *sql.DB
 var VideoDBLock sync.RWMutex
 
 func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
+	AChannel.Lock.RLock()
+	defer AChannel.Lock.RUnlock()
+	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval, Type, Enabled, UpdatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval, Type, Enabled, UpdatedAt, CreatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
 	Url=excluded.Url,
@@ -86,7 +91,7 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	Type=excluded.Type,
 	Enabled=excluded.Enabled,
 	UpdatedAt=excluded.UpdatedAt
-	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.Enabled, time.Now().UTC())
+	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.Enabled, TimeNow, TimeNow)
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
@@ -122,7 +127,7 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 	if err != nil {
 		return nil, err
 	}
-	var ChannelsList []*ArchiveChannel
+	ChannelsList := []*ArchiveChannel{}
 	for Rows.Next() {
 		Channel := &ArchiveChannel{}
 		err := Rows.Scan(
@@ -164,18 +169,20 @@ func DB_LoadChannels(WD *WatchingBundle) error {
 func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
+	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT INTO Videos(Id, FromChannel, Title, Url, ReleaseDate, Duration, VideoType, UpdatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO Videos(Id, FromChannel, Title, Url, Availability, ReleaseDate, Duration, VideoType, UpdatedAt, AddedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	FromChannel=excluded.FromChannel,
 	Title=excluded.Title,
 	Url=excluded.Url,
+	Availability=excluded.Availability,
 	ReleaseDate=excluded.ReleaseDate,
 	Duration=excluded.Duration,
 	VideoType=excluded.VideoType,
 	UpdatedAt=excluded.UpdatedAt
-	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.ReleaseDate, Video.Duration, Video.VideoType, time.Now().UTC())
+	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.Availability, Video.ReleaseDate, Video.Duration, Video.VideoType, TimeNow, TimeNow)
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateVideoInfo ERR: %v\n", err)
@@ -195,14 +202,55 @@ func DB_UpdateVideoStatus(Video *VideoInfo, Status int) error {
 	return err
 }
 
+func DB_UpdateVideoAvalibility(Video *VideoInfo, Availability string) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
+	Video.Availability = Availability
+	_, err := GDB.Exec(`
+	UPDATE Videos SET Availability = ?, UpdatedAt = ? WHERE Id = ?
+	`, Availability, time.Now().UTC(), Video.Id)
+	return err
+}
+
+func DB_UpdateVideoRefreshState(Video *VideoInfo, RefreshState int) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
+	_, err := GDB.Exec(`
+	UPDATE Videos SET RefreshState = ?, UpdatedAt = ? WHERE Id = ?
+	`, RefreshState, time.Now().UTC(), Video.Id)
+	return err
+}
+
+func DB_DeleteVideo(Video *VideoInfo) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
+	_, err := GDB.Exec(`
+	DELETE FROM Videos WHERE Id = ?
+	`, Video.Id)
+	return err
+}
+
 func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	VideoDBLock.RLock()
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration, VideoType FROM Videos WHERE Id = ?
+	SELECT FromChannel, Id, Title, Url, Availability, Status, ReleaseDate, Duration, VideoType,
+	AddedAt, UpdatedAt FROM Videos WHERE Id = ?
 	`, VideoId)
-	err := VideoRow.Scan(&VideoInfo.FromChannel, &VideoInfo.Id, &VideoInfo.Title, &VideoInfo.Url, &VideoInfo.Status, &VideoInfo.ReleaseDate, &VideoInfo.Duration, &VideoInfo.VideoType)
+	err := VideoRow.Scan(
+		&VideoInfo.FromChannel,
+		&VideoInfo.Id,
+		&VideoInfo.Title,
+		&VideoInfo.Url,
+		&VideoInfo.Availability,
+		&VideoInfo.Status,
+		&VideoInfo.ReleaseDate,
+		&VideoInfo.Duration,
+		&VideoInfo.VideoType,
+		&VideoInfo.AddedAt,
+		&VideoInfo.UpdatedAt,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -213,30 +261,70 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	return VideoInfo, nil
 }
 
-func DB_ListVideos(Limit int, Offset int, Status int, FromChannel string) ([]*VideoInfo, error) {
+const (
+	DB_VIDEO_ORDERBY_AddedAt     = 0
+	DB_VIDEO_ORDERBY_ReleaseDate = 1
+	DB_VIDEO_ORDERBY_UpdatedAt   = 2
+)
+
+type ListVideosQuery struct {
+	Status int
+	FromChannelId string
+	RefreshState int
+	
+	OrderBy int
+	OrderDirection int
+}
+
+func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, error) {
 	Args := []interface{}{}
 	
 	// ORDER BY ReleaseDate DESC
-	Statement := "SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration, VideoType FROM Videos"
-	if Status != -1 || FromChannel != "" {
+	Statement := `
+	SELECT FromChannel, Id, Title, Url, Availability, Status, ReleaseDate, Duration, VideoType,
+	AddedAt, UpdatedAt FROM Videos`
+	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 {
 		Statement += " WHERE "
 		AddAnd := false
-		if Status != -1 {
+		if Query.Status != -1 {
 			Statement += " Status = ?"
-			Args = append(Args, Status)
+			Args = append(Args, Query.Status)
 			AddAnd = true
 		}
-		if FromChannel != "" {
+		if Query.FromChannelId != "" {
 			if AddAnd {
 				Statement += " AND "
 			}
 			Statement += " FromChannel = ?"
-			Args = append(Args, FromChannel)
+			Args = append(Args, Query.FromChannelId)
+			AddAnd = true
+		}
+		if Query.RefreshState != -1 {
+			if AddAnd {
+				Statement += " AND "
+			}
+			Statement += " RefreshState = ?"
+			Args = append(Args, Query.RefreshState)
 			AddAnd = true
 		}
 	}
 	
-	Statement = Statement + " ORDER BY AddedAt DESC LIMIT ? OFFSET ?"
+	OrderBy := "AddedAt"
+	switch Query.OrderBy {
+	case DB_VIDEO_ORDERBY_ReleaseDate:
+		OrderBy = "ReleaseDate"
+	case DB_VIDEO_ORDERBY_UpdatedAt:
+		OrderBy = "UpdatedAt"
+	}
+	
+	OrderDirection := "DESC"
+	if Query.OrderDirection == -1 {
+		OrderDirection = "ASC"
+	}
+	
+	fmt.Printf("OrderDirection: %s\n", OrderDirection)
+	
+	Statement = Statement + fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
 	Args = append(Args, Limit, Offset)
 	Rows, err := GDB.Query(Statement, Args...)
 	if err != nil {
@@ -252,10 +340,14 @@ func DB_ListVideos(Limit int, Offset int, Status int, FromChannel string) ([]*Vi
 			&VideoInfo.Id,
 			&VideoInfo.Title,
 			&VideoInfo.Url,
+			&VideoInfo.Availability,
 			&VideoInfo.Status,
 			&VideoInfo.ReleaseDate,
 			&VideoInfo.Duration,
 			&VideoInfo.VideoType,
+			
+			&VideoInfo.AddedAt,
+			&VideoInfo.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -275,7 +367,15 @@ func OpenDB() error {
 	
 	_, err = db.Exec("ALTER TABLE Videos ADD COLUMN VideoType INTEGER DEFAULT 0")
 	if err != nil {
-	    // Column might already exist, handle accordingly
+		fmt.Printf("err: %v\n", err)
+	}
+	_, err = db.Exec("ALTER TABLE Videos ADD COLUMN RefreshState INTEGER NOT NULL DEFAULT 0")
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
+	_, err = db.Exec("ALTER TABLE Videos ADD COLUMN Availability TEXT NOT NULL DEFAULT ''")
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

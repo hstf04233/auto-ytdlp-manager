@@ -72,7 +72,19 @@ function showToast(message, type = 'info') {
 
 // ========== Channel helpers ==========
 function statusBadge(type) {
-  return type ? '<span class="badge badge-type-live">Live</span>' : '<span class="badge badge-type-videos">Videos</span>';
+  if (type === 0) {
+    return '<span class="badge badge-type-videos">Videos</span>';
+  }
+  if (type === 1) {
+    return '<span class="badge badge-type-live">Live</span>';
+  }
+  if (type === 2) {
+    return '<span class="badge badge-type-videos">List only</span>';
+  }
+  if (type === 3) {
+    return '<span class="badge badge-type-videos">List and ignore</span>';
+  }
+  return '<span class="badge badge-type-videos">Videos?</span>';
 }
 
 function qualityLabel(q) {
@@ -109,6 +121,7 @@ function videoStatusBadge(status) {
     1: ['downloading', 'Downloading...'],
     2: ['downloaded', 'Downloaded'],
     3: ['failed', 'Failed'],
+    4: ['ignored', 'Ignored'],
   };
   const [cls, label] = map[status] || ['queued', 'Unknown'];
   return `<span class="badge badge-${cls}">${label}</span>`;
@@ -199,6 +212,23 @@ async function deleteChannel(id, name) {
     showToast(`Failed to delete: ${err.message}`, 'error');
   }
 }
+async function deleteVideo(id, name) {
+  try {
+    await API.del(`/api/videos/${id}`);
+    showToast("Video \"" + name + "\" was deleted!", 'success');
+    loadVideos();
+  } catch (err) {
+    showToast(`Failed to delete: ${err.message}`, 'error');
+  }
+}
+async function refreshVideoInfo(id,) {
+  try {
+    await API.put(`/api/videos/${id}`, {refresh_state: true});
+    //showToast("Video \"" + name + "\" was deleted!", 'success');
+  } catch (err) {
+    showToast(`Failed to refresh: ${err.message}`, 'error');
+  }
+}
 
 // ========== Channel Modal ==========
 function openAddChannelModal() {
@@ -229,7 +259,7 @@ function openEditChannelModal(id) {
   document.getElementById('channelDownloadDir').value = ch.download_dir || '';
   document.getElementById('channelOutputTemplate').value = ch.output_template || '';
   document.getElementById('channelCheckInterval').value = ch.check_interval || '';
-  document.getElementById('channelFullCheckInterval').value = ch.full_check_interval || '';
+  document.getElementById('channelFullCheckInterval').value = ch.full_check_interval !== -1 ? ch.full_check_interval : '';
   document.getElementById('channelSubmitBtn').textContent = 'Save Changes';
   document.getElementById('channelModal').classList.add('active');
 }
@@ -327,13 +357,16 @@ function renderVideos() {
         </div>
         <div class="video-info">
           <h3 title="${escHtml(v.title)}">${escHtml(v.title)}</h3>
-          <p>${channel ? escHtml(channel.name) : 'Unknown Channel'}</p>
+          <p>From: <a>${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
           <p>Released: ${formatDate(v.release_date)} \u00b7 ${formatDuration(v.duration)}</p>
+          <p>${escHtml(v.availability)}</p>
         </div>
         <div class="video-actions">
           ${videoStatusBadge(v.status)}
           ${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}
           <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video on YouTube">Open Video</a>
+          <button class="btn btn-secondary btn-sm" onclick="refreshVideoInfo('${v.id}')">Refresh</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteVideo('${v.id}', '${v.title}')">Delete</button>
         </div>
       </div>
     `;
@@ -358,14 +391,16 @@ function filterVideos() {
 }
 
 function renderVideoPagination() {
-  const container = document.getElementById('videoPagination');
+  const container_top = document.getElementById('videoPagination-top');
+  const container_bottom = document.getElementById('videoPagination-bottom');
   const hasMore = allVideos.length >= VIDEO_PAGE_SIZE;
-
-  container.innerHTML = `
+  
+  container_top.innerHTML = `
     <button onclick="videoPage--;loadVideos()" ${videoPage <= 0 ? 'disabled' : ''}>← Prev</button>
     <span style="padding:6px 14px;color:var(--text-secondary)">Page ${videoPage + 1}</span>
     <button onclick="videoPage++;loadVideos()" ${!hasMore ? 'disabled' : ''}>Next →</button>
   `;
+  container_bottom.innerHTML = container_top.innerHTML;
 }
 
 function updateVideoStats() {

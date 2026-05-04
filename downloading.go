@@ -13,6 +13,8 @@ import (
 const (
 	ACHANNEL_TYPE_VIDEOS = 0
 	ACHANNEL_TYPE_LIVE   = 1
+	ACHANNEL_TYPE_LIST_NO_DOWNLOAD = 2
+	ACHANNEL_TYPE_LIST_AND_IGNORE  = 3
 )
 
 type ArchiveChannel struct {
@@ -43,16 +45,6 @@ type WatchingBundle struct {
 
 var WatchedDownloading WatchingBundle
 
-func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
-	for _, AChannel := range(WD.Channels) {
-		if AChannel.Id == Id {
-			return AChannel
-		}
-	}
-	
-	return  nil
-}
-
 func AddArchiveChannel(WD *WatchingBundle, AChannel *ArchiveChannel) error {
 	if AChannel.Id == "" {
 		AChannel.Id = uuid.New().String()
@@ -82,6 +74,8 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
 	for _, AChannel := range(WD.Channels) {
 		if AChannel.Id == Id { continue }
 		
+		AChannel.Enabled = false
+		
 		NewChannels = append(NewChannels, AChannel)
 		DB_RemoveChannel(Id)
 	}
@@ -92,6 +86,16 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
 	return nil
 }
 
+func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
+	for _, AChannel := range(WD.Channels) {
+		if AChannel.Id == Id {
+			return AChannel
+		}
+	}
+	
+	return  nil
+}
+
 func CheckIsVideoDownloaded(v VideoInfo) bool {
 	DB_VideoInfo, err := DB_GetVideo(v.Id)
 	if err != nil {
@@ -99,7 +103,9 @@ func CheckIsVideoDownloaded(v VideoInfo) bool {
 		return false
 	}
 	if DB_VideoInfo != nil {
-		if DB_VideoInfo.Status == VIDEO_STATUS_DOWNLOADED || DB_VideoInfo.Status == VIDEO_STATUS_DOWNLOADING {
+		if DB_VideoInfo.Status == VIDEO_STATUS_DOWNLOADED ||
+		   DB_VideoInfo.Status == VIDEO_STATUS_DOWNLOADING ||
+		   DB_VideoInfo.Status == VIDEO_STATUS_IGNORED {
 			return true
 		}
 		return false
@@ -109,7 +115,23 @@ func CheckIsVideoDownloaded(v VideoInfo) bool {
 	return false
 }
 
+func RefreshVideoInfo(v *VideoInfo) {
+	err := RequestVideoInfo(v.Url, v)
+	if err != nil {
+		fmt.Printf("Failed to grab video info... err: %v\n", err)
+		DB_UpdateVideoAvalibility(v, "UNKNOWN")
+		DB_UpdateVideoRefreshState(v, 0)
+		return
+	}
+	DB_UpdateVideoInfo(v)
+	DB_UpdateVideoRefreshState(v, 0)
+}
+
 func DownloadVideo(AChannel *ArchiveChannel, v *VideoInfo) {
+	if AChannel.Type == ACHANNEL_TYPE_LIST_NO_DOWNLOAD || AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
+		fmt.Printf("DownloadVideo tried to download from a channel that doesn't allow downloads? Name: \"%s\"\n", AChannel.Name)
+		return
+	}
 	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADING)
 	err := yt_dlp_DownloadVideo(*AChannel, v)
 	if err != nil {
@@ -126,6 +148,7 @@ func DownloadYTLive(AChannel *ArchiveChannel, v *VideoInfo) {
 		return
 	}
 	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADED)
+	RefreshVideoInfo(v)
 }
 
 func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
@@ -133,7 +156,9 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 		return
 	}
 	
-	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADING)
+	if AChannel.Type != ACHANNEL_TYPE_LIST_NO_DOWNLOAD && AChannel.Type != ACHANNEL_TYPE_LIST_AND_IGNORE {
+		DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADING)
+	}
 	
 	err := RequestVideoInfo(v.Url, v)
 	if err != nil {
@@ -143,7 +168,14 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 	}
 	
 	DB_UpdateVideoInfo(v)
-	//DB_UpdateVideoStatus(v, VIDEO_STATUS_QUEUED)
+	
+	if AChannel.Type == ACHANNEL_TYPE_LIST_NO_DOWNLOAD || AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
+		if AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
+			DB_UpdateVideoStatus(v, VIDEO_STATUS_IGNORED)
+		}
+		
+		return
+	}
 	
 	switch v.VideoType {
 	case VIDEO_TYPE_ISLIVE:
@@ -179,25 +211,24 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	PlaylistEnd := 6
 	if AChannel.FullCheckInterval > 0 && TimeNow > AChannel.NextFullChannelCheckMSEC {
 		PlaylistEnd = -1
-		// Every 24 hours, check the entire channel for new videos.
-		AChannel.NextFullChannelCheckMSEC = TimeNow + (1000 * 60 * 60 * 24)
+		AChannel.NextFullChannelCheckMSEC = TimeNow + (AChannel.FullCheckInterval * 1000)
 		fmt.Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
 	}
 	
-	VideoList, err := ListVideos(Url, PlaylistEnd)
+	VideoList, err := yt_dlp_ListVideos(Url, PlaylistEnd)
 	if err != nil {
 		fmt.Printf("Error when grabbing videos: %v\n", err)
 		return
 	}
 	
 	// Add the videos to the queued list.
-	for _, v := range(VideoList) {
+	for i := len(VideoList)-1; i >= 0; i-- {
+		v := VideoList[i]
 		v.FromChannel = AChannel.Id
 		Exists, err := DB_GetVideo(v.Id)
 		if Exists == nil && err == nil {
 			DB_UpdateVideoInfo(&v)
 		}
-		//DB_UpdateVideoStatus(&v, VIDEO_STATUS_QUEUED)
 	}
 	
 	for _, v := range(VideoList) {
@@ -206,7 +237,11 @@ func CheckChannel(AChannel *ArchiveChannel) {
 		CheckVideoAndDownload(AChannel, &v)
 	}
 	
-	QueuedVideosList, err := DB_ListVideos(-1, 0, 0, AChannel.Id)
+	QueuedVideosList, err := DB_ListVideos(-1, 0, ListVideosQuery{
+		RefreshState: -1,
+		Status: 0,
+		FromChannelId: AChannel.Id,
+	})
 	if err != nil {
 		fmt.Printf("DB_ListVideos err: %v\n", err)
 	}
@@ -218,6 +253,22 @@ func CheckChannel(AChannel *ArchiveChannel) {
 		}
 	}
 	
+	RefreshableVideos, err := DB_ListVideos(10, 0, ListVideosQuery{
+		RefreshState: 1,
+		FromChannelId: AChannel.Id,
+		Status: -1,
+	})
+	if err != nil {
+		fmt.Printf("RefreshableVideos DB_ListVideos err: %v\n", err)
+	}
+	if err == nil && len(RefreshableVideos) > 0 {
+		for _, v := range(RefreshableVideos) {
+			if !AChannel.Enabled { break }
+			RefreshVideoInfo(v)
+		}
+	}
+	
+	AChannel.NextCheckMSEC = time.Now().UnixMilli() + (AChannel.CheckInterval*1000)
 }
 
 func CheckChannels(WD *WatchingBundle) {

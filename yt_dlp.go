@@ -18,23 +18,29 @@ const (
 )
 
 type VideoInfo struct {
-	FromChannel string  `json:"from_channel"`	// Channel id
-	Title       string  `json:"title"`
-	Url         string  `json:"url"`
-	Id          string  `json:"id"`
-	ReleaseDate int64   `json:"release_date"`
-	Duration    float64 `json:"duration"`
-	Status      int     `json:"status"`
+	FromChannel  string  `json:"from_channel"`	// Channel id
+	Title        string  `json:"title"`
+	Url          string  `json:"url"`
+	Id           string  `json:"id"`
+	Availability string  `json:"availability"`  // public, unlisted, private etc...
+	
+	ReleaseDate  int64   `json:"release_date"`
+	Duration     float64 `json:"duration"`
+	Status       int     `json:"status"`
 	
 	VideoType   int32   `json:"video_type"`
+	
+	AddedAt   time.Time `json:"added_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type YT_DLP_OUTVIDEO struct {
-	Title        string    `json:"fulltitle"`
-	Duration     float64   `json:"duration"`
+	Title        string    `json:"title"`
+	FullTitle    string    `json:"fulltitle"`
 	Url          string    `json:"webpage_url"`
 	Id           string    `json:"id"`
 	Availability string    `json:"availability"`
+	Duration     float64   `json:"duration"`
 	Timestamp    int64     `json:"timestamp"`
 	ReleaseTimestamp int64 `json:"release_timestamp"`
 	
@@ -43,7 +49,11 @@ type YT_DLP_OUTVIDEO struct {
 }
 
 func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDEO) {
-	VideoInfo.Title    = OutVideo.Title
+	if OutVideo.FullTitle != "" {
+		VideoInfo.Title = OutVideo.FullTitle
+	} else {
+		VideoInfo.Title = OutVideo.Title
+	}
 	VideoInfo.Url      = OutVideo.Url
 	VideoInfo.Id       = OutVideo.Id
 	VideoInfo.Duration = OutVideo.Duration
@@ -53,6 +63,12 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 		VideoInfo.VideoType = VIDEO_TYPE_WASLIVE
 	} else {
 		VideoInfo.VideoType = VIDEO_TYPE_VIDEO
+	}
+	
+	if OutVideo.Availability != "" {
+		VideoInfo.Availability = OutVideo.Availability
+	} else {
+		VideoInfo.Availability = "public?"
 	}
 	
 	if OutVideo.ReleaseTimestamp != 0 {
@@ -87,7 +103,7 @@ func RequestVideoInfo(VideoUrl string, v *VideoInfo) (error) {
 	return nil
 }
 
-func ListVideos(ChannelUrl string, PlaylistEnd int) ([]VideoInfo, error) {
+func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int) ([]VideoInfo, error) {
 	Args := []string{
 		ChannelUrl,
 		"--ignore-config",

@@ -44,35 +44,35 @@ func Verify_API_RequestChannelBody(body API_RequestChannelBody) (bool, string) {
 }
 
 func API_NewChannel(w http.ResponseWriter, r *http.Request) {
-	var body API_RequestChannelBody
+	var Body API_RequestChannelBody
 	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(&body); err != nil {
+	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	
-	if IsVerified, Reason := Verify_API_RequestChannelBody(body); !IsVerified {
+	if IsVerified, Reason := Verify_API_RequestChannelBody(Body); !IsVerified {
 		http.Error(w, Reason, http.StatusBadRequest)
 		return
 	}
-	if body.Name == "" {
-		body.Name = "New Channel"
+	if Body.Name == "" {
+		Body.Name = "New Channel"
 	}
-	if body.QualitySelect < 0 {
-		body.QualitySelect = 0
+	if Body.QualitySelect < 0 {
+		Body.QualitySelect = 0
 	}
 	
 	NewChannel := &ArchiveChannel{
-		Name: body.Name,
-		Url: body.Url,
+		Name: Body.Name,
+		Url: Body.Url,
 		
-		DownloadDir: body.DownloadDir,
-		OutputTemplate: body.OutputTemplate,
-		QualitySelect: body.QualitySelect,
-		Type: body.Type,
+		DownloadDir: Body.DownloadDir,
+		OutputTemplate: Body.OutputTemplate,
+		QualitySelect: Body.QualitySelect,
+		Type: Body.Type,
 		
-		CheckInterval: body.CheckInterval,
-		FullCheckInterval: body.FullCheckInterval,
+		CheckInterval: Body.CheckInterval,
+		FullCheckInterval: Body.FullCheckInterval,
 	}
 	// This is intended behavior. I want all newly created channels to be paused by default ! (Even if the request wants it to be enabled...)
 	NewChannel.Enabled = false
@@ -84,12 +84,12 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(NewChannel)
 }
-func Set_API_RequestChannelBodyDefaults(body *API_RequestChannelBody) {
-	body.QualitySelect = -1
-	body.Type = -1
-	body.CheckInterval = -1
-	body.FullCheckInterval = -1
-	body.Enabled = nil
+func Set_API_RequestChannelBodyDefaults(Body *API_RequestChannelBody) {
+	Body.QualitySelect = -1
+	Body.Type = -1
+	Body.CheckInterval = -1
+	Body.FullCheckInterval = -1
+	Body.Enabled = nil
 }
 func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	Id := path.Base(r.URL.Path)
@@ -99,45 +99,45 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	var body API_RequestChannelBody
-	Set_API_RequestChannelBodyDefaults(&body)
+	var Body API_RequestChannelBody
+	Set_API_RequestChannelBodyDefaults(&Body)
 	dec := json.NewDecoder(r.Body)
-	if err := dec.Decode(&body); err != nil {
+	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	
-	if IsVerified, Reason := Verify_API_RequestChannelBody(body); !IsVerified {
+	if IsVerified, Reason := Verify_API_RequestChannelBody(Body); !IsVerified {
 		http.Error(w, Reason, http.StatusBadRequest)
 		return
 	}
 	
-	if body.Name != "" {
-		AChannel.Name = body.Name
+	if Body.Name != "" {
+		AChannel.Name = Body.Name
 	}
-	if body.Url != "" {
-		AChannel.Url = body.Url
+	if Body.Url != "" {
+		AChannel.Url = Body.Url
 	}
-	if body.DownloadDir != "" {
-		AChannel.DownloadDir = body.DownloadDir
+	if Body.DownloadDir != "" {
+		AChannel.DownloadDir = Body.DownloadDir
 	}
-	if body.OutputTemplate != "" {
-		AChannel.OutputTemplate = body.OutputTemplate
+	if Body.OutputTemplate != "" {
+		AChannel.OutputTemplate = Body.OutputTemplate
 	}
-	if body.QualitySelect >= 0 {
-		AChannel.QualitySelect = body.QualitySelect
+	if Body.QualitySelect >= 0 {
+		AChannel.QualitySelect = Body.QualitySelect
 	}
-	if body.Type != -1 {
-		AChannel.Type = body.Type
+	if Body.Type != -1 {
+		AChannel.Type = Body.Type
 	}
-	if body.CheckInterval != -1 {
-		AChannel.CheckInterval = body.CheckInterval
+	if Body.CheckInterval != -1 {
+		AChannel.CheckInterval = Body.CheckInterval
 	}
-	if body.FullCheckInterval != -1 {
-		AChannel.FullCheckInterval = body.FullCheckInterval
+	if Body.FullCheckInterval != -1 {
+		AChannel.FullCheckInterval = Body.FullCheckInterval
 	}
-	if body.Enabled != nil {
-		AChannel.Enabled = *body.Enabled
+	if Body.Enabled != nil {
+		AChannel.Enabled = *Body.Enabled
 		if AChannel.Enabled {
 			AChannel.NextCheckMSEC = time.Now().UnixMilli() + (1000 * 4)
 		}
@@ -217,13 +217,15 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	FromChannel := ""
+	OrderBy := 0
+	OrderDirection := 1
+	FromChannelId := ""
 	Status := -1
 	Limit := 50
 	Offset := 0
 	if fc := r.URL.Query().Get("from_channel"); fc != "" {
-		FromChannel = fc
-		AChannel := GetArchiveChannelFromId(&WatchedDownloading, FromChannel)
+		FromChannelId = fc
+		AChannel := GetArchiveChannelFromId(&WatchedDownloading, FromChannelId)
 		if AChannel == nil {
 			http.Error(w, "Channel not found.", http.StatusNotFound)
 			return
@@ -243,8 +245,27 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	if o := r.URL.Query().Get("offset"); o != "" {
 		Offset, _ = strconv.Atoi(o)
 	}
+	if o := r.URL.Query().Get("order_direction"); o != "" {
+		OrderDirection, _ = strconv.Atoi(o)
+	}
+	if o := r.URL.Query().Get("order_by"); o != "" {
+		if o == "added_at" {
+			OrderBy = DB_VIDEO_ORDERBY_AddedAt
+		} else if o == "release_date" {
+			OrderBy = DB_VIDEO_ORDERBY_ReleaseDate
+		} else if o == "updated_at" {
+			OrderBy = DB_VIDEO_ORDERBY_UpdatedAt
+		}
+	}
 	
-	VideosList, err := DB_ListVideos(Limit, Offset, Status, FromChannel)
+	VideosList, err := DB_ListVideos(Limit, Offset, ListVideosQuery{
+		RefreshState: -1,
+		Status: Status,
+		FromChannelId: FromChannelId,
+		
+		OrderBy: OrderBy,
+		OrderDirection: OrderDirection,
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -282,10 +303,76 @@ func API_GetVideoStatus(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
+	RequestId := path.Base(r.URL.Path)
+	if RequestId == "" {
+		http.Error(w, "Video ID required.", http.StatusBadRequest)
+		return
+	}
+	VideoInfo, err := DB_GetVideo(RequestId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if VideoInfo == nil {
+		http.Error(w, "Video not found.", http.StatusNotFound)
+		return
+	}
+	
+	var Body struct{
+		Status *int `json:"status"`
+		RefreshState *bool `json:"refresh_state"`
+	}
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&Body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	if Body.Status != nil && *Body.Status >= 0 && *Body.Status <= 10 {
+		fmt.Printf("New Status: %d\n", *Body.Status)
+		DB_UpdateVideoStatus(VideoInfo, *Body.Status)
+	}
+	
+	if Body.RefreshState != nil {
+		if *Body.RefreshState {
+			DB_UpdateVideoRefreshState(VideoInfo, 1)
+		} else {
+			DB_UpdateVideoRefreshState(VideoInfo, 0)
+		}
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(VideoInfo)
+}
+
+func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
+	Id := path.Base(r.URL.Path)
+	Video, err := DB_GetVideo(Id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if Video == nil {
+		http.Error(w, "Video not found.", http.StatusNotFound)
+		return
+	}
+	err = DB_DeleteVideo(Video)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte("{\"Success\":true}"))
+}
+
 func ServeApi(w http.ResponseWriter, r *http.Request) {
 	r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/")
 	Path := r.URL.Path
 	Method := r.Method
+	
+	// !! TODO: Create a "Check now" api for channels.
 	
 	if Path == "channels" && Method == "POST" {
 		// POSTing to api/channels will create a new channel.
@@ -308,6 +395,12 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		  api/video/{video_id} will give you a specific video.
 		*/
 		API_GetVideos(w, r)
+	} else if (strings.HasPrefix(Path, "videos/")) && Method == "PUT" {
+		// TODO: explain
+		API_UpdateVideo(w, r)
+	} else if (strings.HasPrefix(Path, "videos/")) && Method == "DELETE" {
+		// DELETE api/video/{video_id} will delete a video
+		API_DeleteVideo(w, r)
 	} else if (strings.HasPrefix(Path, "get-video-status/")) && Method == "GET" {
 		// api/get-video-status/{video_id} will return just the status of the video and nothing else.
 		// Returns as json (example: {status: 0})

@@ -231,6 +231,7 @@ body {
 .badge-downloading { background: var(--warning); color: #1a1a2e; }
 .badge-downloaded  { background: var(--success); color: white; }
 .badge-failed      { background: var(--danger);  color: white; }
+.badge-ignored     { background: var(--warning); color: #1a1a2e; }
 .badge-live        { background: var(--danger);  color: white; animation: pulse 1.5s infinite; }
 .badge-waslive     { background: var(--warning); color: #1a1a2e; }
 .badge-video       { background: var(--info);    color: white; }
@@ -399,6 +400,7 @@ body {
   justify-content: center;
   gap: 8px;
   margin-top: 20px;
+  margin-bottom: 20px;
 }
 
 .pagination button {

@@ -59,12 +59,14 @@
           <option value="">All Channels</option>
         </select>
       </div>
+      
+      <div class="pagination" id="videoPagination-top"></div>
 
       <div id="videosList">
         <div class="loading">Loading videos...</div>
       </div>
 
-      <div class="pagination" id="videoPagination"></div>
+      <div class="pagination" id="videoPagination-bottom"></div>
     </div>
   </div>
 
@@ -91,6 +93,8 @@
             <select id="channelType">
               <option value="0">Videos Only</option>
               <option value="1">Live Streams</option>
+              <option value="2">List only. Don't download</option>
+              <option value="3">List and ignore videos</option>
             </select>
           </div>
           <div class="form-group">
