@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	VIDEO_TYPE_UNKNOWN = iota
-	VIDEO_TYPE_VIDEO
-	VIDEO_TYPE_ISLIVE
-	VIDEO_TYPE_WASLIVE
+	VIDEO_TYPE_UNKNOWN = 0
+	VIDEO_TYPE_VIDEO   = 1
+	VIDEO_TYPE_ISLIVE  = 2
+	VIDEO_TYPE_WASLIVE = 3
 )
 
 type VideoInfo struct {
@@ -47,6 +47,7 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	VideoInfo.Url      = OutVideo.Url
 	VideoInfo.Id       = OutVideo.Id
 	VideoInfo.Duration = OutVideo.Duration
+	fmt.Printf("%+v\n", OutVideo)
 	if OutVideo.IsLive {
 		VideoInfo.VideoType = VIDEO_TYPE_ISLIVE
 	} else if OutVideo.WasLive {
@@ -54,6 +55,7 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	} else {
 		VideoInfo.VideoType = VIDEO_TYPE_VIDEO
 	}
+	fmt.Printf("VideoType: %v\n", VideoInfo.VideoType)
 	
 	if OutVideo.ReleaseTimestamp != 0 {
 		VideoInfo.ReleaseDate = OutVideo.ReleaseTimestamp
@@ -74,6 +76,9 @@ func RequestVideoInfo(VideoUrl string, v *VideoInfo) (error) {
 	if err != nil {
 		fmt.Printf("Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
 		return err
+	}
+	if v.Id == "7WiKbK5Qlis" {
+		fmt.Printf("%s\n", Out)
 	}
 	var OutVideo YT_DLP_OUTVIDEO
 	err = json.Unmarshal(Out, &OutVideo)
@@ -168,7 +173,7 @@ func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		fmt.Printf("Failed to download video from url: %s, Error: %v\n", v.Url, err)
 		return err
 	}
-	fmt.Printf("Output: %s\n", Out)
+	//fmt.Printf("Output: %s\n", Out)
 	
 	return nil
 }

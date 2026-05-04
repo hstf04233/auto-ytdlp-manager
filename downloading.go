@@ -139,7 +139,8 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 	switch v.VideoType {
 	case VIDEO_TYPE_ISLIVE:
 		// TODO:
-		if v.Url[0:19] == "https://youtube.com" {
+		//fmt.Printf(" THIS IS A LIVE VIDEO!!! TEST: '%s' %s\n", v.Url[0:19], v.Url)
+		if v.Url[0:23] == "https://www.youtube.com" {
 			// use ytarchive
 			go ytarchive_DownloadLive(*AChannel, v)
 			break
@@ -148,6 +149,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 	case VIDEO_TYPE_WASLIVE: fallthrough
 	case VIDEO_TYPE_VIDEO:   fallthrough
 	default:
+		//fmt.Printf(" Downloading wind waker using yt-dlp...: %d\n", v.VideoType)
 		DownloadVideo(AChannel, v)
 	}
 }

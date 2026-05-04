@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 	OutputTemplate    TEXT NOT NULL,
 	QualitySelect     INTEGER NOT NULL,
 	CheckInterval     INTEGER NOT NULL,
-	FullCheckInterval INTEGER NOT NULL default 86400,
+	FullCheckInterval INTEGER NOT NULL default 172800,
 	
 	Type    INTEGER NOT NULL,
 	Enabled BOOLEAN,
@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS Videos (
 	Url   TEXT NOT NULL,
 	Duration FLOAT,
 	
-	Status INTEGER NOT NULL DEFAULT 0,
+	Status    INTEGER NOT NULL DEFAULT 0,
+	VideoType INTEGER NOT NULL DEFAULT 0,
 	
 	ReleaseDate BIGINT NOT NULL,
 	
@@ -72,12 +73,13 @@ var VideoDBLock sync.RWMutex
 
 func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	_, err := GDB.Exec(`
-	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, Type, Enabled, UpdatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval, Type, Enabled, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
 	Url=excluded.Url,
 	DownloadDir=excluded.DownloadDir,
+	OutputTemplate=excluded.OutputTemplate,
 	QualitySelect=excluded.QualitySelect,
 	CheckInterval=excluded.CheckInterval,
 	FullCheckInterval=excluded.FullCheckInterval,
@@ -163,16 +165,17 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
 	_, err := GDB.Exec(`
-	INSERT INTO Videos(Id, FromChannel, Title, Url, ReleaseDate, Duration, UpdatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO Videos(Id, FromChannel, Title, Url, ReleaseDate, Duration, VideoType, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	FromChannel=excluded.FromChannel,
 	Title=excluded.Title,
 	Url=excluded.Url,
 	ReleaseDate=excluded.ReleaseDate,
 	Duration=excluded.Duration,
+	VideoType=excluded.VideoType,
 	UpdatedAt=excluded.UpdatedAt
-	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.ReleaseDate, Video.Duration, time.Now().UTC())
+	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.ReleaseDate, Video.Duration, Video.VideoType, time.Now().UTC())
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateVideoInfo ERR: %v\n", err)
@@ -197,9 +200,9 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos WHERE Id = ?
+	SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration, VideoType FROM Videos WHERE Id = ?
 	`, VideoId)
-	err := VideoRow.Scan(&VideoInfo.FromChannel, &VideoInfo.Id, &VideoInfo.Title, &VideoInfo.Url, &VideoInfo.Status, &VideoInfo.ReleaseDate, &VideoInfo.Duration)
+	err := VideoRow.Scan(&VideoInfo.FromChannel, &VideoInfo.Id, &VideoInfo.Title, &VideoInfo.Url, &VideoInfo.Status, &VideoInfo.ReleaseDate, &VideoInfo.Duration, &VideoInfo.VideoType)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -214,7 +217,7 @@ func DB_ListVideos(Limit int, Offset int, Status int, FromChannel string) ([]*Vi
 	Args := []interface{}{}
 	
 	// ORDER BY ReleaseDate DESC
-	Statement := "SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration FROM Videos"
+	Statement := "SELECT FromChannel, Id, Title, Url, Status, ReleaseDate, Duration, VideoType FROM Videos"
 	if Status != -1 || FromChannel != "" {
 		Statement += " WHERE "
 		AddAnd := false
@@ -252,6 +255,7 @@ func DB_ListVideos(Limit int, Offset int, Status int, FromChannel string) ([]*Vi
 			&VideoInfo.Status,
 			&VideoInfo.ReleaseDate,
 			&VideoInfo.Duration,
+			&VideoInfo.VideoType,
 		)
 		if err != nil {
 			return nil, err
@@ -267,6 +271,11 @@ func OpenDB() error {
 	db, err := sql.Open("sqlite3", DATABASE_FILE)
 	if err != nil {
 		return err
+	}
+	
+	_, err = db.Exec("ALTER TABLE Videos ADD COLUMN VideoType INTEGER DEFAULT 0")
+	if err != nil {
+	    // Column might already exist, handle accordingly
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

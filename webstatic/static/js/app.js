@@ -67,7 +67,7 @@ function showToast(message, type = 'info') {
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
   container.appendChild(toast);
-  setTimeout(() => toast.remove(), 3500);
+  setTimeout(() => toast.remove(), 4000);
 }
 
 // ========== Channel helpers ==========
@@ -82,9 +82,11 @@ function qualityLabel(q) {
 
 function intervalLabel(s) {
   if (s <= 0) return 'Never';
-  if (s < 3600) return `${s}s`;
-  if (s < 86400) return `${s / 3600 | 0}h`;
-  return `${s / 86400 | 0}d`;
+  // TODO: add more detail to dis...
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${(s / 60).toFixed(2)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600 | 0).toFixed(2)}h`;
+  return `${Math.floor(s / 86400 | 0)}d`;
 }
 
 function formatDate(ts) {
@@ -114,9 +116,10 @@ function videoStatusBadge(status) {
 
 function videoTypeBadge(vtype) {
   const map = {
-    0: ['video', 'Video'],
-    1: ['live', 'Live'],
-    2: ['waslive', 'Was Live'],
+    0: ['video', 'Video?'],
+    1: ['video', 'Video'],
+    2: ['live', 'Live'],
+    3: ['waslive', 'Was Live'],
   };
   const [cls, label] = map[vtype] || ['video', 'Video'];
   return `<span class="badge badge-${cls}">${label}</span>`;
@@ -245,7 +248,7 @@ async function saveChannel(e) {
   const downloadDir = document.getElementById('channelDownloadDir').value.trim();
   const outputTemplate = document.getElementById('channelOutputTemplate').value.trim();
   const checkInterval = document.getElementById('channelCheckInterval').value ? parseInt(document.getElementById('channelCheckInterval').value) : 3600;
-  const fullCheckInterval = document.getElementById('channelFullCheckInterval').value ? parseInt(document.getElementById('channelFullCheckInterval').value) : 86400;
+  const fullCheckInterval = document.getElementById('channelFullCheckInterval').value ? parseInt(document.getElementById('channelFullCheckInterval').value) : 172800;
 
   const body = {
     name,
@@ -325,7 +328,7 @@ function renderVideos() {
         <div class="video-info">
           <h3 title="${escHtml(v.title)}">${escHtml(v.title)}</h3>
           <p>${channel ? escHtml(channel.name) : 'Unknown Channel'}</p>
-          <p>Released: ${formatDate(v.releaseDate)} \u00b7 ${formatDuration(v.duration)}</p>
+          <p>Released: ${formatDate(v.release_date)} \u00b7 ${formatDuration(v.duration)}</p>
         </div>
         <div class="video-actions">
           ${videoStatusBadge(v.status)}
@@ -415,7 +418,10 @@ async function init() {
     if (videosPage.classList.contains('active')) {
       loadVideos();
     }
-  }, 10000);
+  }, 10_000);
 }
 
 init();
+
+document.getElementById('videoChannelFilter').addEventListener('change', () => { videoPage = 0; loadVideos(); });
+document.getElementById('videoStatusFilter').addEventListener('change',  () => { videoPage = 0; loadVideos(); });
