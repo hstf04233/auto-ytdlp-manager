@@ -218,7 +218,7 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	OrderBy := 0
-	OrderDirection := 1
+	OrderDirection := -1
 	FromChannelId := ""
 	Status := -1
 	Limit := 50
@@ -330,7 +330,6 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if Body.Status != nil && *Body.Status >= 0 && *Body.Status <= 10 {
-		fmt.Printf("New Status: %d\n", *Body.Status)
 		DB_UpdateVideoStatus(VideoInfo, *Body.Status)
 	}
 	

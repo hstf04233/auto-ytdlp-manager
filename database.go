@@ -62,14 +62,6 @@ WHERE Status = 1;
 
 `
 
-const (
-	VIDEO_STATUS_QUEUED      = 0
-	VIDEO_STATUS_DOWNLOADING = 1
-	VIDEO_STATUS_DOWNLOADED  = 2
-	VIDEO_STATUS_FAILED      = 3
-	VIDEO_STATUS_IGNORED     = 4
-)
-
 var GDB *sql.DB
 var VideoDBLock sync.RWMutex
 
@@ -192,13 +184,18 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	return nil
 }
 
-func DB_UpdateVideoStatus(Video *VideoInfo, Status int) error {
+func DB_UpdateVideoStatus(Video *VideoInfo, NewStatus int) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
-	Video.Status = Status
+	if Video.Status == NewStatus {
+		// Nothing has changed. Don't update?
+		return nil
+	}
+	
+	Video.Status = NewStatus
 	_, err := GDB.Exec(`
 	UPDATE Videos SET Status = ?, UpdatedAt = ? WHERE Id = ?
-	`, Status, time.Now().UTC(), Video.Id)
+	`, NewStatus, time.Now().UTC(), Video.Id)
 	return err
 }
 
@@ -215,6 +212,7 @@ func DB_UpdateVideoAvalibility(Video *VideoInfo, Availability string) error {
 func DB_UpdateVideoRefreshState(Video *VideoInfo, RefreshState int) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
+	Video.RefreshState = RefreshState
 	_, err := GDB.Exec(`
 	UPDATE Videos SET RefreshState = ?, UpdatedAt = ? WHERE Id = ?
 	`, RefreshState, time.Now().UTC(), Video.Id)
@@ -236,7 +234,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
 	SELECT FromChannel, Id, Title, Url, Availability, Status, ReleaseDate, Duration, VideoType,
-	AddedAt, UpdatedAt FROM Videos WHERE Id = ?
+	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
 	`, VideoId)
 	err := VideoRow.Scan(
 		&VideoInfo.FromChannel,
@@ -248,8 +246,10 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		&VideoInfo.ReleaseDate,
 		&VideoInfo.Duration,
 		&VideoInfo.VideoType,
+		
 		&VideoInfo.AddedAt,
 		&VideoInfo.UpdatedAt,
+		&VideoInfo.RefreshState,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -282,7 +282,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	// ORDER BY ReleaseDate DESC
 	Statement := `
 	SELECT FromChannel, Id, Title, Url, Availability, Status, ReleaseDate, Duration, VideoType,
-	AddedAt, UpdatedAt FROM Videos`
+	AddedAt, UpdatedAt, RefreshState FROM Videos`
 	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 {
 		Statement += " WHERE "
 		AddAnd := false
@@ -318,8 +318,11 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	}
 	
 	OrderDirection := "DESC"
-	if Query.OrderDirection == -1 {
+	if Query.OrderDirection != 0 {
 		OrderDirection = "ASC"
+		if Query.OrderDirection == -1 {
+			OrderDirection = "DESC"
+		}
 	}
 	
 	Statement = Statement + fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
@@ -346,6 +349,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			
 			&VideoInfo.AddedAt,
 			&VideoInfo.UpdatedAt,
+			&VideoInfo.RefreshState,
 		)
 		if err != nil {
 			return nil, err

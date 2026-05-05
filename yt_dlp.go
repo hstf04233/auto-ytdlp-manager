@@ -32,6 +32,8 @@ type VideoInfo struct {
 	
 	AddedAt   time.Time `json:"added_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	
+	RefreshState int `json:"refresh_state"`
 }
 
 type YT_DLP_OUTVIDEO struct {

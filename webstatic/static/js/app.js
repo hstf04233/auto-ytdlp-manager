@@ -63,6 +63,10 @@ document.querySelectorAll('.sidebar nav a').forEach(link => {
 // ========== Toast ==========
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
+  const MAX_TOASTS = 3;
+  while (container.querySelectorAll('.toast').length >= MAX_TOASTS) {
+    container.querySelector('.toast').remove();
+  }
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
@@ -106,6 +110,29 @@ function formatDate(ts) {
   return new Date(ts * 1000).toLocaleDateString();
 }
 
+function formatRelative(isoStr) {
+  if (!isoStr) return '\u2014';
+  const date = new Date(isoStr);
+  const now = new Date();
+  const diffMs = now - date;
+  if (diffMs < 0) return 'Just now';
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) {
+    const mins = diffMin % 60;
+    return mins ? `${diffHr}h ${mins}m ago` : `${diffHr}h ago`;
+  }
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) {
+    const hrs = diffHr % 24;
+    return hrs ? `${diffDay}d ${hrs}h ago` : `${diffDay}d ago`;
+  }
+  return formatDate(Math.floor(date.getTime() / 1000));
+}
+
 function formatDuration(sec) {
   if (!sec || sec <= 0) return '\u2014';
   const h = Math.floor(sec / 3600);
@@ -115,7 +142,7 @@ function formatDuration(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function videoStatusBadge(status) {
+function videoStatusBadge(videoId, status) {
   const map = {
     0: ['queued', 'Queued'],
     1: ['downloading', 'Downloading...'],
@@ -123,8 +150,63 @@ function videoStatusBadge(status) {
     3: ['failed', 'Failed'],
     4: ['ignored', 'Ignored'],
   };
-  const [cls, label] = map[status] || ['queued', 'Unknown'];
-  return `<span class="badge badge-${cls}">${label}</span>`;
+  const [cls, label] = map[status] || ['queued', `Status ${status}`];
+  return `<span class="badge badge-${cls} status-badge" onclick="event.stopPropagation();showStatusDropdown('${videoId}', ${status}, this)" title="Click to change status">${label}</span>`;
+}
+
+function hideAllStatusDropdowns() {
+  document.querySelectorAll('.status-dropdown').forEach(el => el.remove());
+}
+
+let _dropdownListenerActive = false;
+
+function closeStatusDropdown() {
+  hideAllStatusDropdowns();
+  _dropdownListenerActive = false;
+}
+
+function showStatusDropdown(videoId, currentStatus, buttonEl) {
+  hideAllStatusDropdowns();
+  const rect = buttonEl.getBoundingClientRect();
+  const dropdown = document.createElement('div');
+  dropdown.className = 'status-dropdown';
+  dropdown.style.top = (rect.bottom + 4) + 'px';
+  dropdown.style.left = rect.left + 'px';
+  
+  const statuses = [
+    [0, 'Queued'],
+    [1, 'Downloading'],
+    [2, 'Downloaded'],
+    [3, 'Failed'],
+    [4, 'Ignored'],
+  ];
+  dropdown.innerHTML = statuses.map(([val, label]) =>
+    `<div class="status-option ${val === currentStatus ? 'active' : ''}" data-video-id="${videoId}" data-new-status="${val}">${label}${val === currentStatus ? ' ✓' : ''}</div>`
+  ).join('');
+  
+  dropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const option = e.target.closest('.status-option');
+    if (option) {
+      changeVideoStatus(option.dataset.videoId, parseInt(option.dataset.newStatus));
+    }
+  });
+  
+  document.body.appendChild(dropdown);
+  if (!_dropdownListenerActive) {
+    document.addEventListener('click', closeStatusDropdown);
+    _dropdownListenerActive = true;
+  }
+}
+
+async function changeVideoStatus(videoId, newStatus) {
+  try {
+    await API.put(`/api/videos/${videoId}`, { status: parseInt(newStatus) });
+    showToast('Status changed', 'success');
+    loadVideos();
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
 }
 
 function videoTypeBadge(vtype) {
@@ -212,10 +294,10 @@ async function deleteChannel(id, name) {
     showToast(`Failed to delete: ${err.message}`, 'error');
   }
 }
-async function deleteVideo(id, name) {
+async function deleteVideo(id) {
   try {
     await API.del(`/api/videos/${id}`);
-    showToast("Video \"" + name + "\" was deleted!", 'success');
+    showToast("Video was deleted!", 'success');
     loadVideos();
   } catch (err) {
     showToast(`Failed to delete: ${err.message}`, 'error');
@@ -321,6 +403,8 @@ async function loadVideos() {
   try {
     const statusFilter = document.getElementById('videoStatusFilter').value;
     const channelFilter = document.getElementById('videoChannelFilter').value;
+    const orderBy = document.getElementById('videoOrderBy').value;
+    const orderDir = document.getElementById('videoOrderDirection').value;
     let url = `/api/videos?limit=${VIDEO_PAGE_SIZE}&offset=${videoPage * VIDEO_PAGE_SIZE}`;
     if (statusFilter !== '') {
       url += `&status=${statusFilter}`;
@@ -328,6 +412,10 @@ async function loadVideos() {
     if (channelFilter !== '') {
       url += `&from_channel=${channelFilter}`;
     }
+    if (orderBy) {
+      url += `&order_by=${orderBy}`;
+    }
+    url += `&order_direction=${orderDir}`;
     const data = await API.get(url);
     allVideos = data.videos || data;
     renderVideos();
@@ -348,8 +436,10 @@ function renderVideos() {
   }
 
   container.innerHTML = filtered.map(v => {
-    const thumbUrl = `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
+    var thumbUrl = `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
     const channel = allChannels.find(c => c.id === v.from_channel);
+    const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
+    const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
     return `
       <div class="card video-card">
         <div class="video-thumb">
@@ -357,16 +447,17 @@ function renderVideos() {
         </div>
         <div class="video-info">
           <h3 title="${escHtml(v.title)}">${escHtml(v.title)}</h3>
-          <p>From: <a>${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
+          <p>From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
           <p>Released: ${formatDate(v.release_date)} \u00b7 ${formatDuration(v.duration)}</p>
           <p>${escHtml(v.availability)}</p>
+          <p>${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
         </div>
         <div class="video-actions">
-          ${videoStatusBadge(v.status)}
+          ${videoStatusBadge(v.id, v.status)}
           ${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}
           <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video on YouTube">Open Video</a>
-          <button class="btn btn-secondary btn-sm" onclick="refreshVideoInfo('${v.id}')">Refresh</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteVideo('${v.id}', '${v.title}')">Delete</button>
+          <button class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteVideo('${v.id}')">Delete</button>
         </div>
       </div>
     `;
@@ -386,8 +477,21 @@ function getFilteredVideos() {
   });
 }
 
+function clearFilters() {
+  document.getElementById('videoSearch').value = '';
+  document.getElementById('videoStatusFilter').value = '';
+  document.getElementById('videoChannelFilter').value = '';
+  videoPage = 0;
+  loadVideos();
+}
+
 function filterVideos() {
   renderVideos();
+}
+
+function onVideoFilterChange() {
+  videoPage = 0;
+  loadVideos();
 }
 
 function renderVideoPagination() {
@@ -457,6 +561,3 @@ async function init() {
 }
 
 init();
-
-document.getElementById('videoChannelFilter').addEventListener('change', () => { videoPage = 0; loadVideos(); });
-document.getElementById('videoStatusFilter').addEventListener('change',  () => { videoPage = 0; loadVideos(); });

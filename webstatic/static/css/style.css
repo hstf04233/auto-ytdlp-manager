@@ -288,6 +288,54 @@ body {
   font-size: 0.8rem;
 }
 
+.video-info p a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.video-info p a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.status-badge {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.status-badge:hover {
+  opacity: 0.8;
+}
+
+.status-dropdown {
+  position: fixed;
+  z-index: 1500;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+.status-option {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+
+.status-option:hover {
+  background: var(--bg-card);
+}
+
+.status-option.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .video-actions {
   display: flex;
   gap: 8px;

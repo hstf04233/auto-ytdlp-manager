@@ -17,6 +17,14 @@ const (
 	ACHANNEL_TYPE_LIST_AND_IGNORE  = 3
 )
 
+const (
+	VIDEO_STATUS_QUEUED      = 0
+	VIDEO_STATUS_DOWNLOADING = 1
+	VIDEO_STATUS_DOWNLOADED  = 2
+	VIDEO_STATUS_FAILED      = 3
+	VIDEO_STATUS_IGNORED     = 4
+)
+
 type ArchiveChannel struct {
 	Lock sync.RWMutex `json:"-"`
 	

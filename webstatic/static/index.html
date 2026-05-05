@@ -48,16 +48,27 @@
 
       <div class="filter-bar">
         <input type="text" id="videoSearch" placeholder="Search videos..." oninput="filterVideos()">
-        <select id="videoStatusFilter" onchange="filterVideos()">
+        <select id="videoStatusFilter" onchange="onVideoFilterChange()">
           <option value="">All Statuses</option>
           <option value="0">Queued</option>
           <option value="1">Downloading</option>
           <option value="2">Downloaded</option>
           <option value="3">Failed</option>
+          <option value="4">Ignored</option>
         </select>
-        <select id="videoChannelFilter" onchange="filterVideos()">
+        <select id="videoChannelFilter" onchange="onVideoFilterChange()">
           <option value="">All Channels</option>
         </select>
+        <select id="videoOrderBy" onchange="onVideoFilterChange()">
+          <option value="added_at">Sort: Added</option>
+          <option value="release_date">Sort: Release Date</option>
+          <option value="updated_at">Sort: Updated</option>
+        </select>
+        <select id="videoOrderDirection" onchange="onVideoFilterChange()">
+          <option value="-1">Newest</option>
+          <option value="1">Oldest</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear Filters</button>
       </div>
       
       <div class="pagination" id="videoPagination-top"></div>
@@ -84,7 +95,7 @@
 
         <div class="form-group">
           <label for="channelUrl">Channel / Playlist URL *</label>
-          <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/UC..." required>
+          <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." required>
         </div>
 
         <div class="form-row">
