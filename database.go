@@ -322,8 +322,6 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 		OrderDirection = "ASC"
 	}
 	
-	fmt.Printf("OrderDirection: %s\n", OrderDirection)
-	
 	Statement = Statement + fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
 	Args = append(Args, Limit, Offset)
 	Rows, err := GDB.Query(Statement, Args...)

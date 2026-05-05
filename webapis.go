@@ -389,14 +389,14 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		API_GetChannels(w, r)
 	} else if (Path == "videos" || strings.HasPrefix(Path, "videos/")) && Method == "GET" {
 		/*
-		  api/video?limit={int}&offset={int}&status={int}&from_channel={channel_id} Will return a list of videos,
-		  status and from_channel are optional.
+		  api/video?limit={int}&offset={int}&status={int}&from_channel={channel_id}&order_by={order}&order_direction={1, -1} Will return a list of videos,
+		  status, from_channel, order_by and order_direction are optional.
 		  
 		  api/video/{video_id} will give you a specific video.
 		*/
 		API_GetVideos(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "PUT" {
-		// TODO: explain
+		// You can set status, refresh_state
 		API_UpdateVideo(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "DELETE" {
 		// DELETE api/video/{video_id} will delete a video
