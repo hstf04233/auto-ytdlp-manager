@@ -98,7 +98,7 @@ body {
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.9rem;
-  transition: all 0.2s;
+  /* transition: all 0.2s; */
   font-weight: 500;
 }
 
@@ -106,14 +106,18 @@ body {
   background: var(--accent);
   color: white;
 }
-.btn-primary:hover { background: var(--accent-hover); }
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
 
 .btn-secondary {
   background: var(--bg-input);
   color: var(--text-primary);
   border: 1px solid var(--border);
 }
-.btn-secondary:hover { background: var(--border); }
+.btn-secondary:hover {
+  background: var(--border);
+}
 
 .btn-danger {
   background: var(--danger);
@@ -291,7 +295,7 @@ body {
 .video-info p a {
   color: var(--accent);
   text-decoration: none;
-  transition: color 0.2s;
+  /* transition: color 0.2s; */
 }
 
 .video-info p a:hover {
@@ -301,11 +305,13 @@ body {
 
 .status-badge {
   cursor: pointer;
-  transition: opacity 0.2s;
+  /* transition: filter 0.2s; */
+  user-select: none;
 }
 
 .status-badge:hover {
-  opacity: 0.8;
+  /* filter: brightness(0.8); */
+  background-image: linear-gradient(rgba(0, 0, 0, 0.25) 0 0);
 }
 
 .status-dropdown {
@@ -317,6 +323,7 @@ body {
   padding: 6px 0;
   min-width: 180px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  user-select: none;
 }
 
 .status-option {
@@ -325,6 +332,7 @@ body {
   font-size: 0.85rem;
   color: var(--text-primary);
   transition: background 0.15s;
+  user-select: none;
 }
 
 .status-option:hover {

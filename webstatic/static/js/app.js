@@ -151,7 +151,7 @@ function videoStatusBadge(videoId, status) {
     4: ['ignored', 'Ignored'],
   };
   const [cls, label] = map[status] || ['queued', `Status ${status}`];
-  return `<span class="badge badge-${cls} status-badge" onclick="event.stopPropagation();showStatusDropdown('${videoId}', ${status}, this)" title="Click to change status">${label}</span>`;
+  return `<span class="badge badge-${cls} status-badge" onclick="event.stopPropagation();toggleStatusDropdown('${videoId}', ${status}, this)" title="Click to change status">${label}</span>`;
 }
 
 function hideAllStatusDropdowns() {
@@ -159,14 +159,21 @@ function hideAllStatusDropdowns() {
 }
 
 let _dropdownListenerActive = false;
+let statusDropdownIsActive = false;
 
 function closeStatusDropdown() {
   hideAllStatusDropdowns();
   _dropdownListenerActive = false;
+  statusDropdownIsActive = false;
+  console.log("closeStatusDropdown");
 }
 
-function showStatusDropdown(videoId, currentStatus, buttonEl) {
-  hideAllStatusDropdowns();
+function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
+  if (statusDropdownIsActive) {
+    closeStatusDropdown();
+    return;
+  }
+  statusDropdownIsActive = true;
   const rect = buttonEl.getBoundingClientRect();
   const dropdown = document.createElement('div');
   dropdown.className = 'status-dropdown';
@@ -189,6 +196,7 @@ function showStatusDropdown(videoId, currentStatus, buttonEl) {
     const option = e.target.closest('.status-option');
     if (option) {
       changeVideoStatus(option.dataset.videoId, parseInt(option.dataset.newStatus));
+      closeStatusDropdown()
     }
   });
   
