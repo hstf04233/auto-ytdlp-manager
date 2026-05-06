@@ -24,7 +24,11 @@ func ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	} else if path == "" || path == "/" {
 		path = "index.html"
 	} else {
-		path = strings.TrimPrefix(path, "static/")
+		if strings.HasPrefix(path, "static/") {
+			path = strings.TrimPrefix(path, "static/")
+		} else {
+			path = "index.html"
+		}
 	}
 	
 	File, err := WebStaticContent.Open(fmt.Sprintf("static/%s", path))

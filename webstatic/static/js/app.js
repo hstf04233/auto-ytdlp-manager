@@ -47,16 +47,38 @@ let allVideos = [];
 let videoPage = 0;
 const VIDEO_PAGE_SIZE = 50;
 
+let lastPageOpen = ''
+
+function showPage(page, dontSaveHistory) {
+  if (!dontSaveHistory) {
+    if (page != lastPageOpen) {
+      history.pushState({}, '', '/' + page);
+      lastPageOpen = page
+    }
+  }
+  
+  document.querySelectorAll('.sidebar nav a').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.sidebar nav a').forEach(l => {
+    if (l.dataset.page == page) {
+      l.classList.add('active');
+    }
+  })
+  
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  let pageDoc = document.getElementById(`page-${page}`)
+  if (pageDoc) {
+    pageDoc.classList.add('active');
+  }
+  
+  if (page === 'videos') loadVideos();
+}
+
 // ========== Navigation ==========
 document.querySelectorAll('.sidebar nav a').forEach(link => {
   link.addEventListener('click', e => {
     e.preventDefault();
     const page = link.dataset.page;
-    document.querySelectorAll('.sidebar nav a').forEach(l => l.classList.remove('active'));
-    link.classList.add('active');
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.getElementById(`page-${page}`).classList.add('active');
-    if (page === 'videos') loadVideos();
+    showPage(page)
   });
 });
 
@@ -314,7 +336,7 @@ async function deleteVideo(id) {
 async function refreshVideoInfo(id,) {
   try {
     await API.put(`/api/videos/${id}`, {refresh_state: true});
-    //showToast("Video \"" + name + "\" was deleted!", 'success');
+    loadVideos()
   } catch (err) {
     showToast(`Failed to refresh: ${err.message}`, 'error');
   }
@@ -547,7 +569,6 @@ function updateChannelFilter() {
   });
 }
 
-// ========== Utility ==========
 function escHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -555,9 +576,18 @@ function escHtml(str) {
   return div.innerHTML;
 }
 
-// ========== Init ==========
+window.addEventListener('popstate', function (e) {
+  const tab = window.location.pathname.replace(/^\//, '') || '';
+  showPage(tab, true);
+});
+
 async function init() {
   await loadChannels();
+  
+  const lastTab = window.location.pathname.replace(/^\//, '') || 'channels';
+  //setTimeout(() => showPage(lastTab), 1);
+  showPage(lastTab)
+  
   updateChannelFilter();
   // Auto-refresh videos every 10s
   setInterval(() => {
@@ -568,4 +598,4 @@ async function init() {
   }, 10_000);
 }
 
-init();
+init()
