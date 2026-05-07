@@ -45,6 +45,8 @@ const API = {
 let allChannels = [];
 let allVideos = [];
 let videoPage = 0;
+let videoTotalCount = 0;
+let videoStats = {};
 const VIDEO_PAGE_SIZE = 50;
 
 let lastPageOpen = ''
@@ -454,6 +456,8 @@ async function loadVideos() {
     
     const data = await API.get(url);
     allVideos = data.videos || data;
+    videoStats = data.stats || {};
+    videoTotalCount = videoStats.total || allVideos.length;
     renderVideos();
     renderVideoPagination();
     updateVideoStats();
@@ -539,31 +543,102 @@ function onVideoFilterChange() {
 function renderVideoPagination() {
   const container_top = document.getElementById('videoPagination-top');
   const container_bottom = document.getElementById('videoPagination-bottom');
-  const hasMore = allVideos.length >= VIDEO_PAGE_SIZE;
   
-  container_top.innerHTML = `
-    <button onclick="videoPage--;loadVideos()" ${videoPage <= 0 ? 'disabled' : ''}>← Prev</button>
-    <span style="padding:6px 14px;color:var(--text-secondary)">Page ${videoPage + 1}</span>
-    <button onclick="videoPage++;loadVideos()" ${!hasMore ? 'disabled' : ''}>Next →</button>
-  `;
-  container_bottom.innerHTML = container_top.innerHTML;
+  const totalPages = Math.ceil(videoTotalCount / VIDEO_PAGE_SIZE) || 1;
+  const currentPage = videoPage;
+  const html = buildPaginationHTML(currentPage, totalPages);
+  
+  container_top.innerHTML = html;
+  container_bottom.innerHTML = html;
+}
+
+function buildPaginationHTML(currentPage, totalPages) {
+  const btn = (label, page, disabled, active) => {
+    const disabledAttr = disabled ? ' disabled' : '';
+    const activeAttr = active ? ' class="active"' : '';
+    const onclick = disabled ? '' : ` onclick="videoPage=${page};loadVideos()"`;
+    return `<button${activeAttr}${disabledAttr}${onclick}>${label}</button>`;
+  };
+  
+  // Single page case
+  if (totalPages <= 1) {
+    return `<span class="single-page-msg">All videos shown (page 1 of 1)</span>`;
+  }
+  
+  // Page numbers group
+  let pageButtons = [];
+  
+  if (totalPages <= 7) {
+    // Show all pages
+    for (let i = 0; i < totalPages; i++) {
+      pageButtons.push(btn(String(i + 1), i, false, currentPage === i));
+    }
+  } else {
+    // Build range around current page
+    let rangeStart = Math.max(1, currentPage - 2);
+    let rangeEnd = Math.min(totalPages - 2, currentPage + 2);
+    
+    // Adjust if at edges
+    if (rangeStart <= 1) {
+      rangeEnd = Math.min(totalPages - 2, rangeStart + 5);
+    }
+    if (rangeEnd >= totalPages - 3) {
+      if (rangeEnd == totalPages - 3) {
+        rangeEnd += 1;
+      }
+      rangeStart = Math.max(1, rangeEnd - 5);
+    }
+    
+    // Page 1
+    const isFirstActive = currentPage === 0;
+    pageButtons.push(btn('1', 0, false, isFirstActive));
+    
+    // Ellipsis after page 1
+    if (rangeStart > 2) {
+      pageButtons.push('<span class="page-ellipsis">…</span>');
+    } else if (rangeStart === 2) {
+      pageButtons.push(btn('2', 1, false, false));
+    }
+    
+    // Range
+    for (let i = rangeStart; i <= rangeEnd; i++) {
+      pageButtons.push(btn(String(i + 1), i, false, currentPage === i));
+    }
+    
+    // Ellipsis before last page
+    if (rangeEnd < totalPages - 2) {
+      pageButtons.push('<span class="page-ellipsis">…</span>');
+    }
+    
+    // Last page
+    pageButtons.push(btn(String(totalPages), totalPages - 1, false, currentPage === totalPages - 1));
+  }
+  
+  const pageRow = pageButtons.join('');
+  const prevDisabled = currentPage === 0;
+  const nextDisabled = currentPage >= totalPages - 1;
+  
+  // Two-row layout
+  return `<div class="page-numbers">${pageRow}</div><div class="nav-buttons">${btn('‹ PREV', currentPage - 1, prevDisabled, false)}${btn('NEXT ›', currentPage + 1, nextDisabled, false)}</div>`;
 }
 
 function updateVideoStats() {
   const container = document.getElementById('videoStats');
   
-  const total = allVideos.length;
-  const queued      = allVideos.filter(v => v.status === 0).length;
-  const downloading = allVideos.filter(v => v.status === 1).length;
-  const downloaded  = allVideos.filter(v => v.status === 2).length;
-  const failed      = allVideos.filter(v => v.status === 3).length;
+  const total = videoStats.total || 0;
+  const queued      = videoStats.total_queued || 0;
+  const downloading = videoStats.total_downloading || 0;
+  const downloaded  = videoStats.total_downloaded || 0;
+  const failed      = videoStats.total_failed || 0;
+  const ignored     = videoStats.total_ignored || 0;
 
   container.innerHTML = `
-    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Showing</div></div>
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--info)">${queued}</div><div class="stat-label">Queued</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--warning)">${downloading}</div><div class="stat-label">Downloading</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--success)">${downloaded}</div><div class="stat-label">Downloaded</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${failed}</div><div class="stat-label">Failed</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--text-secondary)">${ignored}</div><div class="stat-label">Ignored</div></div>
   `;
 }
 

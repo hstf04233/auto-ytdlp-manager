@@ -283,7 +283,7 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	VideosListStats := VideosList
-	if len(VideosList) >= Limit {
+	if (len(VideosList) >= Limit || Offset > 0) {
 		// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every video...
 		// (Or maybe cache the results aswell...)
 		VideosListAll, err := DB_ListVideos(-1, 0, ListVideosQuery{
