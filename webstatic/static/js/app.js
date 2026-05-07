@@ -156,7 +156,7 @@ function formatRelative(isoStr) {
 }
 
 function formatDuration(sec) {
-  if (!sec || sec <= 0) return '\u2014';
+  if (!sec || sec <= 0) return '0:00';
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = Math.floor(sec % 60);
@@ -486,7 +486,7 @@ function renderVideos() {
           <p>From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
           <p>Released: ${formatDate(v.release_date)} \u00b7 ${formatDuration(v.duration)}</p>
           <p>${escHtml(v.availability)}</p>
-          <p>${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
+          <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
         </div>
         <div class="video-actions">
           ${videoStatusBadge(v.id, v.status)}

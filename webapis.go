@@ -282,10 +282,52 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	VideosListStats := VideosList
+	if len(VideosList) >= Limit {
+		// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every video...
+		// (Or maybe cache the results aswell...)
+		VideosListAll, err := DB_ListVideos(-1, 0, ListVideosQuery{
+			RefreshState: -1,
+			Status: Status,
+			FromChannelId: FromChannelId,
+			SearchQuery:   SearchQuery,
+			
+			OrderBy: OrderBy,
+			OrderDirection: OrderDirection,
+		})
+		if err == nil {
+			VideosListStats = VideosListAll
+		} else if err != nil {
+			fmt.Printf("Failed to get videos list for stats... Err: %v\n", VideosListAll)
+		}
+	}
+	
+	Stats := struct{
+		Total int `json:"total"`
+		
+		TotalQueued      int `json:"total_queued"`
+		TotalDownloading int `json:"total_downloading"`
+		TotalDownloaded  int `json:"total_downloaded"`
+		TotalFailed      int `json:"total_failed"`
+		TotalIgnored     int `json:"total_ignored"`
+	}{
+		Total: len(VideosListStats),
+	}
+	for _, Video := range(VideosListStats) {
+		switch Video.Status {
+			case VIDEO_STATUS_QUEUED:      Stats.TotalQueued++
+			case VIDEO_STATUS_DOWNLOADING: Stats.TotalDownloading++
+			case VIDEO_STATUS_DOWNLOADED:  Stats.TotalDownloaded++
+			case VIDEO_STATUS_FAILED:      Stats.TotalFailed++
+			case VIDEO_STATUS_IGNORED:     Stats.TotalIgnored++
+		}
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"count": len(VideosList),
+		"count":  len(VideosList),
 		"videos": VideosList,
+		"stats":  Stats,
 	})
 }
 

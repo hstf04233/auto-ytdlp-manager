@@ -9,6 +9,7 @@ import (
 
 const (
 	SERVER_PORT = 8867
+	APPLICATION_NAME = "YT Video Manager"
 	CMD_YT_DLP = "yt-dlp"
 	CMD_YT_ARCHIVE = "ytarchive"
 	DEFAULT_DOWNLOAD_DIR = "./downloads"
