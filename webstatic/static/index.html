@@ -6,6 +6,7 @@
   <title>YT Stream Archiver</title>
   <link rel="icon" href="/favicon.ico" type="image/png">
   <link rel="stylesheet" href="/static/css/style.css">
+  <!-- <link rel="stylesheet" href="/static/css/y2k.css"> -->>
 </head>
 <body>
   <div class="sidebar">
@@ -47,7 +48,7 @@
       <div class="stats-row" id="videoStats"></div>
 
       <div class="filter-bar">
-        <input type="text" id="videoSearch" placeholder="Search videos..." oninput="filterVideos()">
+        <input type="text" id="videoSearch" placeholder="Search videos..." oninput="videoSearchFilterUpdate()">
         <select id="videoStatusFilter" onchange="onVideoFilterChange()">
           <option value="">All Statuses</option>
           <option value="0">Queued</option>

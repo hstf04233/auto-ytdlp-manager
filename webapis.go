@@ -220,14 +220,24 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	OrderBy := 0
 	OrderDirection := -1
 	FromChannelId := ""
+	SearchQuery := ""
 	Status := -1
 	Limit := 50
 	Offset := 0
 	if fc := r.URL.Query().Get("from_channel"); fc != "" {
 		FromChannelId = fc
+		/*
 		AChannel := GetArchiveChannelFromId(&WatchedDownloading, FromChannelId)
 		if AChannel == nil {
 			http.Error(w, "Channel not found.", http.StatusNotFound)
+			return
+		}
+		*/
+	}
+	if sq := r.URL.Query().Get("search_query"); sq != "" {
+		SearchQuery = sq
+		if len(SearchQuery) > 1024 {
+			http.Error(w, "search_query must be shorter than 1024 characters", http.StatusBadRequest)
 			return
 		}
 	}
@@ -262,6 +272,7 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		RefreshState: -1,
 		Status: Status,
 		FromChannelId: FromChannelId,
+		SearchQuery:   SearchQuery,
 		
 		OrderBy: OrderBy,
 		OrderDirection: OrderDirection,

@@ -3,8 +3,9 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"time"
+	"strings"
 	"sync"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -214,8 +215,8 @@ func DB_UpdateVideoRefreshState(Video *VideoInfo, RefreshState int) error {
 	defer VideoDBLock.Unlock()
 	Video.RefreshState = RefreshState
 	_, err := GDB.Exec(`
-	UPDATE Videos SET RefreshState = ?, UpdatedAt = ? WHERE Id = ?
-	`, RefreshState, time.Now().UTC(), Video.Id)
+	UPDATE Videos SET RefreshState = ?, WHERE Id = ?
+	`, RefreshState, Video.Id)
 	return err
 }
 
@@ -270,6 +271,7 @@ const (
 type ListVideosQuery struct {
 	Status int
 	FromChannelId string
+	SearchQuery string
 	RefreshState int
 	
 	OrderBy int
@@ -326,13 +328,29 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	}
 	
 	Statement = Statement + fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
-	Args = append(Args, Limit, Offset)
+	QLimit := Limit
+	QOffset := Offset
+	
+	IsSearching := false
+	var SearchWords []string
+	if Query.SearchQuery != "" {
+		QLimit = -1
+		QOffset = 0
+		IsSearching = true
+		SearchWords = strings.Split(Query.SearchQuery, " ")
+		for i := 0; i < len(SearchWords); i++ {
+			SearchWords[i] = strings.ToLower(SearchWords[i])
+		}
+	}
+	Args = append(Args, QLimit, QOffset)
 	Rows, err := GDB.Query(Statement, Args...)
 	if err != nil {
 		return nil, err
 	}
 	
 	VideosList := []*VideoInfo{}
+	
+	Si := 0
 	
 	for Rows.Next() {
 		VideoInfo := &VideoInfo{}
@@ -355,7 +373,38 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			return nil, err
 		}
 		
+		if IsSearching {
+			IsWhatWeAreLookingFor := true
+			
+			// Simple search!
+			TitleLowercase := strings.ToLower(VideoInfo.Title)
+			
+			for _, Word := range(SearchWords) {
+				if !strings.Contains(TitleLowercase, Word) &&
+				   !strings.Contains(strings.ToLower(VideoInfo.Availability), Word) &&
+				   !strings.Contains(strings.ToLower(VideoInfo.Id), Word) {
+					// This video is NOT what we are looking for!
+					IsWhatWeAreLookingFor = false
+					break
+				}
+			}
+			
+			if !IsWhatWeAreLookingFor {
+				continue
+			}
+			// This video contains words from the search query!
+			if Si < Offset {
+				Si += 1
+				continue
+			}
+		}
+		
 		VideosList = append(VideosList, VideoInfo)
+		if IsSearching {
+			if Limit != -1 && len(VideosList) >= Limit {
+				break
+			}
+		}
 	}
 	
 	return VideosList, nil

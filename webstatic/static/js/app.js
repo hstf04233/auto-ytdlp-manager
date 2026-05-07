@@ -446,6 +446,12 @@ async function loadVideos() {
       url += `&order_by=${orderBy}`;
     }
     url += `&order_direction=${orderDir}`;
+    const search = document.getElementById('videoSearch').value;
+    if (search !== '') {
+      // TODO: This is bad an inappropriate!!! filter this out so you can't do some funky shi
+      url += `&search_query=${search}`
+    }
+    
     const data = await API.get(url);
     allVideos = data.videos || data;
     renderVideos();
@@ -495,14 +501,14 @@ function renderVideos() {
 }
 
 function getFilteredVideos() {
-  const search = document.getElementById('videoSearch').value.toLowerCase();
+  //const search = document.getElementById('videoSearch').value.toLowerCase();
   const statusFilter = document.getElementById('videoStatusFilter').value;
   const channelFilter = document.getElementById('videoChannelFilter').value;
 
   return allVideos.filter(v => {
-    if (search && !v.title.toLowerCase().includes(search)) return false;
+    //if (search && !v.title.toLowerCase().includes(search)) return false;
     //if (statusFilter !== '' && String(v.status) !== statusFilter) return false;
-    if (channelFilter && v.from_channel !== channelFilter) return false;
+    //if (channelFilter && v.from_channel !== channelFilter) return false;
     return true;
   });
 }
@@ -519,6 +525,12 @@ function filterVideos() {
   renderVideos();
 }
 
+let videoSearchDidUpdate = false;
+function videoSearchFilterUpdate() {
+  videoSearchDidUpdate = true;
+  // videoPage = 0;
+  // loadVideos();
+}
 function onVideoFilterChange() {
   videoPage = 0;
   loadVideos();
@@ -596,6 +608,16 @@ async function init() {
       loadVideos();
     }
   }, 10_000);
+  
+  
+  // Check search updates every 250ms
+  setInterval(() => {
+    if (videoSearchDidUpdate) {
+      videoSearchDidUpdate = false;
+      videoPage = 0
+      loadVideos();
+    }
+  }, 250);
 }
 
 init()
