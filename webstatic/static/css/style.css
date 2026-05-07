@@ -236,11 +236,16 @@ body {
 .badge-downloaded  { background: var(--success); color: white; }
 .badge-failed      { background: var(--danger);  color: white; }
 .badge-ignored     { background: var(--warning); color: #1a1a2e; }
-.badge-live        { background: var(--danger);  color: white; animation: pulse 1.5s infinite; }
+.badge-live        { background: #f04233;      color: white; animation: badge-live-pulse 1.5s ease-in infinite; }
 .badge-waslive     { background: var(--warning); color: #1a1a2e; }
 .badge-video       { background: var(--info);    color: white; }
 .badge-type-videos { background: var(--info);    color: white; }
 .badge-type-live   { background: var(--danger);  color: white; }
+
+@keyframes badge-live-pulse {
+  0%, 100% { background: #f04233; }
+  50% { background: #88261d; }
+}
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
