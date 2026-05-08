@@ -47,7 +47,7 @@ let allVideos = [];
 let videoPage = 0;
 let videoTotalCount = 0;
 let videoStats = {};
-const VIDEO_PAGE_SIZE = 50;
+const VIDEO_PAGE_SIZE = 40;
 
 let lastPageOpen = ''
 
@@ -614,12 +614,10 @@ function buildPaginationHTML(currentPage, totalPages) {
     pageButtons.push(btn(String(totalPages), totalPages - 1, false, currentPage === totalPages - 1));
   }
   
-  const pageRow = pageButtons.join('');
+  // Single-line layout: PREV + page numbers + NEXT
   const prevDisabled = currentPage === 0;
   const nextDisabled = currentPage >= totalPages - 1;
-  
-  // Two-row layout
-  return `<div class="page-numbers">${pageRow}</div><div class="nav-buttons">${btn('‹ PREV', currentPage - 1, prevDisabled, false)}${btn('NEXT ›', currentPage + 1, nextDisabled, false)}</div>`;
+  return btn('&lt;', currentPage - 1, prevDisabled, false) + pageButtons.join('') + btn('&gt;', currentPage + 1, nextDisabled, false) + `<span class="single-page-msg">Showing ${allVideos.length} videos out of ${videoTotalCount}</span>`;
 }
 
 function updateVideoStats() {
