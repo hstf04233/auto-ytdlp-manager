@@ -150,6 +150,16 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(AChannel)
 }
+func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
+	Id := path.Base(r.URL.Path)
+	AChannel := GetArchiveChannelFromId(&WatchedDownloading, Id)
+	if AChannel == nil {
+		http.Error(w, "Channel not found.", http.StatusNotFound)
+		return
+	}
+	
+	AChannel.NextCheckMSEC = time.Now().UnixMilli()-1
+}
 func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	Id := path.Base(r.URL.Path)
 	AChannel := GetArchiveChannelFromId(&WatchedDownloading, Id)
@@ -420,7 +430,11 @@ func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_GetTasks(w http.ResponseWriter, r *http.Request) {
-	// TODO: This is unfinished!!!
+	RequestId := path.Base(r.URL.Path)
+	if strings.HasPrefix(r.URL.Path, "tasks/") && RequestId != "" {
+		// TODO: This is unfinished!!! Pretend this works.
+		return
+	}
 	
 	Limit := 20
 	Offset := 0
@@ -449,12 +463,30 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func API_GetTaskOutput(w http.ResponseWriter, r *http.Request) {
+	RequestId := path.Base(r.URL.Path)
+	if RequestId == "" {
+		http.Error(w, "Task ID required.", http.StatusBadRequest)
+		return
+	}
+	
+	Task := CL_GetCommandTask(RequestId)
+	if Task == nil {
+		http.Error(w, "Task not found!", http.StatusBadRequest)
+		return
+	}
+	
+	Task.Lock.RLock()
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(TruncateOutput(Task.RealtimeOutput)))
+	Task.Lock.RUnlock()
+	return
+}
+
 func ServeApi(w http.ResponseWriter, r *http.Request) {
 	r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/")
 	Path := r.URL.Path
 	Method := r.Method
-	
-	// !! TODO: Create a "Check now" api for channels.
 	
 	if Path == "channels" && Method == "POST" {
 		// POSTing to api/channels will create a new channel.
@@ -469,6 +501,9 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		// api/channels will give the entire list of channels !
 		// api/channels/{channel_id} will give you a specific channel.
 		API_GetChannels(w, r)
+	} else if strings.HasPrefix(Path, "check-channel-now/") && Method == "PATCH" {
+		// PATCHing to api/check-channel-now/{channel_id} make the channel be checked first chance it gets.
+		API_CheckChannel(w, r)
 	} else if (Path == "videos" || strings.HasPrefix(Path, "videos/")) && Method == "GET" {
 		/*
 		  api/video?limit={int}&offset={int}&status={int}&from_channel={channel_id}&order_by={order}&order_direction={1, -1} Will return a list of videos,
@@ -491,8 +526,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		API_GetVideoStatus(w, r)
 	} else if (Path == "tasks" || strings.HasPrefix(Path, "tasks/")) && Method == "GET" {
 		API_GetTasks(w, r)
-	} else if (Path == "tasks" || strings.HasPrefix(Path, "tasks/")) && Method == "GET" {
-		API_GetTasks(w, r)
+	} else if strings.HasPrefix(Path, "get-realtime-task-output/") && Method == "GET" {
+		API_GetTaskOutput(w, r)
 	} else {
 		http.NotFound(w, r)
 	}

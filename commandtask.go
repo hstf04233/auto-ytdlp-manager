@@ -356,6 +356,13 @@ func CL_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 	
 	return TasksList, nil
 }
+func CL_GetCommandTask(TaskId string) *CommandTask {
+	ARCT_Lock.RLock()
+	Task := AllRunningCommandTasks[TaskId]
+	ARCT_Lock.RUnlock()
+	
+	return Task
+}
 
 func init() {
 	AllRunningCommandTasks = make(map[string]*CommandTask)
