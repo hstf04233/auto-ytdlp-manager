@@ -7,8 +7,14 @@ import (
 	"net/http"
 )
 
+var (
+	APPLICATION_VERSION = "release"
+)
 const (
+	
 	SERVER_PORT = 8867
+	SERVER_PORT_DEBUG = 6788
+	
 	APPLICATION_NAME = "YT Video Manager"
 	CMD_YT_DLP = "yt-dlp"
 	CMD_YT_ARCHIVE = "ytarchive"
@@ -43,5 +49,12 @@ func main() {
 	
 	go StartDownloading()
 	
-	StartServer(SERVER_PORT)
+	
+	fmt.Printf("APPLICATION_VERSION: %s\n", APPLICATION_VERSION)
+	ServerPort := SERVER_PORT
+	if APPLICATION_VERSION == "debug" {
+		ServerPort = SERVER_PORT_DEBUG
+	}
+	
+	StartServer(ServerPort)
 }

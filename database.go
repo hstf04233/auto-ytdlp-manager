@@ -11,6 +11,7 @@ import (
 )
 
 const DATABASE_FILE = "yt_download_manager.db"
+const DATABASE_FILE_DEBUG = "yt_download_manager_DEBUG.db"
 
 const db_SQL_Header = `
 PRAGMA foreign_keys = ON;
@@ -411,7 +412,12 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 }
 
 func OpenDB() error {
-	db, err := sql.Open("sqlite3", DATABASE_FILE)
+	DatabaseFilePath := DATABASE_FILE
+	if APPLICATION_VERSION == "debug" {
+		DatabaseFilePath = DATABASE_FILE_DEBUG
+	}
+	
+	db, err := sql.Open("sqlite3", DatabaseFilePath)
 	if err != nil {
 		return err
 	}
