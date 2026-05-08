@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS Videos (
 	Title        TEXT NOT NULL,
 	Url          TEXT NOT NULL,
 	Availability TEXT NOT NULL,
+	Resolution   TEXT DEFAULT '',
 	Duration     FLOAT DEFAULT 0,
 	
 	RefreshState INTEGER NOT NULL DEFAULT 0,
@@ -53,6 +54,21 @@ CREATE TABLE IF NOT EXISTS Videos (
 	
 	AddedAt     DATETIME NOT NULL DEFAULT (datetime('now')),
 	UpdatedAt   DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS CommandTasks (
+	Id     TEXT PRIMARY KEY,
+	Type   INTEGER NOT NULL DEFAULT 0,
+	Status INTEGER NOT NULL DEFAULT 0,
+	
+	FromChannel TEXT,
+	FromVideo   TEXT,
+	
+	RunArgs TEXT NOT NULL,
+	Output  TEXT NOT NULL,
+	
+	StartTime DATETIME NOT NULL DEFAULT (datetime('now')),
+	EndTime   DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
 /*
@@ -165,18 +181,20 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	defer VideoDBLock.Unlock()
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT INTO Videos(Id, FromChannel, Title, Url, Availability, ReleaseDate, Duration, VideoType, UpdatedAt, AddedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO Videos(Id, FromChannel, Title, Url, Availability, Resolution, ReleaseDate, Duration, VideoType, UpdatedAt, AddedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	FromChannel=excluded.FromChannel,
 	Title=excluded.Title,
 	Url=excluded.Url,
 	Availability=excluded.Availability,
+	Resolution=excluded.Resolution,
+	
 	ReleaseDate=excluded.ReleaseDate,
 	Duration=excluded.Duration,
 	VideoType=excluded.VideoType,
 	UpdatedAt=excluded.UpdatedAt
-	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.Availability, Video.ReleaseDate, Video.Duration, Video.VideoType, TimeNow, TimeNow)
+	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.Availability, Video.Resolution, Video.ReleaseDate, Video.Duration, Video.VideoType, TimeNow, TimeNow)
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateVideoInfo ERR: %v\n", err)
@@ -216,8 +234,11 @@ func DB_UpdateVideoRefreshState(Video *VideoInfo, RefreshState int) error {
 	defer VideoDBLock.Unlock()
 	Video.RefreshState = RefreshState
 	_, err := GDB.Exec(`
-	UPDATE Videos SET RefreshState = ?, WHERE Id = ?
+	UPDATE Videos SET RefreshState = ? WHERE Id = ?
 	`, RefreshState, Video.Id)
+	if err != nil {
+		fmt.Printf("DB_UpdateVideoRefreshState err: %v\n", err)
+	}
 	return err
 }
 
@@ -235,7 +256,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Url, Availability, Status, ReleaseDate, Duration, VideoType,
+	SELECT FromChannel, Id, Title, Url, Availability, Resolution, Status, ReleaseDate, Duration, VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
 	`, VideoId)
 	err := VideoRow.Scan(
@@ -244,6 +265,8 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		&VideoInfo.Title,
 		&VideoInfo.Url,
 		&VideoInfo.Availability,
+		&VideoInfo.Resolution,
+		
 		&VideoInfo.Status,
 		&VideoInfo.ReleaseDate,
 		&VideoInfo.Duration,
@@ -284,7 +307,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	
 	// ORDER BY ReleaseDate DESC
 	Statement := `
-	SELECT FromChannel, Id, Title, Url, Availability, Status, ReleaseDate, Duration, VideoType,
+	SELECT FromChannel, Id, Title, Url, Availability, Resolution, Status, ReleaseDate, Duration, VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos`
 	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 {
 		Statement += " WHERE "
@@ -361,6 +384,8 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			&VideoInfo.Title,
 			&VideoInfo.Url,
 			&VideoInfo.Availability,
+			&VideoInfo.Resolution,
+			
 			&VideoInfo.Status,
 			&VideoInfo.ReleaseDate,
 			&VideoInfo.Duration,
@@ -411,6 +436,86 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	return VideosList, nil
 }
 
+func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
+	Task.Lock.Lock()
+	defer Task.Lock.Unlock()
+	
+	Output := Task.Output
+	if len(Output) > MAX_TASK_OUTPUT_LOG+100 {
+		Output = TruncateOutput(Output)
+	}
+	Status := Task.Status
+	if Status == TASK_STATUS_RUNNING {
+		// Don't save the running status incase the program abruptly quits!
+		Status = TASK_STATUS_FAILED
+	}
+	
+	_, err := GDB.Exec(`
+	INSERT INTO CommandTasks(Id, Type, Status, FromChannel, FromVideo, RunArgs, Output, StartTime, EndTime)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	DO UPDATE SET
+	Type=excluded.Type,
+	Status=excluded.Status,
+	
+	FromChannel=excluded.FromChannel,
+	FromVideo=excluded.FromVideo,
+	
+	RunArgs=excluded.RunArgs,
+	Output=excluded.Output,
+	
+	StartTime=excluded.StartTime,
+	EndTime=excluded.EndTime
+	`, Task.Id, Task.Type, Status, Task.FromChannelId, Task.FromVideoId, Task.RunArgs, Output, Task.StartTime, Task.EndTime)
+	
+	if err != nil {
+		fmt.Printf("DB_UpdateCommandTaskInfo ERR: %v\n", err)
+		return err
+	}
+	
+	return nil
+}
+
+func DB_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
+	Args := []interface{}{}
+	
+	Statement := `
+	SELECT Id, Type, Status, FromChannel, FromVideo, RunArgs, Output,
+	StartTime, EndTime FROM CommandTasks`
+	
+	Statement = Statement + " ORDER BY EndTime DESC LIMIT ? OFFSET ?"
+	Args = append(Args, Limit, Offset)
+	
+	Rows, err := GDB.Query(Statement, Args...)
+	if err != nil {
+		return nil, err
+	}
+	
+	TasksList := []*CommandTask{}
+	for Rows.Next() {
+		CommandTask := &CommandTask{}
+		err := Rows.Scan(
+			&CommandTask.Id,
+			&CommandTask.Type,
+			&CommandTask.Status,
+			&CommandTask.FromChannelId,
+			&CommandTask.FromVideoId,
+			
+			&CommandTask.RunArgs,
+			&CommandTask.Output,
+			
+			&CommandTask.StartTime,
+			&CommandTask.EndTime,
+		)
+		if err != nil {
+			return nil, err
+		}
+		
+		TasksList = append(TasksList, CommandTask)
+	}
+	
+	return TasksList, nil
+}
+
 func OpenDB() error {
 	DatabaseFilePath := DATABASE_FILE
 	if APPLICATION_VERSION == "debug" {
@@ -419,7 +524,7 @@ func OpenDB() error {
 	
 	db, err := sql.Open("sqlite3", DatabaseFilePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to open database '%s' Error: %v\n", DatabaseFilePath, err)
 	}
 	
 	_, err = db.Exec("ALTER TABLE Videos ADD COLUMN VideoType INTEGER DEFAULT 0")
@@ -434,10 +539,14 @@ func OpenDB() error {
 	if err != nil {
 		fmt.Printf("err: %v\n", err)
 	}
+	_, err = db.Exec("ALTER TABLE Videos ADD COLUMN Resolution TEXT DEFAULT ''")
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
 	
 	_, err = db.Exec(db_SQL_Header)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed run database header '%s' Error: %v\n", DatabaseFilePath, err)
 	}
 	
 	GDB = db

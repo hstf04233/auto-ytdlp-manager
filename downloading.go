@@ -123,8 +123,8 @@ func CheckIsVideoDownloaded(v VideoInfo) bool {
 	return false
 }
 
-func RefreshVideoInfo(v *VideoInfo) {
-	err := RequestVideoInfo(v.Url, v)
+func RefreshVideoInfo(AChannel ArchiveChannel, v *VideoInfo) {
+	err := RequestVideoInfo(AChannel, v.Url, v)
 	if err != nil {
 		fmt.Printf("Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoAvalibility(v, "UNKNOWN")
@@ -156,7 +156,7 @@ func DownloadYTLive(AChannel *ArchiveChannel, v *VideoInfo) {
 		return
 	}
 	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADED)
-	RefreshVideoInfo(v)
+	RefreshVideoInfo(*AChannel, v)
 }
 
 func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
@@ -168,7 +168,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, v *VideoInfo) {
 		DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADING)
 	}
 	
-	err := RequestVideoInfo(v.Url, v)
+	err := RequestVideoInfo(*AChannel, v.Url, v)
 	if err != nil {
 		fmt.Printf("Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoStatus(v, VIDEO_STATUS_FAILED)
@@ -272,7 +272,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	if err == nil && len(RefreshableVideos) > 0 {
 		for _, v := range(RefreshableVideos) {
 			if !AChannel.Enabled { break }
-			RefreshVideoInfo(v)
+			RefreshVideoInfo(*AChannel, v)
 		}
 	}
 	

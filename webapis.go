@@ -419,6 +419,36 @@ func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("{\"Success\":true}"))
 }
 
+func API_GetTasks(w http.ResponseWriter, r *http.Request) {
+	// TODO: This is unfinished!!!
+	
+	Limit := 20
+	Offset := 0
+	if l := r.URL.Query().Get("limit"); l != "" {
+		Limit, _ = strconv.Atoi(l)
+		if Limit == -1 {
+			Limit = -1
+		} else if Limit < 0 {
+			Limit = 20
+		}
+	}
+	if o := r.URL.Query().Get("offset"); o != "" {
+		Offset, _ = strconv.Atoi(o)
+	}
+	
+	CommandTasks, err := CL_ListCommandTasks(Limit, Offset)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when trying to list videos, err: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"count": len(CommandTasks),
+		"tasks": CommandTasks,
+	})
+}
+
 func ServeApi(w http.ResponseWriter, r *http.Request) {
 	r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/")
 	Path := r.URL.Path
@@ -429,8 +459,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	if Path == "channels" && Method == "POST" {
 		// POSTing to api/channels will create a new channel.
 		API_NewChannel(w, r)
-	} else if strings.HasPrefix(Path, "channels/") && Method == "PUT" {
-		// PUTing to api/channels/{channel_id} will update a channel.
+	} else if strings.HasPrefix(Path, "channels/") && Method == "PATCH" {
+		// PATCHing to api/channels/{channel_id} will update a channel.
 		API_UpdateChannel(w, r)
 	} else if strings.HasPrefix(Path, "channels/") && Method == "DELETE" {
 		// DELETE-ing to api/channels/{channel_id} will delete a channel.
@@ -447,7 +477,7 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		  api/video/{video_id} will give you a specific video.
 		*/
 		API_GetVideos(w, r)
-	} else if (strings.HasPrefix(Path, "videos/")) && Method == "PUT" {
+	} else if (strings.HasPrefix(Path, "videos/")) && Method == "PATCH" {
 		// You can set status, refresh_state
 		API_UpdateVideo(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "DELETE" {
@@ -459,6 +489,10 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		
 		// This is to grab the video status without refreshing the entire list with the api/videos list api.
 		API_GetVideoStatus(w, r)
+	} else if (Path == "tasks" || strings.HasPrefix(Path, "tasks/")) && Method == "GET" {
+		API_GetTasks(w, r)
+	} else if (Path == "tasks" || strings.HasPrefix(Path, "tasks/")) && Method == "GET" {
+		API_GetTasks(w, r)
 	} else {
 		http.NotFound(w, r)
 	}

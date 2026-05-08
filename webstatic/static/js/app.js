@@ -17,15 +17,15 @@ const API = {
     }
     return res.json();
   },
-  async put(url, body) {
+  async patch(url, body) {
     const res = await fetch(url, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API PUT ${url}: ${res.status} - ${text}`);
+      throw new Error(`API PATCH ${url}: ${res.status} - ${text}`);
     }
     return res.json();
   },
@@ -233,7 +233,7 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
 
 async function changeVideoStatus(videoId, newStatus) {
   try {
-    await API.put(`/api/videos/${videoId}`, { status: parseInt(newStatus) });
+    await API.patch(`/api/videos/${videoId}`, { status: parseInt(newStatus) });
     showToast('Status changed', 'success');
     loadVideos();
   } catch (err) {
@@ -309,7 +309,7 @@ function renderChannels() {
 
 async function toggleChannel(id, enabled) {
   try {
-    await API.put(`/api/channels/${id}`, { enabled });
+    await API.patch(`/api/channels/${id}`, { enabled });
     showToast(`Channel ${enabled ? 'enabled' : 'disabled'}`, 'success');
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
@@ -337,7 +337,7 @@ async function deleteVideo(id) {
 }
 async function refreshVideoInfo(id,) {
   try {
-    await API.put(`/api/videos/${id}`, {refresh_state: true});
+    await API.patch(`/api/videos/${id}`, {refresh_state: true});
     loadVideos()
   } catch (err) {
     showToast(`Failed to refresh: ${err.message}`, 'error');
@@ -417,7 +417,7 @@ async function saveChannel(e) {
       patch.type = type;
       patch.check_interval = checkInterval;
       patch.full_check_interval = fullCheckInterval;
-      await API.put(`/api/channels/${id}`, patch);
+      await API.patch(`/api/channels/${id}`, patch);
       showToast('Channel updated!', 'success');
     } else {
       await API.post('/api/channels', body);

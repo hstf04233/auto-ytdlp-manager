@@ -23,6 +23,7 @@ type VideoInfo struct {
 	Url          string  `json:"url"`
 	Id           string  `json:"id"`
 	Availability string  `json:"availability"`  // public, unlisted, private etc...
+	Resolution   string  `json:"resolution"` 
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
@@ -37,14 +38,18 @@ type VideoInfo struct {
 }
 
 type YT_DLP_OUTVIDEO struct {
-	Title        string    `json:"title"`
-	FullTitle    string    `json:"fulltitle"`
-	Url          string    `json:"webpage_url"`
-	Id           string    `json:"id"`
-	Availability string    `json:"availability"`
-	Duration     float64   `json:"duration"`
-	Timestamp    int64     `json:"timestamp"`
+	Title        string  `json:"title"`
+	FullTitle    string  `json:"fulltitle"`
+	Url          string  `json:"webpage_url"`
+	Id           string  `json:"id"`
+	Availability string  `json:"availability"`
+	Resolution   string  `json:"resolution"`
+	
+	Duration     float64  `json:"duration"`
+	
+	Timestamp        int64 `json:"timestamp"`
 	ReleaseTimestamp int64 `json:"release_timestamp"`
+	
 	
 	IsLive  bool `json:"is_live"`
 	WasLive bool `json:"was_live"`
@@ -73,6 +78,10 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 		VideoInfo.Availability = "public?"
 	}
 	
+	if OutVideo.Resolution != "" {
+		VideoInfo.Resolution = OutVideo.Resolution
+	}
+	
 	if OutVideo.ReleaseTimestamp != 0 {
 		VideoInfo.ReleaseDate = OutVideo.ReleaseTimestamp
 	} else if OutVideo.Timestamp != 0 {
@@ -80,14 +89,19 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	}
 }
 
-func RequestVideoInfo(VideoUrl string, v *VideoInfo) (error) {
-	Cmd := exec.Command(
-		CMD_YT_DLP,
+func RequestVideoInfo(AChannel ArchiveChannel, VideoUrl string, v *VideoInfo) (error) {
+	Args := []string{
 		VideoUrl,
 		"--ignore-config",
 		"--dump-json",
 		"--skip-download",
-	)
+	}
+	if AChannel.QualitySelect > 0 {
+		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
+	}
+	
+	Cmd := exec.Command(CMD_YT_DLP, Args...)
+	
 	Out, err := Cmd.Output()
 	if err != nil {
 		fmt.Printf("Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
@@ -171,6 +185,7 @@ func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
 	Args := []string{
 		v.Url,
 		"--ignore-config",
+		"--external-downloader-args", "ffmpeg: -loglevel warning -stats",
 		"-o", OutputTemplate,
 	}
 	if AChannel.QualitySelect > 0 {
@@ -179,9 +194,15 @@ func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
 	
 	Cmd := exec.Command(CMD_YT_DLP, Args...)
 	Cmd.Dir = DownloadDir
-	Out, err := Cmd.CombinedOutput()
+	CL_DownloadTask(Cmd, v.Id, AChannel.Id)
+	
+	err = Cmd.Start()
 	if err != nil {
-		fmt.Printf("%s\n", Out)
+		fmt.Printf("Failed to start download video from url: %s, Error: %v\n", v.Url, err)
+		return err
+	}
+	err = Cmd.Wait()
+	if err != nil {
 		fmt.Printf("Failed to download video from url: %s, Error: %v\n", v.Url, err)
 		return err
 	}
@@ -235,13 +256,19 @@ func ytarchive_DownloadLive(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		QualityString,
 	)
 	Cmd.Dir = DownloadDir
-	Out, err := Cmd.CombinedOutput()
+	CL_DownloadTask(Cmd, v.Id, AChannel.Id)
+	
+	err = Cmd.Start()
 	if err != nil {
-		fmt.Printf("%s\n", Out)
-		fmt.Printf("Failed to download video from url: %s, Error: %v\n", v.Url, err)
+		fmt.Printf("Failed to start live download from url: %s, Error: %v\n", v.Url, err)
 		return err
 	}
-	fmt.Printf("Output: %s\n", Out)
+	err = Cmd.Wait()
+	if err != nil {
+		fmt.Printf("Failed to live download from url: %s, Error: %v\n", v.Url, err)
+		return err
+	}
+	//fmt.Printf("Output: %s\n", Out)
 	
 	return nil
 }
