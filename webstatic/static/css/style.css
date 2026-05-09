@@ -579,6 +579,204 @@ body {
   to { transform: translateX(0); opacity: 1; }
 }
 
+/* ========== Tasks Page ========== */
+.task-layout {
+  display: flex;
+  gap: 20px;
+  min-height: 500px;
+}
+
+.task-list-container {
+  flex: 0 0 350px;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.task-item:hover {
+  border-color: var(--accent);
+  background: rgba(233, 69, 96, 0.05);
+}
+
+.task-item.active {
+  border-color: var(--accent);
+  background: rgba(233, 69, 96, 0.1);
+}
+
+.task-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.task-item-id {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+.task-item-run-args {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 4px;
+  max-width: 100%;
+}
+
+.task-item-time {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.task-item-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.task-item-footer span {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* ========== Terminal Output ========== */
+.task-output-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #1e1e1e;
+  border-bottom: 1px solid #333;
+}
+
+.terminal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.terminal-red { background: #ff5f57; }
+.terminal-yellow { background: #ffbd2e; }
+.terminal-green { background: #28c840; }
+
+.terminal-title {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 0.75rem;
+  color: #888;
+  flex: 1;
+  margin-left: 4px;
+}
+
+.terminal-status {
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 0.7rem;
+  color: #888;
+  font-style: italic;
+}
+
+.terminal-body {
+  flex: 1;
+  background: #0a0a0a;
+  color: #e0e0e0;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 1rem;
+  line-height: 1.5;
+  padding: 12px 14px;
+  overflow-y: auto;
+  /* white-space: pre-wrap; */
+  word-break: break-all;
+  min-height: 400px;
+  max-height: calc(100vh - 320px);
+  scroll-behavior: smooth;
+}
+
+.terminal-body .terminal-prompt {
+  color: #666;
+  font-style: italic;
+}
+
+.terminal-body .terminal-line {
+  display: block;
+}
+
+.terminal-body .terminal-line-running {
+  color: #50fa7b;
+}
+
+.terminal-body .terminal-line-error {
+  color: #ff5555;
+}
+
+.terminal-body .terminal-line-warning {
+  color: #ffb86c;
+}
+
+.terminal-body .terminal-line-info {
+  color: #8be9fd;
+}
+
+.terminal-body .terminal-line-dim {
+  color: #666;
+}
+
+.terminal-body .terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 14px;
+  background: #50fa7b;
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .sidebar {
@@ -592,4 +790,6 @@ body {
   .video-card { flex-direction: column; }
   .video-thumb { width: 100%; min-width: unset; height: 180px; }
   .channel-card { flex-direction: column; align-items: flex-start; }
+  .task-layout { flex-direction: column; }
+  .task-list-container { flex: 1; }
 }

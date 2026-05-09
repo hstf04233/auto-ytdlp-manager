@@ -55,7 +55,7 @@ var AllRunningCommandTasks map[string]*CommandTask
 
 func TruncateOutput(Output string) string {
 	if len(Output) > MAX_TASK_OUTPUT_LOG-30 {
-		Output = fmt.Sprintf("...%d CHARACTERS TRUNCATED\n\n", len(Output) - (MAX_TASK_OUTPUT_LOG-30)) +
+		Output = fmt.Sprintf("[%d CHARACTERS TRUNCATED]\n", len(Output) - (MAX_TASK_OUTPUT_LOG-30)) +
 				 Output[len(Output)-(MAX_TASK_OUTPUT_LOG-30):]
 		
 		return Output

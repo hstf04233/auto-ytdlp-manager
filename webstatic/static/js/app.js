@@ -73,6 +73,10 @@ function showPage(page, dontSaveHistory) {
   }
   
   if (page === 'videos') loadVideos();
+  if (page === 'tasks') {
+    stopRealtimePolling();
+    loadTasks();
+  }
 }
 
 // ========== Navigation ==========
@@ -654,6 +658,225 @@ function updateChannelFilter() {
   });
 }
 
+// ========== Tasks ==========
+let allTasks = [];
+let taskPage = 0;
+const TASK_PAGE_SIZE = 25;
+let selectedTask = null;
+let selectedTaskId = null;
+let selectedTaskType = null;
+let realtimeOutputTimer = null;
+let realtimeOutputOffset = 0;
+
+const TASK_TYPE_LABELS = { 0: 'Generic', 1: 'Listing', 2: 'Download' };
+const TASK_STATUS_LABELS = { 0: 'Running', 1: 'Failed', 2: 'Finished' };
+const TASK_STATUS_BADGE = {
+  0: ['downloading', 'Downloading...'],
+  1: ['failed', 'Failed'],
+  2: ['downloaded', 'Finished'],
+};
+
+function taskTypeLabel(type) {
+  return TASK_TYPE_LABELS[type] || `Type ${type}`;
+}
+
+function taskStatusBadge(status) {
+  const [cls, label] = TASK_STATUS_BADGE[status] || ['queued', `Status ${status}`];
+  return `<span class="badge badge-${cls}">${label}</span>`;
+}
+
+function taskTypeBadge(type) {
+  const map = { 0: 'generic', 1: 'queued', 2: 'downloading' };
+  const cls = map[type] || 'queued';
+  return `<span class="badge badge-${cls}">${taskTypeLabel(type)}</span>`;
+}
+
+async function loadTasks() {
+  try {
+    const url = `/api/tasks?limit=${TASK_PAGE_SIZE}&offset=${taskPage * TASK_PAGE_SIZE}`;
+    const data = await API.get(url);
+    allTasks = data.tasks || data;
+    
+    if (selectedTaskId !== null) {
+      allTasks.forEach(t => {
+      if (t.id == selectedTaskId) {
+          selectedTask = t;
+        }
+      })
+    }
+    
+    renderTasks();
+    renderTaskStats();
+    renderTaskPagination();
+  } catch (err) {
+    showToast(`Failed to load tasks: ${err.message}`, 'error');
+  }
+}
+
+function renderTaskStats() {
+  const container = document.getElementById('taskStats');
+  const running = allTasks.filter(t => t.status === 0).length;
+  const failed = allTasks.filter(t => t.status === 1).length;
+  const finished = allTasks.filter(t => t.status === 2).length;
+  
+  container.innerHTML = `
+    <div class="stat-card"><div class="stat-value">${allTasks.length}</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--warning)">${running}</div><div class="stat-label">Running</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--success)">${finished}</div><div class="stat-label">Finished</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${failed}</div><div class="stat-label">Failed</div></div>
+  `;
+}
+
+function renderTasks() {
+  const container = document.getElementById('taskList');
+  if (allTasks.length === 0) {
+    container.innerHTML = '<div class="loading">No tasks found.</div>';
+    return;
+  }
+  container.innerHTML = allTasks.map(t => `
+    <div class="task-item ${selectedTaskId === t.id ? 'active' : ''}" onclick="selectTask('${t.id}')">
+      <div class="task-item-header">
+        <span class="task-item-id">${escHtml(t.id)}</span>
+        <span class="task-item-time">${formatRelative(t.start_time)}</span>
+      </div>
+      <div class="task-item-status">
+        ${taskStatusBadge(t.status)}
+        ${taskTypeBadge(t.type)}
+      </div>
+      <div class="task-item-run-args" title="${escHtml(t.run_args)}">${escHtml(t.run_args)}</div>
+    </div>
+  `).join('');
+}
+
+function renderTaskPagination() {
+  const container = document.getElementById('taskPagination-top');
+  // Simple: just show count for now
+  container.innerHTML = `<span class="single-page-msg">${allTasks.length} tasks shown</span>`;
+}
+
+function selectTask(id) {
+  selectedTaskId = id;
+  //selectedTaskType = type;
+  allTasks.forEach(t => {
+    if (t.id == selectedTaskId) {
+      selectedTask = t;
+    }
+  })
+  renderTasks();
+  
+  const outputContainer = document.getElementById('taskOutputContent');
+  const statusEl = document.getElementById('taskOutputStatus');
+  
+  outputContainer.innerHTML = '<span class="terminal-prompt">Loading output...</span>';
+  statusEl.textContent = '';
+  
+  // Start polling for real-time output
+  startRealtimePolling();
+  
+  // Also load the full output from the task list
+  loadFullTaskOutput(id);
+}
+
+async function loadFullTaskOutput(taskId) {
+  const outputContainer = document.getElementById('taskOutputContent');
+  
+  try {
+    const task = allTasks.find(t => t.id === taskId);
+    if (task && task.output !== null) {
+      outputContainer.innerHTML = formatTerminalOutput(task.output, task.status);
+    }
+  } catch (err) {
+    outputContainer.innerHTML = `<span class="terminal-line-error">Error loading output: ${err.message}</span>`;
+  }
+}
+
+function formatTerminalOutput(text, status) {
+  const lines = text.split('\n');
+  const formatted = lines.map(line => {
+    let cls = 'terminal-line';
+    if (status === 0) cls += ' terminal-line-running';
+    if (/error|fail|exception/i.test(line)) cls = 'terminal-line-error';
+    else if (/warn/i.test(line)) cls = 'terminal-line-warning';
+    else if (/info|downloaded|saved/i.test(line)) cls = 'terminal-line-info';
+    else if (/^\s*$/.test(line)) cls = 'terminal-line-dim';
+    return `<span class="${cls}">${escHtml(line)}</span>`;
+  }).join('\n');
+  
+  const cursor = status === 0 ? '<span class="terminal-cursor"></span>' : '';
+  return formatted + cursor;
+}
+
+function startRealtimePolling() {
+  if (realtimeOutputTimer) {
+    clearInterval(realtimeOutputTimer);
+  }
+  
+  realtimeOutputTimer = setInterval(async () => {
+    if (!selectedTaskId || !selectedTask || selectedTask.status !== 0) {
+      return;
+    }
+    
+    const statusEl = document.getElementById('taskOutputStatus');
+    try {
+      const res = await fetch(`/api/get-realtime-task-output/${selectedTaskId}`);
+      if (!res.ok) {
+        statusEl.textContent = 'No output available';
+        return;
+      }
+      
+      const text = await res.text();
+      const outputContainer = document.getElementById('taskOutputContent');
+      outputContainer.innerHTML = formatTerminalOutput(text, selectedTaskType);
+      
+      // Auto-scroll to bottom
+      outputContainer.scrollTop = outputContainer.scrollHeight;
+      
+      statusEl.textContent = 'Live';
+    } catch (err) {
+      statusEl.textContent = 'Poll error';
+    }
+  }, 200);
+}
+
+function stopRealtimePolling() {
+  if (realtimeOutputTimer) {
+    clearInterval(realtimeOutputTimer);
+    realtimeOutputTimer = null;
+  }
+  selectedTaskId = null;
+  selectedTaskType = null;
+  const statusEl = document.getElementById('taskOutputStatus');
+  if (statusEl) statusEl.textContent = '';
+}
+
+function renderTaskPagination() {
+  const container = document.getElementById('taskPagination-top');
+  const totalPages = Math.ceil(allTasks.length / TASK_PAGE_SIZE) || 1;
+  const currentPage = taskPage;
+  
+  const btn = (label, page, disabled, active) => {
+    const disabledAttr = disabled ? ' disabled' : '';
+    const activeAttr = active ? ' class="active"' : '';
+    const onclick = disabled ? '' : ` onclick="taskPage=${page};loadTasks()"`;
+    return `<button${activeAttr}${disabledAttr}${onclick}>${label}</button>`;
+  };
+  
+  if (totalPages <= 1) {
+    container.innerHTML = `<span class="single-page-msg">All tasks shown</span>`;
+    return;
+  }
+  
+  const pages = [];
+  pages.push(btn('‹', currentPage - 1, currentPage === 0, false));
+  
+  for (let i = 0; i < Math.min(totalPages, 5); i++) {
+    pages.push(btn(String(i + 1), i, false, currentPage === i));
+  }
+  
+  pages.push(btn('›', currentPage + 1, currentPage >= totalPages - 1, false));
+  container.innerHTML = pages.join('');
+}
+
 function escHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -681,6 +904,14 @@ async function init() {
       loadVideos();
     }
   }, 10_000);
+  
+  // Auto-refresh tasks every 5s
+  setInterval(() => {
+    const tasksPage = document.getElementById('page-tasks');
+    if (tasksPage.classList.contains('active')) {
+      loadTasks();
+    }
+  }, 5_000);
   
   
   // Check search updates every 250ms

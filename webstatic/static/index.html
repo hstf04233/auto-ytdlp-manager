@@ -18,6 +18,9 @@
       <a href="#" data-page="videos">
         <span>&#9654;</span> <span>Videos</span>
       </a>
+      <a href="#" data-page="tasks">
+        <span>&#9733;</span> <span>Tasks</span>
+      </a>
     </nav>
   </div>
 
@@ -79,6 +82,37 @@
       </div>
 
       <div class="pagination" id="videoPagination-bottom"></div>
+    </div>
+
+    <!-- TASKS PAGE -->
+    <div class="page" id="page-tasks">
+      <div class="page-header">
+        <h2>Tasks</h2>
+      </div>
+
+      <div class="stats-row" id="taskStats"></div>
+
+      <div class="task-layout">
+        <div class="task-list-container">
+          <div id="taskList">
+            <div class="loading">Loading tasks...</div>
+          </div>
+          <div class="pagination" id="taskPagination-top"></div>
+        </div>
+
+        <div class="task-output-container" id="taskOutputPanel">
+          <div class="terminal-header">
+            <span class="terminal-dot terminal-red"></span>
+            <span class="terminal-dot terminal-yellow"></span>
+            <span class="terminal-dot terminal-green"></span>
+            <span class="terminal-title">Task Output</span>
+            <span class="terminal-status" id="taskOutputStatus"></span>
+          </div>
+          <div class="terminal-body" id="taskOutputContent">
+            <span class="terminal-prompt">Select a task to view its output</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
