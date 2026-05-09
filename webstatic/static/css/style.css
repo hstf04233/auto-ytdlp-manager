@@ -587,9 +587,10 @@ body {
 }
 
 .task-list-container {
-  flex: 0 0 350px;
+  flex: 0 0 200px;
   display: flex;
   flex-direction: column;
+  max-height: calc(100vh - 240px);
 }
 
 .task-list {
@@ -603,7 +604,7 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 12px 14px;
+  padding: 8px 10px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -654,6 +655,7 @@ body {
 }
 
 .task-item-status {
+  user-select: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -715,6 +717,24 @@ body {
   font-size: 0.7rem;
   color: #888;
   font-style: italic;
+}
+
+.terminal-cmd {
+  padding: 8px 14px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
+  font-size: 0.8rem;
+  color: #50fa7b;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: nowrap;
+  word-break: break-all;
+}
+
+.terminal-cmd::before {
+  content: '> ';
+  color: #8be9fd;
 }
 
 .terminal-body {

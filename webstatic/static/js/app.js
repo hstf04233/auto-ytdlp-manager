@@ -743,7 +743,6 @@ function renderTasks() {
         ${taskStatusBadge(t.status)}
         ${taskTypeBadge(t.type)}
       </div>
-      <div class="task-item-run-args" title="${escHtml(t.run_args)}">${escHtml(t.run_args)}</div>
     </div>
   `).join('');
 }
@@ -767,6 +766,8 @@ function selectTask(id) {
   const outputContainer = document.getElementById('taskOutputContent');
   const statusEl = document.getElementById('taskOutputStatus');
   
+  const task = allTasks.find(t => t.id == selectedTaskId);
+  
   outputContainer.innerHTML = '<span class="terminal-prompt">Loading output...</span>';
   statusEl.textContent = '';
   
@@ -783,27 +784,32 @@ async function loadFullTaskOutput(taskId) {
   try {
     const task = allTasks.find(t => t.id === taskId);
     if (task && task.output !== null) {
-      outputContainer.innerHTML = formatTerminalOutput(task.output, task.status);
+      outputContainer.innerHTML = formatTerminalOutput(task.output, task.status, task.run_args);
+      // Auto-scroll to bottom
+      outputContainer.scrollTop = outputContainer.scrollHeight;
     }
   } catch (err) {
     outputContainer.innerHTML = `<span class="terminal-line-error">Error loading output: ${err.message}</span>`;
   }
 }
 
-function formatTerminalOutput(text, status) {
+function formatTerminalOutput(text, status, run_args) {
   const lines = text.split('\n');
   const formatted = lines.map(line => {
     let cls = 'terminal-line';
+    /*
     if (status === 0) cls += ' terminal-line-running';
     if (/error|fail|exception/i.test(line)) cls = 'terminal-line-error';
     else if (/warn/i.test(line)) cls = 'terminal-line-warning';
     else if (/info|downloaded|saved/i.test(line)) cls = 'terminal-line-info';
     else if (/^\s*$/.test(line)) cls = 'terminal-line-dim';
+    */
     return `<span class="${cls}">${escHtml(line)}</span>`;
   }).join('\n');
   
   const cursor = status === 0 ? '<span class="terminal-cursor"></span>' : '';
-  return formatted + cursor;
+  const runArgsContent = `<span class="terminal-line">${escHtml(run_args)}</span><br><span class="terminal-line"></span>`;
+  return runArgsContent + formatted + cursor;
 }
 
 function startRealtimePolling() {
@@ -826,7 +832,7 @@ function startRealtimePolling() {
       
       const text = await res.text();
       const outputContainer = document.getElementById('taskOutputContent');
-      outputContainer.innerHTML = formatTerminalOutput(text, selectedTaskType);
+      outputContainer.innerHTML = formatTerminalOutput(text, selectedTask.status, selectedTask.run_args);
       
       // Auto-scroll to bottom
       outputContainer.scrollTop = outputContainer.scrollHeight;
@@ -846,7 +852,11 @@ function stopRealtimePolling() {
   selectedTaskId = null;
   selectedTaskType = null;
   const statusEl = document.getElementById('taskOutputStatus');
+  const outputContainer = document.getElementById('taskOutputContent');
   if (statusEl) statusEl.textContent = '';
+  if (outputContainer) {
+    outputContainer.innerHTML = '<span class="terminal-prompt">Select a task to view its output</span>';
+  }
 }
 
 function renderTaskPagination() {
