@@ -214,6 +214,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	
 	AChannel.Lock.RLock()
 	Url := AChannel.Url
+	ChannelId := AChannel.Id
 	AChannel.Lock.RUnlock()
 	
 	PlaylistEnd := 6
@@ -223,7 +224,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 		fmt.Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
 	}
 	
-	VideoList, err := yt_dlp_ListVideos(Url, PlaylistEnd)
+	VideoList, err := yt_dlp_ListVideos(Url, ChannelId, PlaylistEnd)
 	if err != nil {
 		fmt.Printf("Error when grabbing videos: %v\n", err)
 		return

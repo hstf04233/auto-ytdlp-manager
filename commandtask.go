@@ -77,7 +77,6 @@ func watchStd(std io.ReadCloser, buf *[]byte, nout *int, Mutex *sync.RWMutex) {
 		if nout_val == -1 {
 			n, err = std.Read(*buf)
 		} else {
-			//Mutex.Unlock()
 			// Wait for the other thread to read the output before continuing!
 			time.Sleep(16 * time.Millisecond)
 			continue
@@ -266,7 +265,9 @@ func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCl
 	AllRunningCommandTasks[Task.Id] = Task
 	ARCT_Lock.Unlock()
 	
-	go monitorTaskCmdOutput(Task, stdout, stderr)
+	if stdout != nil && stderr != nil {
+		go monitorTaskCmdOutput(Task, stdout, stderr)
+	}
 	
 	NextUpdate := time.Now().UnixMilli() + (1000 * 10)
 	
@@ -280,8 +281,9 @@ func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCl
 				if Task.Status == TASK_STATUS_RUNNING {
 					Task.Lock.Unlock()
 					CL_FinishTask(Task, TASK_STATUS_FAILED)
+				} else {
+					Task.Lock.Unlock()
 				}
-				Task.Lock.Unlock()
 			}
 			break
 		}
@@ -314,7 +316,6 @@ func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCl
 	} else {
 		Task.Lock.Unlock()
 	}
-	//Task.Lock.Unlock()
 }
 
 func GetRealArgs(Args []string) string {
@@ -356,7 +357,7 @@ func CL_DownloadTask(Cmd *exec.Cmd, VideoId string, ChannelId string) (*CommandT
 	Task.FromChannelId = ChannelId
 	Task.Type = TASK_TYPE_DOWNLOAD
 	Task.Cmd = Cmd
-	// TODO: this is kinda bad and you should add quotes to args with spaces!
+	
 	Task.RunArgs = GetRealArgs(Cmd.Args)
 	
 	stdout, err := Task.Cmd.StdoutPipe()
@@ -379,6 +380,22 @@ func CL_DownloadTask(Cmd *exec.Cmd, VideoId string, ChannelId string) (*CommandT
 	}
 	
 	go CL_CommandTaskRun(Task, stdout, stderr)
+	
+	Task.UpdatedAt = time.Now().UTC()
+	DB_UpdateCommandTaskInfo(Task)
+	return Task, nil
+}
+
+func CL_ListTask(Cmd *exec.Cmd, ChannelId string) (*CommandTask, error) {
+	Task := CL_NewTask()
+	
+	Task.FromChannelId = ChannelId
+	Task.Type = TASK_TYPE_LISTING
+	Task.Cmd = Cmd
+	
+	Task.RunArgs = GetRealArgs(Cmd.Args)
+	
+	go CL_CommandTaskRun(Task, nil, nil)
 	
 	Task.UpdatedAt = time.Now().UTC()
 	DB_UpdateCommandTaskInfo(Task)

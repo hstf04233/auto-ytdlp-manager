@@ -25,7 +25,7 @@ type VideoInfo struct {
 	Availability string  `json:"availability"`  // public, unlisted, private etc...
 	Resolution   string  `json:"resolution"`
 	
-	Filename     string  `json:"Filename"`		// Where the video is stored on device
+	Filename     string  `json:"filename"`		// Where the video is stored on device
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
@@ -152,7 +152,7 @@ func RequestVideoInfo(AChannel ArchiveChannel, VideoUrl string, Video *VideoInfo
 	return nil
 }
 
-func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int) ([]VideoInfo, error) {
+func yt_dlp_ListVideos(ChannelUrl string, ChannelId string, PlaylistEnd int) ([]VideoInfo, error) {
 	Args := []string{
 		ChannelUrl,
 		"--ignore-config",
@@ -166,6 +166,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int) ([]VideoInfo, error) 
 	}
 	
 	Cmd := exec.Command(CMD_YT_DLP, Args...)
+	CL_ListTask(Cmd, ChannelId)
 	
 	Out, err := Cmd.Output()
 	if err != nil {

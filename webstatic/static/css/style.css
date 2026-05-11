@@ -587,7 +587,7 @@ body {
 }
 
 .task-list-container {
-  flex: 0 0 400px;
+  flex: 0 0 450px;
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 240px);
