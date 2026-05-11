@@ -728,7 +728,7 @@ function updateChannelFilter() {
 // ========== Tasks ==========
 let allTasks = [];
 let taskPage = 0;
-const TASK_PAGE_SIZE = 2;
+const TASK_PAGE_SIZE = 20;
 let taskTotalCount = 0;
 let taskStatsData = {};
 let selectedTask = null;
