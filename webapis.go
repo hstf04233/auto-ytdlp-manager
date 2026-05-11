@@ -11,6 +11,7 @@ import (
 )
 
 const API_MAX_URL_LENGTH = 1 << 14
+const API_MAX_REQUEST_ID = 1 << 8
 
 type API_RequestChannelBody struct{
 	Name string `json:"name"`
@@ -92,8 +93,13 @@ func Set_API_RequestChannelBodyDefaults(Body *API_RequestChannelBody) {
 	Body.Enabled = nil
 }
 func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
-	Id := path.Base(r.URL.Path)
-	AChannel := GetArchiveChannelFromId(&WatchedDownloading, Id)
+	RequestId := path.Base(r.URL.Path)
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid channel id.", http.StatusBadRequest)
+		return
+	}
+	
+	AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
 	if AChannel == nil {
 		http.Error(w, "Channel not found.", http.StatusNotFound)
 		return
@@ -151,8 +157,13 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(AChannel)
 }
 func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
-	Id := path.Base(r.URL.Path)
-	AChannel := GetArchiveChannelFromId(&WatchedDownloading, Id)
+	RequestId := path.Base(r.URL.Path)
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid channel id.", http.StatusBadRequest)
+		return
+	}
+	
+	AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
 	if AChannel == nil {
 		http.Error(w, "Channel not found.", http.StatusNotFound)
 		return
@@ -161,13 +172,18 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 	AChannel.NextCheckMSEC = time.Now().UnixMilli()-1
 }
 func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
-	Id := path.Base(r.URL.Path)
-	AChannel := GetArchiveChannelFromId(&WatchedDownloading, Id)
+	RequestId := path.Base(r.URL.Path)
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid channel id.", http.StatusBadRequest)
+		return
+	}
+	
+	AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
 	if AChannel == nil {
 		http.Error(w, "Channel not found.", http.StatusNotFound)
 		return
 	}
-	err := RemoveArchiveChannel(&WatchedDownloading, Id)
+	err := RemoveArchiveChannel(&WatchedDownloading, RequestId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -180,6 +196,11 @@ func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if strings.HasPrefix(r.URL.Path, "channels/") && RequestId != "" {
+		if len(RequestId) > API_MAX_REQUEST_ID {
+			http.Error(w, "Invalid channel id.", http.StatusBadRequest)
+			return
+		}
+		
 		// Request single channel.
 		AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
 		if AChannel == nil {
@@ -211,6 +232,11 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if strings.HasPrefix(r.URL.Path, "videos/") && RequestId != "" {
+		if len(RequestId) > API_MAX_REQUEST_ID {
+			http.Error(w, "Invalid video id.", http.StatusBadRequest)
+			return
+		}
+		
 		// Request single video.
 		VideoInfo, err := DB_GetVideo(RequestId)
 		if err != nil {
@@ -343,38 +369,47 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 
 func API_GetVideoStatus(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
-	if RequestId != "" {
-		// Request single video.
-		VideoInfo, err := DB_GetVideo(RequestId)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		if VideoInfo == nil {
-			http.Error(w, "Video not found.", http.StatusNotFound)
-			return
-		}
-		
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"status": VideoInfo.Status,
-		})
+	if RequestId == "" {
+		http.Error(w, "Video id required.", http.StatusBadRequest)
+		return
+	}
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid video id.", http.StatusBadRequest)
 		return
 	}
 	
-	http.Error(w, "Video ID required.", http.StatusBadRequest)
+	VideoInfo, err := DB_GetVideo(RequestId)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when getting video: %v !", err), http.StatusInternalServerError)
+		return
+	}
+	if VideoInfo == nil {
+		http.Error(w, "Video not found.", http.StatusNotFound)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": VideoInfo.Status,
+	})
+	
 	return
 }
 
 func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if RequestId == "" {
-		http.Error(w, "Video ID required.", http.StatusBadRequest)
+		http.Error(w, "Video id required.", http.StatusBadRequest)
 		return
 	}
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid video id.", http.StatusBadRequest)
+		return
+	}
+	
 	VideoInfo, err := DB_GetVideo(RequestId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error when getting video: %v !", err), http.StatusInternalServerError)
 		return
 	}
 	if VideoInfo == nil {
@@ -409,10 +444,15 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
-	Id := path.Base(r.URL.Path)
-	Video, err := DB_GetVideo(Id)
+	RequestId := path.Base(r.URL.Path)
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid video id.", http.StatusBadRequest)
+		return
+	}
+	
+	Video, err := DB_GetVideo(RequestId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error when checking if video exists: %v !", err), http.StatusInternalServerError)
 		return
 	}
 	if Video == nil {
@@ -421,7 +461,7 @@ func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
 	}
 	err = DB_DeleteVideo(Video)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error when deleting video: %v !", err), http.StatusInternalServerError)
 		return
 	}
 	
@@ -432,7 +472,22 @@ func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
 func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if strings.HasPrefix(r.URL.Path, "tasks/") && RequestId != "" {
-		// TODO: This is unfinished!!! Pretend this works.
+		if len(RequestId) > API_MAX_REQUEST_ID {
+			http.Error(w, "Invalid task id.", http.StatusBadRequest)
+			return
+		}
+		Task, err := CL_GetCommandTask(RequestId)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error when getting task: %v !", err), http.StatusInternalServerError)
+			return
+		}
+		if Task == nil {
+			http.Error(w, "Task not found.", http.StatusNotFound)
+			return
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(Task)
 		return
 	}
 	
@@ -450,16 +505,48 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		Offset, _ = strconv.Atoi(o)
 	}
 	
-	CommandTasks, err := CL_ListCommandTasks(Limit, Offset)
+	TasksList, err := CL_ListCommandTasks(Limit, Offset)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error when trying to list videos, err: %v", err), http.StatusInternalServerError)
 		return
 	}
 	
+	TasksListStats := TasksList
+	if (len(TasksList) >= Limit || Offset > 0) {
+		// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every task...
+		// (Or maybe cache the results aswell...)
+		TasksListAll, err := DB_ListCommandTasks(-1, 0)
+		if err == nil {
+			TasksListStats = TasksListAll
+		} else if err != nil {
+			fmt.Printf("Failed to get tasks list for stats... Err: %v\n", TasksListAll)
+		}
+	}
+	
+	Stats := struct{
+		Total int `json:"total"`
+		
+		TotalRunning  int `json:"total_running"`
+		TotalFailed   int `json:"total_failed"`
+		TotalFinished int `json:"total_finished"`
+		TotalCanceled int `json:"total_canceled"`
+	}{
+		Total: len(TasksListStats),
+	}
+	for _, Task := range(TasksListStats) {
+		switch Task.Status {
+			case TASK_STATUS_RUNNING:  Stats.TotalRunning++
+			case TASK_STATUS_FAILED:   Stats.TotalFailed++
+			case TASK_STATUS_FINISHED: Stats.TotalFinished++
+			case TASK_STATUS_CANCELED: Stats.TotalCanceled++
+		}
+	}
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"count": len(CommandTasks),
-		"tasks": CommandTasks,
+		"count": len(TasksList),
+		"tasks": TasksList,
+		"stats": Stats,
 	})
 }
 
@@ -470,15 +557,22 @@ func API_GetTaskOutput(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	Task := CL_GetCommandTask(RequestId)
+	Task, err := CL_GetCommandTask(RequestId)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when getting command task: %v !", err), http.StatusInternalServerError)
+	}
 	if Task == nil {
-		http.Error(w, "Task not found!", http.StatusBadRequest)
+		http.Error(w, "Task not found!", http.StatusNotFound)
 		return
 	}
 	
 	Task.Lock.RLock()
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte(TruncateOutput(Task.RealtimeOutput)))
+	if Task.Status == TASK_STATUS_RUNNING {
+		w.Write([]byte(TruncateOutput(Task.RealtimeOutput)))
+	} else {
+		w.Write([]byte(TruncateOutput(Task.Output)))
+	}
 	Task.Lock.RUnlock()
 	return
 }
@@ -506,17 +600,17 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		API_CheckChannel(w, r)
 	} else if (Path == "videos" || strings.HasPrefix(Path, "videos/")) && Method == "GET" {
 		/*
-		  api/video?limit={int}&offset={int}&status={int}&from_channel={channel_id}&order_by={order}&order_direction={1, -1} Will return a list of videos,
+		  api/videos?limit={int}&offset={int}&status={int}&from_channel={channel_id}&order_by={order}&order_direction={1, -1} Will return a list of videos.
 		  status, from_channel, order_by and order_direction are optional.
 		  
-		  api/video/{video_id} will give you a specific video.
+		  api/videos/{video_id} will give you a specific video.
 		*/
 		API_GetVideos(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "PATCH" {
 		// You can set status, refresh_state
 		API_UpdateVideo(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "DELETE" {
-		// DELETE api/video/{video_id} will delete a video
+		// DELETE api/videos/{video_id} will delete a video
 		API_DeleteVideo(w, r)
 	} else if (strings.HasPrefix(Path, "get-video-status/")) && Method == "GET" {
 		// api/get-video-status/{video_id} will return just the status of the video and nothing else.
@@ -525,6 +619,11 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		// This is to grab the video status without refreshing the entire list with the api/videos list api.
 		API_GetVideoStatus(w, r)
 	} else if (Path == "tasks" || strings.HasPrefix(Path, "tasks/")) && Method == "GET" {
+		/*
+		  api/tasks?limit={int}&offset={int} Returns a list of videos. (There are no filter at the moment... but there will be swoon)
+		  
+		  api/tasks/{video_id} will give you a specific task.
+		*/
 		API_GetTasks(w, r)
 	} else if strings.HasPrefix(Path, "get-realtime-task-output/") && Method == "GET" {
 		API_GetTaskOutput(w, r)

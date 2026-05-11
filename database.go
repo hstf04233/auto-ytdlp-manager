@@ -479,6 +479,36 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	return nil
 }
 
+func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
+	CommandTask := &CommandTask{}
+	TaskRow := GDB.QueryRow(`
+	SELECT Id, Type, Status, FromChannel, FromVideo, RunArgs, Output,
+	StartTime, EndTime FROM CommandTasks WHERE Id = ?
+	`, TaskId)
+	
+	err := TaskRow.Scan(
+		&CommandTask.Id,
+		&CommandTask.Type,
+		&CommandTask.Status,
+		
+		&CommandTask.FromChannelId,
+		&CommandTask.FromVideoId,
+		
+		&CommandTask.RunArgs,
+		&CommandTask.Output,
+		&CommandTask.StartTime,
+		&CommandTask.EndTime,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	
+	return CommandTask, nil
+}
+
 func DB_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 	Args := []interface{}{}
 	

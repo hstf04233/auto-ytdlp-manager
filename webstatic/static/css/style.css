@@ -587,7 +587,7 @@ body {
 }
 
 .task-list-container {
-  flex: 0 0 300px;
+  flex: 0 0 400px;
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 240px);
@@ -635,7 +635,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 200px;
+  max-width: 300px;
 }
 
 .task-item-run-args {

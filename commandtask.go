@@ -375,7 +375,6 @@ func CL_DownloadTask(Cmd *exec.Cmd, VideoId string, ChannelId string) (*CommandT
 	return Task, nil
 }
 
-
 func CL_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 	TasksList, err := DB_ListCommandTasks(Limit, Offset)
 	if err != nil {
@@ -403,12 +402,21 @@ func CL_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 	
 	return TasksList, nil
 }
-func CL_GetCommandTask(TaskId string) *CommandTask {
+func CL_GetCommandTask(TaskId string) (*CommandTask, error) {
 	ARCT_Lock.RLock()
 	Task := AllRunningCommandTasks[TaskId]
 	ARCT_Lock.RUnlock()
 	
-	return Task
+	if Task == nil {
+		var err error
+		Task, err = DB_GetCommandTask(TaskId)
+		if err != nil {
+			fmt.Printf("DB_GetCommandTask error: %v !\n", err)
+			return nil, err
+		}
+	}
+	
+	return Task, nil
 }
 
 func init() {
