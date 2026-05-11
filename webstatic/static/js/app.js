@@ -55,6 +55,14 @@ let videoStats = {};
 const VIDEO_PAGE_SIZE = 40;
 
 let lastPageOpen = ''
+let _pgCallbacks = {}
+let _pgId = 0
+
+function _registerPgCbs(cbs) {
+  const id = ++_pgId
+  _pgCallbacks[id] = cbs
+  return id
+}
 
 function showPage(page, dontSaveHistory) {
   if (!dontSaveHistory) {
@@ -536,16 +544,14 @@ function getFilteredVideos() {
   });
 }
 
-function clearFilters() {
+function clearVideoFilters() {
   document.getElementById('videoSearch').value = '';
   document.getElementById('videoStatusFilter').value = '';
   document.getElementById('videoChannelFilter').value = '';
   videoPage = 0;
-  loadVideos();
-}
-
-function filterVideos() {
-  renderVideos();
+  if (!areVideosLoading) {
+    loadVideos();
+  }
 }
 
 let videoSearchDidUpdate = false;
@@ -560,44 +566,68 @@ function onVideoFilterChange() {
 }
 
 function renderVideoPagination() {
-  const container_top = document.getElementById('videoPagination-top');
+  const container_top    = document.getElementById('videoPagination-top');
   const container_bottom = document.getElementById('videoPagination-bottom');
-  
   const totalPages = Math.ceil(videoTotalCount / VIDEO_PAGE_SIZE) || 1;
-  const currentPage = videoPage;
-  const html = buildPaginationHTML(currentPage, totalPages);
+  const cbsId = _registerPgCbs({
+    prev: () => { if (!areVideosLoading && videoPage > 0) { videoPage--; loadVideos(); } },
+    next: () => { if (!areVideosLoading) { videoPage++; loadVideos(); } },
+    page: (p) => { if (!areVideosLoading) { videoPage = p; loadVideos(); } },
+  });
   
-  container_top.innerHTML = html;
-  container_bottom.innerHTML = html;
+  const paginationHtml = buildPaginationHTML({
+    currentPage: videoPage,
+    totalPages,
+    totalCount: videoTotalCount,
+    currentItems: allVideos.length,
+    label: 'videos',
+    cbsId: cbsId,
+  });
+  
+  container_top.innerHTML = paginationHtml;
+  container_bottom.innerHTML = paginationHtml;
 }
 
-function buildPaginationHTML(currentPage, totalPages) {
-  const btn = (label, page, disabled, active) => {
+function buildPaginationHTML(cfg) {
+  const { currentPage, totalPages, totalCount, currentItems, label, cbsId } = cfg;
+  
+  const btn = (labelText, page, disabled, active) => {
     const disabledAttr = disabled ? ' disabled' : '';
     const activeAttr = active ? ' class="active"' : '';
-    const onclick = disabled ? '' : ` onclick="if (!areVideosLoading) { videoPage=${page}; loadVideos(); }"`;
-    return `<button${activeAttr}${disabledAttr}${onclick}>${label}</button>`;
+    let onclick = '';
+    if (!disabled) {
+      if (page < 0) {
+        // Prev
+        onclick = ` onclick="(_pgCallbacks[${cbsId}]&&_pgCallbacks[${cbsId}].prev())"`;
+      } else if (page >= totalPages) {
+        // Next
+        onclick = ` onclick="(_pgCallbacks[${cbsId}]&&_pgCallbacks[${cbsId}].next())"`;
+      } else {
+        // Page num
+        onclick = ` onclick="(_pgCallbacks[${cbsId}]&&_pgCallbacks[${cbsId}].page(${page}))"`;
+      }
+    }
+    return `<button${activeAttr}${disabledAttr}${onclick}>${labelText}</button>`;
   };
   
-  // Single page case
+  const singlePageMsg = `All ${label} shown (page 1 of 1)`;
+  const countMsg = `Showing ${currentItems} ${label} out of ${totalCount}`;
+  
   if (totalPages <= 1) {
-    return `<span class="single-page-msg">All videos shown (page 1 of 1)</span>`;
+    return `<span class="single-page-msg">${singlePageMsg}</span>`;
   }
   
   // Page numbers group
   let pageButtons = [];
   
   if (totalPages <= 7) {
-    // Show all pages
     for (let i = 0; i < totalPages; i++) {
       pageButtons.push(btn(String(i + 1), i, false, currentPage === i));
     }
   } else {
-    // Build range around current page
     let rangeStart = Math.max(1, currentPage - 2);
     let rangeEnd = Math.min(totalPages - 2, currentPage + 2);
     
-    // Adjust if at edges
     if (rangeStart <= 1) {
       rangeEnd = Math.min(totalPages - 2, rangeStart + 5);
     }
@@ -608,35 +638,57 @@ function buildPaginationHTML(currentPage, totalPages) {
       rangeStart = Math.max(1, rangeEnd - 5);
     }
     
-    // Page 1
     const isFirstActive = currentPage === 0;
     pageButtons.push(btn('1', 0, false, isFirstActive));
     
-    // Ellipsis after page 1
     if (rangeStart > 2) {
       pageButtons.push('<span class="page-ellipsis">…</span>');
     } else if (rangeStart === 2) {
       pageButtons.push(btn('2', 1, false, false));
     }
     
-    // Range
     for (let i = rangeStart; i <= rangeEnd; i++) {
       pageButtons.push(btn(String(i + 1), i, false, currentPage === i));
     }
     
-    // Ellipsis before last page
     if (rangeEnd < totalPages - 2) {
       pageButtons.push('<span class="page-ellipsis">…</span>');
     }
     
-    // Last page
     pageButtons.push(btn(String(totalPages), totalPages - 1, false, currentPage === totalPages - 1));
   }
   
-  // Single-line layout: PREV + page numbers + NEXT
   const prevDisabled = currentPage === 0;
   const nextDisabled = currentPage >= totalPages - 1;
-  return btn('&lt;', currentPage - 1, prevDisabled, false) + pageButtons.join('') + btn('&gt;', currentPage + 1, nextDisabled, false) + `<span class="single-page-msg">Showing ${allVideos.length} videos out of ${videoTotalCount}</span>`;
+  const prevBtn = btn('‹', -1, prevDisabled, false);
+  const nextBtn = btn('›', totalPages+100, nextDisabled, false);
+  return prevBtn + pageButtons.join('') + nextBtn + `<span class="single-page-msg">${countMsg}</span>`;
+}
+
+function renderTaskPagination() {
+  const container_top    = document.getElementById('taskPagination-top');
+  const container_bottom = document.getElementById('taskPagination-bottom');
+  const totalPages = Math.ceil(taskTotalCount / TASK_PAGE_SIZE) || 1;
+  const cbsId = _registerPgCbs({
+    prev: () => { if (!areTasksLoading && taskPage > 0) { taskPage--; loadTasks(); } },
+    next: () => { if (!areTasksLoading) { taskPage++; loadTasks(); } },
+    page: (p) => { if (!areTasksLoading) { taskPage = p; loadTasks(); } },
+  });
+  
+  console.log("task total: " + taskTotalCount)
+  console.log("task totalPages: " + totalPages)
+  
+  const paginationHtml = buildPaginationHTML({
+    currentPage: taskPage,
+    totalPages,
+    totalCount: taskTotalCount,
+    currentItems: allTasks.length,
+    label: 'tasks',
+    cbsId: cbsId,
+  });
+  
+  container_top.innerHTML = paginationHtml;
+  container_bottom.innerHTML = paginationHtml;
 }
 
 function updateVideoStats() {
@@ -676,7 +728,9 @@ function updateChannelFilter() {
 // ========== Tasks ==========
 let allTasks = [];
 let taskPage = 0;
-const TASK_PAGE_SIZE = 20;
+const TASK_PAGE_SIZE = 2;
+let taskTotalCount = 0;
+let taskStatsData = {};
 let selectedTask = null;
 let selectedTaskId = null;
 let selectedTaskType = null;
@@ -712,6 +766,10 @@ async function loadTasks() {
     const url = `/api/tasks?limit=${TASK_PAGE_SIZE}&offset=${taskPage * TASK_PAGE_SIZE}`;
     const data = await API.get(url);
     allTasks = data.tasks || data;
+    if (data.stats) {
+      taskStatsData = data.stats;
+      taskTotalCount = data.stats.total || allTasks.length;
+    }
     
     if (selectedTaskId !== null) {
       allTasks.forEach(t => {
@@ -732,12 +790,14 @@ async function loadTasks() {
 
 function renderTaskStats() {
   const container = document.getElementById('taskStats');
-  const running = allTasks.filter(t => t.status === 0).length;
-  const failed = allTasks.filter(t => t.status === 1).length;
-  const finished = allTasks.filter(t => t.status === 2).length;
+  const stats = taskStatsData;
+  const total = stats.total || taskTotalCount || allTasks.length;
+  const running = stats.running || 0;
+  const failed = stats.failed || 0;
+  const finished = stats.finished || 0;
   
   container.innerHTML = `
-    <div class="stat-card"><div class="stat-value">${allTasks.length}</div><div class="stat-label">Total</div></div>
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--warning)">${running}</div><div class="stat-label">Running</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--success)">${finished}</div><div class="stat-label">Finished</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${failed}</div><div class="stat-label">Failed</div></div>
@@ -764,12 +824,6 @@ function renderTasks() {
   `).join('');
 }
 
-function renderTaskPagination() {
-  const container = document.getElementById('taskPagination-top');
-  // Simple: just show count for now
-  container.innerHTML = `<span class="single-page-msg">${allTasks.length} tasks shown</span>`;
-}
-
 function selectTask(id) {
   selectedTaskId = id;
   //selectedTaskType = type;
@@ -782,8 +836,6 @@ function selectTask(id) {
   
   const outputContainer = document.getElementById('taskOutputContent');
   const statusEl = document.getElementById('taskOutputStatus');
-  
-  const task = allTasks.find(t => t.id == selectedTaskId);
   
   outputContainer.innerHTML = '<span class="terminal-prompt">Loading output...</span>';
   statusEl.textContent = '';
@@ -877,34 +929,6 @@ function stopRealtimePolling() {
   if (outputContainer) {
     outputContainer.innerHTML = '<span class="terminal-prompt">Select a task to view its output</span>';
   }
-}
-
-function renderTaskPagination() {
-  const container = document.getElementById('taskPagination-top');
-  const totalPages = Math.ceil(allTasks.length / TASK_PAGE_SIZE) || 1;
-  const currentPage = taskPage;
-  
-  const btn = (label, page, disabled, active) => {
-    const disabledAttr = disabled ? ' disabled' : '';
-    const activeAttr = active ? ' class="active"' : '';
-    const onclick = disabled ? '' : ` onclick="taskPage=${page};loadTasks()"`;
-    return `<button${activeAttr}${disabledAttr}${onclick}>${label}</button>`;
-  };
-  
-  if (totalPages <= 1) {
-    container.innerHTML = `<span class="single-page-msg">All tasks shown</span>`;
-    return;
-  }
-  
-  const pages = [];
-  pages.push(btn('‹', currentPage - 1, currentPage === 0, false));
-  
-  for (let i = 0; i < Math.min(totalPages, 5); i++) {
-    pages.push(btn(String(i + 1), i, false, currentPage === i));
-  }
-  
-  pages.push(btn('›', currentPage + 1, currentPage >= totalPages - 1, false));
-  container.innerHTML = pages.join('');
 }
 
 function escHtml(str) {

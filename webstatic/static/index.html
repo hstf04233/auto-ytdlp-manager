@@ -71,7 +71,7 @@
           <option value="-1">Newest</option>
           <option value="1">Oldest</option>
         </select>
-        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear Filters</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearVideoFilters()">Clear Filters</button>
       </div>
       
       <div class="pagination" id="videoPagination-top"></div>
@@ -93,19 +93,18 @@
 
       <div class="task-layout">
         <div class="task-list-container">
+          <div class="pagination" id="taskPagination-top"></div>
           <div id="taskList">
             <div class="loading">Loading tasks...</div>
           </div>
-          <div class="pagination" id="taskPagination-top"></div>
+          <div class="pagination" id="taskPagination-bottom"></div>
         </div>
 
-        <div class="task-output-container" id="taskOutputPanel">
+       <div class="task-output-container" id="taskOutputPanel">
           <div class="terminal-header">
-            <!--
             <span class="terminal-dot terminal-red"></span>
             <span class="terminal-dot terminal-yellow"></span>
             <span class="terminal-dot terminal-green"></span>
-            -->
             <span class="terminal-title">Task Output</span>
             <span class="terminal-status" id="taskOutputStatus"></span>
           </div>
