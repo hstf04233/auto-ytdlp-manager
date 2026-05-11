@@ -124,6 +124,7 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 	// TODO: Rewrite this so it doesn't use strings. Currently this creates a ton of garbage strings.
 	
 	CarriageReturn := false
+	EndWait := time.Now().UnixMilli()
 	
 	for {
 		n := 0
@@ -215,7 +216,12 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 			_c_err = c_err
 		}
 		if Task.Status != TASK_STATUS_RUNNING && _c_err <= 0 && _c_out <= 0 {
-			break
+			// Wait a bit for the output to fully flush out.
+			if time.Now().UnixMilli() > EndWait {
+				break
+			}
+		} else {
+			EndWait = time.Now().UnixMilli() + 500
 		}
 	}
 	
@@ -223,6 +229,8 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 	Task.Output = TruncateOutput(Task.RealtimeOutput)
 	Task.RealtimeOutput = ""
 	Task.Lock.Unlock()
+	
+	DB_UpdateCommandTaskInfo(Task)
 	
 	fmt.Printf("Output for task: '%s' has stopped!\n", Task.Id)
 }
@@ -303,8 +311,10 @@ func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCl
 	if Task.Status == TASK_STATUS_RUNNING {
 		Task.Lock.Unlock()
 		CL_FinishTask(Task, TASK_STATUS_FINISHED)
+	} else {
+		Task.Lock.Unlock()
 	}
-	Task.Lock.Unlock()
+	//Task.Lock.Unlock()
 }
 
 func GetRealArgs(Args []string) string {
