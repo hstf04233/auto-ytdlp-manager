@@ -42,6 +42,9 @@ const API = {
 };
 
 // ========== State ==========
+let areVideosLoading = false;
+let areTasksLoading  = false;
+
 let allChannels = [];
 let allVideos = [];
 let videoPage = 0;
@@ -72,10 +75,18 @@ function showPage(page, dontSaveHistory) {
     pageDoc.classList.add('active');
   }
   
-  if (page === 'videos') loadVideos();
+  if (page === 'videos') {
+    if (!areVideosLoading) {
+      loadVideos();
+    }
+  }
   if (page === 'tasks') {
     stopRealtimePolling();
-    loadTasks();
+    if (!areTasksLoading) {
+      loadTasks();
+    }
+  } else {
+    stopRealtimePolling();
   }
 }
 
@@ -436,6 +447,7 @@ async function saveChannel(e) {
 
 // ========== Videos ==========
 async function loadVideos() {
+  areVideosLoading = true;
   try {
     const statusFilter = document.getElementById('videoStatusFilter').value;
     const channelFilter = document.getElementById('videoChannelFilter').value;
@@ -454,7 +466,7 @@ async function loadVideos() {
     url += `&order_direction=${orderDir}`;
     const search = document.getElementById('videoSearch').value;
     if (search !== '') {
-      // TODO: This is bad an inappropriate!!! filter this out so you can't do some funky shi
+      // TODO: This is bad and inappropriate!!! sanitize this out so the user can't do some funky shi
       url += `&search_query=${search}`
     }
     
@@ -468,6 +480,7 @@ async function loadVideos() {
   } catch (err) {
     showToast(`Failed to load videos: ${err.message}`, 'error');
   }
+  areVideosLoading = false
 }
 
 function renderVideos() {
@@ -560,7 +573,7 @@ function buildPaginationHTML(currentPage, totalPages) {
   const btn = (label, page, disabled, active) => {
     const disabledAttr = disabled ? ' disabled' : '';
     const activeAttr = active ? ' class="active"' : '';
-    const onclick = disabled ? '' : ` onclick="videoPage=${page};loadVideos()"`;
+    const onclick = disabled ? '' : ` onclick="if (!areVideosLoading) { videoPage=${page}; loadVideos(); }"`;
     return `<button${activeAttr}${disabledAttr}${onclick}>${label}</button>`;
   };
   
@@ -692,6 +705,7 @@ function taskTypeBadge(type) {
 }
 
 async function loadTasks() {
+  areTasksLoading = true;
   try {
     const url = `/api/tasks?limit=${TASK_PAGE_SIZE}&offset=${taskPage * TASK_PAGE_SIZE}`;
     const data = await API.get(url);
@@ -711,6 +725,7 @@ async function loadTasks() {
   } catch (err) {
     showToast(`Failed to load tasks: ${err.message}`, 'error');
   }
+  areTasksLoading = false;
 }
 
 function renderTaskStats() {
@@ -807,9 +822,8 @@ function formatTerminalOutput(text, status, run_args) {
     return `<span class="${cls}">${escHtml(line)}</span>`;
   }).join('\n');
   
-  const cursor = status === 0 ? '<span class="terminal-cursor"></span>' : '';
   const runArgsContent = `<span class="terminal-line">${escHtml(run_args)}</span><br><span class="terminal-line"></span>`;
-  return runArgsContent + formatted + cursor;
+  return runArgsContent + formatted;
 }
 
 function startRealtimePolling() {
@@ -817,16 +831,19 @@ function startRealtimePolling() {
     clearInterval(realtimeOutputTimer);
   }
   
+  let canRefresh = true;
+  
   realtimeOutputTimer = setInterval(async () => {
-    if (!selectedTaskId || !selectedTask || selectedTask.status !== 0) {
+    if (!selectedTaskId || !selectedTask || selectedTask.status !== 0 || lastPageOpen !== "tasks" || !canRefresh) {
       return;
     }
     
     const statusEl = document.getElementById('taskOutputStatus');
+    canRefresh = false;
     try {
       const res = await fetch(`/api/get-realtime-task-output/${selectedTaskId}`);
       if (!res.ok) {
-        statusEl.textContent = 'No output available';
+        if (statusEl) statusEl.textContent = 'No output available';
         return;
       }
       
@@ -837,10 +854,11 @@ function startRealtimePolling() {
       // Auto-scroll to bottom
       outputContainer.scrollTop = outputContainer.scrollHeight;
       
-      statusEl.textContent = 'Live';
+      if (statusEl) statusEl.textContent = 'Live';
     } catch (err) {
-      statusEl.textContent = 'Poll error';
+      if (statusEl) statusEl.textContent = 'Poll error';
     }
+    canRefresh = true;
   }, 200);
 }
 
@@ -909,29 +927,42 @@ async function init() {
   updateChannelFilter();
   // Auto-refresh videos every 10s
   setInterval(() => {
+    if (areVideosLoading) {
+      return;
+    }
+    
     const videosPage = document.getElementById('page-videos');
     if (videosPage.classList.contains('active')) {
       loadVideos();
     }
   }, 10_000);
   
-  // Auto-refresh tasks every 5s
+  // Auto-refresh tasks every 7.5s
   setInterval(() => {
+    if (areTasksLoading) {
+      return;
+    }
+    
     const tasksPage = document.getElementById('page-tasks');
     if (tasksPage.classList.contains('active')) {
       loadTasks();
     }
-  }, 5_000);
+  }, 7_500);
   
   
-  // Check search updates every 250ms
+  // Check search updates every 100ms (at best)
   setInterval(() => {
+    if (areVideosLoading) {
+      return;
+    }
+    
     if (videoSearchDidUpdate) {
       videoSearchDidUpdate = false;
-      videoPage = 0
+      videoPage = 0;
+      
       loadVideos();
     }
-  }, 250);
+  }, 100);
 }
 
 init()

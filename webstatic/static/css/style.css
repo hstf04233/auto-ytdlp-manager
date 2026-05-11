@@ -587,10 +587,12 @@ body {
 }
 
 .task-list-container {
-  flex: 0 0 200px;
+  flex: 0 0 300px;
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .task-list {
@@ -682,13 +684,18 @@ body {
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  height: fit-content;
+  min-height: 400px;
+  max-height: calc(100vh - 240px);
 }
 
 .terminal-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 6px 10px;
   background: #1e1e1e;
   border-bottom: 1px solid #333;
 }
@@ -749,7 +756,7 @@ body {
   /* white-space: pre-wrap; */
   word-break: break-all;
   min-height: 400px;
-  max-height: calc(100vh - 320px);
+  /*max-height: calc(100vh - 240px);*/
   scroll-behavior: smooth;
 }
 

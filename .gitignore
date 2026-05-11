@@ -3,3 +3,7 @@ webstatic/static/_oldUI/
 yt_download_manager.db
 yt_download_manager.db-wal
 yt_download_manager.db-shm
+yt_download_manager_DEBUG.db
+yt_download_manager_DEBUG.db-wal
+yt_download_manager_DEBUG.db-shm
+yt-stream-manager-debug.exe

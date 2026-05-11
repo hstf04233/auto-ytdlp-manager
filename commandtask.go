@@ -28,6 +28,7 @@ const (
 	TASK_STATUS_RUNNING  = 0
 	TASK_STATUS_FAILED   = 1
 	TASK_STATUS_FINISHED = 2
+	TASK_STATUS_CANCELED = 3
 )
 
 type CommandTask struct {
@@ -48,6 +49,7 @@ type CommandTask struct {
 	
 	StartTime time.Time `json:"start_time"`
 	EndTime   time.Time `json:"end_time"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 var ARCT_Lock sync.RWMutex
@@ -183,21 +185,20 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 					CarriageReturn = false
 					Task.RealtimeOutput += writeLine.String()
 					writeLine.Reset()
+				} else {
+					if CarriageReturn {
+						CarriageReturn = false
+						VisibleOutput_Lines := strings.Split(Task.RealtimeOutput, "\n")
+						if len(VisibleOutput_Lines) >= 2 {
+							Task.RealtimeOutput = strings.Join(VisibleOutput_Lines[0:len(VisibleOutput_Lines)-1], "\n") + "\n" + string(b)
+						} else {
+							Task.RealtimeOutput = "\n" + string(b)
+						}
+						writeLine.Reset()
+					}
 				}
 				if b == byte('\r') {
-					/*
-					Task.RealtimeOutput += writeLine.String()
-					writeLine.Reset()
-					*/
 					CarriageReturn = true
-				} else if CarriageReturn {
-					CarriageReturn = false
-					VisibleOutput_Lines := strings.Split(Task.RealtimeOutput, "\n")
-					if len(VisibleOutput_Lines) >= 2 {
-						Task.RealtimeOutput = strings.Join(VisibleOutput_Lines[0:len(VisibleOutput_Lines)-1], "\n") + "\n" + writeLine.String()
-					} else {
-						Task.RealtimeOutput = writeLine.String()
-					}
 				}
 			}
 			Task.RealtimeOutput += writeLine.String()
@@ -238,8 +239,11 @@ func CL_NewTask() *CommandTask {
 
 func CL_FinishTask(Task *CommandTask, Status int) {
 	Task.Lock.Lock()
+	
 	Task.Status = Status
 	Task.EndTime = time.Now().UTC()
+	Task.UpdatedAt = time.Now().UTC()
+	
 	Task.Lock.Unlock()
 	
 	DB_UpdateCommandTaskInfo(Task)
@@ -261,18 +265,33 @@ func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCl
 	for {
 		exitCode := Task.Cmd.ProcessState.ExitCode()
 		if exitCode != -1 {
+			fmt.Printf("Task ended with ExitCode: %d\n", exitCode)
+			if exitCode > 0 {
+				// Command failed?
+				Task.Lock.Lock()
+				if Task.Status == TASK_STATUS_RUNNING {
+					Task.Lock.Unlock()
+					CL_FinishTask(Task, TASK_STATUS_FAILED)
+				}
+				Task.Lock.Unlock()
+			}
 			break
 		}
+		Task.Lock.Lock()
 		if Task.Status != TASK_STATUS_RUNNING {
+			Task.Lock.Unlock()
 			fmt.Printf("This task isn't running? Id: %s\n", Task.Id)
 			break
 		}
+		Task.Lock.Unlock()
 		
 		if time.Now().UnixMilli() > NextUpdate {
 			Task.Lock.Lock()
 			if Task.RealtimeOutput != "" {
 				Task.Output = TruncateOutput(Task.RealtimeOutput)
 			}
+			Task.UpdatedAt = time.Now().UTC()
+			
 			Task.Lock.Unlock()
 			DB_UpdateCommandTaskInfo(Task)
 			NextUpdate = time.Now().UnixMilli() + (1000 * 10)
@@ -280,9 +299,12 @@ func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCl
 		time.Sleep(1000 * time.Millisecond)
 	}
 	
+	Task.Lock.Lock()
 	if Task.Status == TASK_STATUS_RUNNING {
+		Task.Lock.Unlock()
 		CL_FinishTask(Task, TASK_STATUS_FINISHED)
 	}
+	Task.Lock.Unlock()
 }
 
 func GetRealArgs(Args []string) string {
@@ -299,6 +321,24 @@ func GetRealArgs(Args []string) string {
 	return strings.Join(SB, " ")
 }
 
+func CL_CancelTask(Task *CommandTask) error {
+	CanCancel := false
+	if Task.Status == TASK_STATUS_RUNNING {
+		CanCancel = true
+	}
+	
+	err := Task.Cmd.Process.Kill()
+	if err != nil {
+		fmt.Printf("Cannot kill process | err: %v\n", err)
+		return err
+	}
+	if CanCancel {
+		CL_FinishTask(Task, TASK_STATUS_CANCELED)
+	}
+	
+	return nil
+}
+
 func CL_DownloadTask(Cmd *exec.Cmd, VideoId string, ChannelId string) (*CommandTask, error) {
 	Task := CL_NewTask()
 	
@@ -311,19 +351,26 @@ func CL_DownloadTask(Cmd *exec.Cmd, VideoId string, ChannelId string) (*CommandT
 	
 	stdout, err := Task.Cmd.StdoutPipe()
 	if err != nil {
-		fmt.Printf("Error creating StdoutPipe: %s\n", err)
+		ErrMsg := fmt.Sprintf("Error creating StdoutPipe: %s\n", err)
+		Task.Output = ErrMsg
+		fmt.Printf("%s", ErrMsg)
 		
 		CL_FinishTask(Task, TASK_STATUS_FAILED)
 		return nil, err
 	}
 	stderr, err := Task.Cmd.StderrPipe()
 	if err != nil {
-		fmt.Printf("Error creating StderrPipe: %v\n", err)
+		ErrMsg := fmt.Sprintf("Error creating StderrPipe: %s\n", err)
+		Task.Output = ErrMsg
+		fmt.Printf("%s", ErrMsg)
+		
 		CL_FinishTask(Task, TASK_STATUS_FAILED)
 		return nil, err
 	}
 	
 	go CL_CommandTaskRun(Task, stdout, stderr)
+	
+	Task.UpdatedAt = time.Now().UTC()
 	DB_UpdateCommandTaskInfo(Task)
 	return Task, nil
 }

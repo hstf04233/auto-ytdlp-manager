@@ -23,7 +23,9 @@ type VideoInfo struct {
 	Url          string  `json:"url"`
 	Id           string  `json:"id"`
 	Availability string  `json:"availability"`  // public, unlisted, private etc...
-	Resolution   string  `json:"resolution"` 
+	Resolution   string  `json:"resolution"`
+	
+	Filename     string  `json:"Filename"`		// Where the video is stored on device
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
@@ -44,12 +46,12 @@ type YT_DLP_OUTVIDEO struct {
 	Id           string  `json:"id"`
 	Availability string  `json:"availability"`
 	Resolution   string  `json:"resolution"`
+	Filename     string  `json:"filename"`
 	
 	Duration     float64  `json:"duration"`
 	
 	Timestamp        int64 `json:"timestamp"`
 	ReleaseTimestamp int64 `json:"release_timestamp"`
-	
 	
 	IsLive  bool `json:"is_live"`
 	WasLive bool `json:"was_live"`
@@ -81,6 +83,10 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	if OutVideo.Resolution != "" {
 		VideoInfo.Resolution = OutVideo.Resolution
 	}
+	if OutVideo.Filename != "" && VideoInfo.Filename == "" {
+		// TODO Filename is unfinished...
+		VideoInfo.Filename = OutVideo.Filename
+	}
 	
 	if OutVideo.ReleaseTimestamp != 0 {
 		VideoInfo.ReleaseDate = OutVideo.ReleaseTimestamp
@@ -89,18 +95,40 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	}
 }
 
-func RequestVideoInfo(AChannel ArchiveChannel, VideoUrl string, v *VideoInfo) (error) {
+func GetDownloadDir(AChannel ArchiveChannel) string {
+	DownloadDir := AChannel.DownloadDir
+	if DownloadDir == "" {
+		DownloadDir = DEFAULT_DOWNLOAD_DIR
+	}
+	return DownloadDir
+}
+func GetOutputTemplate(AChannel ArchiveChannel) string {
+	OutputTemplate := AChannel.OutputTemplate
+	if OutputTemplate == "" {
+		OutputTemplate = DEFAULT_YT_DLP_OUTPUT_TEMPLATE
+	}
+	return OutputTemplate
+}
+
+func RequestVideoInfo(AChannel ArchiveChannel, VideoUrl string, Video *VideoInfo) (error) {
+	DownloadDir    := GetDownloadDir(AChannel)
+	OutputTemplate := GetOutputTemplate(AChannel)
+	
 	Args := []string{
 		VideoUrl,
 		"--ignore-config",
 		"--dump-json",
 		"--skip-download",
+		"--live-from-start",
+		//"--restrict-filenames",
+		"-o", OutputTemplate,
 	}
 	if AChannel.QualitySelect > 0 {
 		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
 	}
 	
 	Cmd := exec.Command(CMD_YT_DLP, Args...)
+	Cmd.Dir = DownloadDir
 	
 	Out, err := Cmd.Output()
 	if err != nil {
@@ -114,7 +142,12 @@ func RequestVideoInfo(AChannel ArchiveChannel, VideoUrl string, v *VideoInfo) (e
 		return err
 	}
 	
-	PopulateVideoInfoFromOutVideo(v, OutVideo)
+	PopulateVideoInfoFromOutVideo(Video, OutVideo)
+	
+	if Video.VideoType == VIDEO_TYPE_ISLIVE || Video.VideoType == VIDEO_TYPE_WASLIVE {
+		DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
+		Video.Filename = fmt.Sprintf("%s %s", DateAndTime, Video.Filename)
+	}
 	
 	return nil
 }
@@ -162,15 +195,8 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int) ([]VideoInfo, error) 
 
 
 func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
-	DownloadDir := AChannel.DownloadDir
-	if DownloadDir == "" {
-		DownloadDir = DEFAULT_DOWNLOAD_DIR
-	}
-	
-	OutputTemplate := AChannel.OutputTemplate
-	if OutputTemplate == "" {
-		OutputTemplate = DEFAULT_YT_DLP_OUTPUT_TEMPLATE
-	}
+	DownloadDir    := GetDownloadDir(AChannel)
+	OutputTemplate := GetOutputTemplate(AChannel)
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
