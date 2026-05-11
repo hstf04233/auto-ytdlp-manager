@@ -42,6 +42,8 @@ const API = {
 };
 
 // ========== State ==========
+
+// These are to stop spamming the api endpoints until the last call is finished!
 let areVideosLoading = false;
 let areTasksLoading  = false;
 
