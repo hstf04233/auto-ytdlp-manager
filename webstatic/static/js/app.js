@@ -416,7 +416,7 @@ async function saveChannel(e) {
   const quality = parseInt(document.getElementById('channelQuality').value);
   const downloadDir = document.getElementById('channelDownloadDir').value.trim();
   const outputTemplate = document.getElementById('channelOutputTemplate').value.trim();
-  const checkInterval = document.getElementById('channelCheckInterval').value ? parseInt(document.getElementById('channelCheckInterval').value) : 3600;
+  const checkInterval = document.getElementById('channelCheckInterval').value ? parseInt(document.getElementById('channelCheckInterval').value) : 900;
   const fullCheckInterval = document.getElementById('channelFullCheckInterval').value ? parseInt(document.getElementById('channelFullCheckInterval').value) : 172800;
 
   const body = {
@@ -565,10 +565,20 @@ function onVideoFilterChange() {
   loadVideos();
 }
 
+let lastVideoPage = 0;
+let lastVideoPageCount = 0;
+
 function renderVideoPagination() {
   const container_top    = document.getElementById('videoPagination-top');
   const container_bottom = document.getElementById('videoPagination-bottom');
   const totalPages = Math.ceil(videoTotalCount / VIDEO_PAGE_SIZE) || 1;
+  if (lastVideoPageCount == totalPages && lastVideoPage == videoPage) {
+    // Nothing has changed.
+    return;
+  }
+  lastVideoPage = videoPage;
+  lastVideoPageCount = totalPages;
+  
   const cbsId = _registerPgCbs({
     prev: () => { if (!areVideosLoading && videoPage > 0) { videoPage--; loadVideos(); } },
     next: () => { if (!areVideosLoading) { videoPage++; loadVideos(); } },
@@ -577,7 +587,7 @@ function renderVideoPagination() {
   
   const paginationHtml = buildPaginationHTML({
     currentPage: videoPage,
-    totalPages,
+    totalPages: totalPages,
     totalCount: videoTotalCount,
     currentItems: allVideos.length,
     label: 'videos',
@@ -665,10 +675,20 @@ function buildPaginationHTML(cfg) {
   return prevBtn + pageButtons.join('') + nextBtn + `<span class="single-page-msg">${countMsg}</span>`;
 }
 
+let lastTaskPage = 0;
+let lastTaskPageCount = 0;
+
 function renderTaskPagination() {
   const container_top    = document.getElementById('taskPagination-top');
   const container_bottom = document.getElementById('taskPagination-bottom');
   const totalPages = Math.ceil(taskTotalCount / TASK_PAGE_SIZE) || 1;
+  if (lastTaskPageCount == totalPages && lastTaskPage == taskPage) {
+    // Nothing has changed.
+    return;
+  }
+  lastTaskPage = taskPage;
+  lastTaskPageCount = totalPages;
+  
   const cbsId = _registerPgCbs({
     prev: () => { if (!areTasksLoading && taskPage > 0) { taskPage--; loadTasks(); } },
     next: () => { if (!areTasksLoading) { taskPage++; loadTasks(); } },
@@ -680,7 +700,7 @@ function renderTaskPagination() {
   
   const paginationHtml = buildPaginationHTML({
     currentPage: taskPage,
-    totalPages,
+    totalPages: totalPages,
     totalCount: taskTotalCount,
     currentItems: allTasks.length,
     label: 'tasks',
@@ -953,7 +973,7 @@ async function init() {
   updateChannelFilter();
   // Auto-refresh videos every 10s
   setInterval(() => {
-    if (areVideosLoading) {
+    if (areVideosLoading || document.hidden) {
       return;
     }
     
@@ -965,7 +985,7 @@ async function init() {
   
   // Auto-refresh tasks every 7.5s
   setInterval(() => {
-    if (areTasksLoading) {
+    if (areTasksLoading || document.hidden) {
       return;
     }
     
@@ -976,19 +996,29 @@ async function init() {
   }, 7_500);
   
   
-  // Check search updates every 100ms (at best)
+  // Check search updates every 300ms (at best)
   setInterval(() => {
-    if (areVideosLoading) {
-      return;
-    }
-    
     if (videoSearchDidUpdate) {
       videoSearchDidUpdate = false;
       videoPage = 0;
       
       loadVideos();
     }
-  }, 100);
+  }, 300);
 }
 
-init()
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    const videosPage = document.getElementById('page-videos');
+    if (!areVideosLoading && videosPage.classList.contains('active')) {
+      loadVideos();
+    }
+    
+    const tasksPage = document.getElementById('page-tasks');
+    if (!areTasksLoading && tasksPage.classList.contains('active')) {
+      loadTasks();
+    }
+  }
+});
+
+init();
