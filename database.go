@@ -374,6 +374,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	if err != nil {
 		return nil, err
 	}
+	defer Rows.Close()
 	
 	VideosList := []*VideoInfo{}
 	
@@ -523,6 +524,7 @@ func DB_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer Rows.Close()
 	
 	TasksList := []*CommandTask{}
 	for Rows.Next() {
