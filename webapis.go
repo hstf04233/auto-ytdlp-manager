@@ -138,9 +138,15 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	if Body.CheckInterval != -1 {
 		AChannel.CheckInterval = Body.CheckInterval
+		if AChannel.NextCheckMSEC > time.Now().UnixMilli()+AChannel.CheckInterval {
+			AChannel.NextCheckMSEC = time.Now().UnixMilli()+AChannel.CheckInterval
+		}
 	}
 	if Body.FullCheckInterval != -1 {
 		AChannel.FullCheckInterval = Body.FullCheckInterval
+		if AChannel.NextFullChannelCheckMSEC > time.Now().UnixMilli()+AChannel.FullCheckInterval {
+			AChannel.NextFullChannelCheckMSEC = time.Now().UnixMilli()+AChannel.FullCheckInterval
+		}
 	}
 	if Body.Enabled != nil {
 		AChannel.Enabled = *Body.Enabled
@@ -229,6 +235,18 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type TAPI_VideoListStats struct{
+	Total int `json:"total"`
+	
+	TotalQueued      int `json:"total_queued"`
+	TotalDownloading int `json:"total_downloading"`
+	TotalDownloaded  int `json:"total_downloaded"`
+	TotalFailed      int `json:"total_failed"`
+	TotalIgnored     int `json:"total_ignored"`
+}
+
+var VideosListCache = NewCache(time.Second * 4)
+
 func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if strings.HasPrefix(r.URL.Path, "videos/") && RequestId != "" {
@@ -260,26 +278,6 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	Status := -1
 	Limit := 50
 	Offset := 0
-	if fc := r.URL.Query().Get("from_channel"); fc != "" {
-		FromChannelId = fc
-		/*
-		AChannel := GetArchiveChannelFromId(&WatchedDownloading, FromChannelId)
-		if AChannel == nil {
-			http.Error(w, "Channel not found.", http.StatusNotFound)
-			return
-		}
-		*/
-	}
-	if sq := r.URL.Query().Get("search_query"); sq != "" {
-		SearchQuery = sq
-		if len(SearchQuery) > 1024 {
-			http.Error(w, "search_query must be shorter than 1024 characters", http.StatusBadRequest)
-			return
-		}
-	}
-	if s := r.URL.Query().Get("status"); s != "" {
-		Status, _ = strconv.Atoi(s)
-	}
 	if l := r.URL.Query().Get("limit"); l != "" {
 		Limit, _ = strconv.Atoi(l)
 		if Limit == -1 {
@@ -290,6 +288,19 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	if o := r.URL.Query().Get("offset"); o != "" {
 		Offset, _ = strconv.Atoi(o)
+	}
+	if fc := r.URL.Query().Get("from_channel"); fc != "" {
+		FromChannelId = fc
+	}
+	if sq := r.URL.Query().Get("search_query"); sq != "" {
+		SearchQuery = sq
+		if len(SearchQuery) > 1024 {
+			http.Error(w, "search_query must be shorter than 1024 characters", http.StatusBadRequest)
+			return
+		}
+	}
+	if s := r.URL.Query().Get("status"); s != "" {
+		Status, _ = strconv.Atoi(s)
 	}
 	if o := r.URL.Query().Get("order_direction"); o != "" {
 		OrderDirection, _ = strconv.Atoi(o)
@@ -318,45 +329,49 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	VideosListStats := VideosList
-	if (len(VideosList) >= Limit || Offset > 0) {
-		// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every video...
-		// (Or maybe cache the results aswell...)
-		VideosListAll, err := DB_ListVideos(-1, 0, ListVideosQuery{
-			RefreshState: -1,
-			Status: Status,
-			FromChannelId: FromChannelId,
-			SearchQuery:   SearchQuery,
-			
-			OrderBy: OrderBy,
-			OrderDirection: OrderDirection,
-		})
-		if err == nil {
-			VideosListStats = VideosListAll
-		} else if err != nil {
-			fmt.Printf("Failed to get videos list for stats... Err: %v\n", VideosListAll)
-		}
-	}
+	CacheKey := fmt.Sprintf("%s %s %d", FromChannelId, SearchQuery, Status)
 	
-	Stats := struct{
-		Total int `json:"total"`
-		
-		TotalQueued      int `json:"total_queued"`
-		TotalDownloading int `json:"total_downloading"`
-		TotalDownloaded  int `json:"total_downloaded"`
-		TotalFailed      int `json:"total_failed"`
-		TotalIgnored     int `json:"total_ignored"`
-	}{
-		Total: len(VideosListStats),
-	}
-	for _, Video := range(VideosListStats) {
-		switch Video.Status {
-			case VIDEO_STATUS_QUEUED:      Stats.TotalQueued++
-			case VIDEO_STATUS_DOWNLOADING: Stats.TotalDownloading++
-			case VIDEO_STATUS_DOWNLOADED:  Stats.TotalDownloaded++
-			case VIDEO_STATUS_FAILED:      Stats.TotalFailed++
-			case VIDEO_STATUS_IGNORED:     Stats.TotalIgnored++
+	VideosListCache.CleanUp()
+	
+	Stats := &TAPI_VideoListStats{}
+	StatsC, CacheExists := VideosListCache.Get(CacheKey)
+	if CacheExists {
+		Stats = StatsC.(*TAPI_VideoListStats)
+	} else {
+		VideosListStats := VideosList
+		if (len(VideosList) >= Limit || Offset > 0) {
+			// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every video...
+			// (Or maybe cache the results aswell...)
+			VideosListAll, err := DB_ListVideos(-1, 0, ListVideosQuery{
+				RefreshState: -1,
+				Status: Status,
+				FromChannelId: FromChannelId,
+				SearchQuery:   SearchQuery,
+				
+				OrderBy: OrderBy,
+				OrderDirection: OrderDirection,
+			})
+			if err == nil {
+				VideosListStats = VideosListAll
+			} else if err != nil {
+				fmt.Printf("Failed to get videos list for stats... Err: %v\n", VideosListAll)
+			}
 		}
+		
+		Stats = &TAPI_VideoListStats{
+			Total: len(VideosListStats),
+		}
+		for _, Video := range(VideosListStats) {
+			switch Video.Status {
+				case VIDEO_STATUS_QUEUED:      Stats.TotalQueued++
+				case VIDEO_STATUS_DOWNLOADING: Stats.TotalDownloading++
+				case VIDEO_STATUS_DOWNLOADED:  Stats.TotalDownloaded++
+				case VIDEO_STATUS_FAILED:      Stats.TotalFailed++
+				case VIDEO_STATUS_IGNORED:     Stats.TotalIgnored++
+			}
+		}
+		
+		VideosListCache.Set(CacheKey, Stats)
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
