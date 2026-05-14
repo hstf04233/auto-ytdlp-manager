@@ -31,21 +31,37 @@ const (
 	TASK_STATUS_CANCELED = 3
 )
 
+type TaskChannelInfo struct {
+	Name string `json:"name"`
+	Url  string `json:"url"`
+	Id   string `json:"id"`
+}
+
+type TaskVideoInfo struct {
+	Title string `json:"title"`
+	Url   string `json:"url"`
+	Id    string `json:"id"`
+}
+
 type CommandTask struct {
-	Lock   sync.RWMutex `json:"-"`
+	Lock   *sync.RWMutex `json:"-"`
 	
 	Id     string `json:"id"`
+	Title  string `json:"title"`
 	Type   int    `json:"type"`
 	Status int    `json:"status"`
 	Cmd    *exec.Cmd `json:"-"`
 	
 	FromChannelId string `json:"from_channel"`
+	ChannelInfo   *TaskChannelInfo `json:"basic_channel_info"`
 	FromVideoId   string `json:"from_video"`
+	VideoInfo     *TaskVideoInfo `json:"basic_video_info"`
 	
 	RunArgs string `json:"run_args"`
+	
 	// TODO: These are a string for now because I just want something working... this could be slow
 	Output         string `json:"output"`
-	RealtimeOutput string `json:"-"`    // TODO: Explain
+	RealtimeOutput string `json:"-"`
 	
 	StartTime time.Time `json:"start_time"`
 	EndTime   time.Time `json:"end_time"`
@@ -237,6 +253,8 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 // Create a blank command task with a random id
 func CL_NewTask() *CommandTask {
 	return &CommandTask{
+		Lock: &sync.RWMutex{},
+		
 		Id: uuid.New().String(),
 		
 		StartTime: time.Now().UTC(),
@@ -256,8 +274,10 @@ func CL_FinishTask(Task *CommandTask, Status int) {
 	DB_UpdateCommandTaskInfo(Task)
 	
 	ARCT_Lock.Lock()
-	defer ARCT_Lock.Unlock()
-	delete(AllRunningCommandTasks, Task.Id)
+	if AllRunningCommandTasks[Task.Id] != nil {
+		delete(AllRunningCommandTasks, Task.Id)
+	}
+	ARCT_Lock.Unlock()
 }
 
 func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCloser) {
@@ -274,7 +294,6 @@ func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCl
 	for {
 		exitCode := Task.Cmd.ProcessState.ExitCode()
 		if exitCode != -1 {
-			fmt.Printf("Task ended with ExitCode: %d\n", exitCode)
 			if exitCode > 0 {
 				// Command failed?
 				Task.Lock.Lock()
@@ -350,10 +369,12 @@ func CL_CancelTask(Task *CommandTask) error {
 	return nil
 }
 
-func CL_DownloadTask(Cmd *exec.Cmd, VideoId string, ChannelId string) (*CommandTask, error) {
+func CL_RunDownloadTask(Cmd *exec.Cmd, Video *VideoInfo, ChannelId string) (*CommandTask, error) {
 	Task := CL_NewTask()
 	
-	Task.FromVideoId = VideoId
+	Task.Title = fmt.Sprintf("Downloading video: \"%s\"", Video.Title)
+	
+	Task.FromVideoId = Video.Id
 	Task.FromChannelId = ChannelId
 	Task.Type = TASK_TYPE_DOWNLOAD
 	Task.Cmd = Cmd
@@ -386,10 +407,11 @@ func CL_DownloadTask(Cmd *exec.Cmd, VideoId string, ChannelId string) (*CommandT
 	return Task, nil
 }
 
-func CL_ListTask(Cmd *exec.Cmd, ChannelId string) (*CommandTask, error) {
+func CL_RunListTask(Cmd *exec.Cmd, AChannel *ArchiveChannel) (*CommandTask, error) {
 	Task := CL_NewTask()
+	Task.Title = fmt.Sprintf("Listing videos for %s", AChannel.Name)
 	
-	Task.FromChannelId = ChannelId
+	Task.FromChannelId = AChannel.Id
 	Task.Type = TASK_TYPE_LISTING
 	Task.Cmd = Cmd
 	
@@ -400,6 +422,21 @@ func CL_ListTask(Cmd *exec.Cmd, ChannelId string) (*CommandTask, error) {
 	Task.UpdatedAt = time.Now().UTC()
 	DB_UpdateCommandTaskInfo(Task)
 	return Task, nil
+}
+
+func CL_NewGenericTask() *CommandTask {
+	Task := CL_NewTask()
+	Task.Title = "Generic Task."
+	
+	Task.Type = TASK_TYPE_GENERIC
+	
+	ARCT_Lock.Lock()
+	AllRunningCommandTasks[Task.Id] = Task
+	ARCT_Lock.Unlock()
+	
+	Task.UpdatedAt = time.Now().UTC()
+	//DB_UpdateCommandTaskInfo(Task)
+	return Task
 }
 
 func CL_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
@@ -415,7 +452,11 @@ func CL_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 		if ActiveTask != nil {
 			ActiveTask.Lock.RLock()
 			
-			Task.Output  = TruncateOutput(ActiveTask.RealtimeOutput)
+			if ActiveTask.RealtimeOutput != "" {
+				Task.Output  = TruncateOutput(ActiveTask.RealtimeOutput)
+			} else {
+				Task.Output  = TruncateOutput(ActiveTask.Output)
+			}
 			Task.Status  = ActiveTask.Status
 			Task.EndTime = ActiveTask.EndTime
 			
@@ -444,6 +485,17 @@ func CL_GetCommandTask(TaskId string) (*CommandTask, error) {
 	}
 	
 	return Task, nil
+}
+
+func CL_Logf(Task *CommandTask, format string, a ... any) {
+	Msg := fmt.Sprintf(format, a ...)
+	
+	Task.Lock.Lock()
+	Task.Output += Msg
+	Task.UpdatedAt = time.Now().UTC()
+	Task.Lock.Unlock()
+	
+	//DB_UpdateCommandTaskInfo(Task)
 }
 
 func init() {

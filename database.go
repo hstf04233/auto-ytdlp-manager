@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS Videos (
 
 CREATE TABLE IF NOT EXISTS CommandTasks (
 	Id     TEXT PRIMARY KEY,
+	Title  TEXT PRIMARY KEY,
 	Type   INTEGER NOT NULL DEFAULT 0,
 	Status INTEGER NOT NULL DEFAULT 0,
 	
@@ -414,7 +415,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 				if !strings.Contains(TitleLowercase, Word) &&
 				   !strings.Contains(strings.ToLower(VideoInfo.Availability), Word) &&
 				   !strings.Contains(strings.ToLower(VideoInfo.Id), Word) {
-					// This video is NOT what we are looking for!
+					// This video is NOT what we are looking for...
 					IsWhatWeAreLookingFor = false
 					break
 				}
@@ -456,10 +457,11 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	}
 	
 	_, err := GDB.Exec(`
-	INSERT INTO CommandTasks(Id, Type, Status, FromChannel, FromVideo, RunArgs, Output, StartTime, EndTime)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO CommandTasks(Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output, StartTime, EndTime)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Type=excluded.Type,
+	Title=excluded.Title,
 	Status=excluded.Status,
 	
 	FromChannel=excluded.FromChannel,
@@ -470,7 +472,7 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	
 	StartTime=excluded.StartTime,
 	EndTime=excluded.EndTime
-	`, Task.Id, Task.Type, Status, Task.FromChannelId, Task.FromVideoId, Task.RunArgs, Output, Task.StartTime, Task.EndTime)
+	`, Task.Id, Task.Title, Task.Type, Status, Task.FromChannelId, Task.FromVideoId, Task.RunArgs, Output, Task.StartTime, Task.EndTime)
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateCommandTaskInfo ERR: %v\n", err)
@@ -480,15 +482,46 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	return nil
 }
 
+func DB_PopulateCommandTaskInfo(Task *CommandTask) {
+	Task.Lock.Lock()
+	defer Task.Lock.Unlock()
+	if Task.FromChannelId != "" {
+		ChannelInfo := &TaskChannelInfo{}
+		AChannel := GetArchiveChannelFromId(&WatchedDownloading, Task.FromChannelId)
+		if AChannel != nil {
+			ChannelInfo.Name = AChannel.Name
+			ChannelInfo.Url  = AChannel.Url
+			ChannelInfo.Id   = AChannel.Id
+		}
+		
+		Task.ChannelInfo = ChannelInfo
+	}
+	
+	if Task.FromVideoId != "" {
+		VideoInfo := &TaskVideoInfo{}
+		Video, err := DB_GetVideo(Task.FromVideoId)
+		if err == nil {
+			VideoInfo.Title = Video.Title
+			VideoInfo.Url   = Video.Url
+			VideoInfo.Id    = Video.Id
+			
+			Task.VideoInfo = VideoInfo
+		}
+	}
+}
+
 func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
-	CommandTask := &CommandTask{}
+	CommandTask := &CommandTask{
+		Lock: &sync.RWMutex{},
+	}
 	TaskRow := GDB.QueryRow(`
-	SELECT Id, Type, Status, FromChannel, FromVideo, RunArgs, Output,
+	SELECT Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output,
 	StartTime, EndTime FROM CommandTasks WHERE Id = ?
 	`, TaskId)
 	
 	err := TaskRow.Scan(
 		&CommandTask.Id,
+		&CommandTask.Title,
 		&CommandTask.Type,
 		&CommandTask.Status,
 		
@@ -506,6 +539,7 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 		}
 		return nil, err
 	}
+	DB_PopulateCommandTaskInfo(CommandTask)
 	
 	return CommandTask, nil
 }
@@ -514,7 +548,7 @@ func DB_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 	Args := []interface{}{}
 	
 	Statement := `
-	SELECT Id, Type, Status, FromChannel, FromVideo, RunArgs, Output,
+	SELECT Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output,
 	StartTime, EndTime FROM CommandTasks`
 	
 	Statement = Statement + " ORDER BY EndTime DESC LIMIT ? OFFSET ?"
@@ -528,9 +562,12 @@ func DB_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 	
 	TasksList := []*CommandTask{}
 	for Rows.Next() {
-		CommandTask := &CommandTask{}
+		CommandTask := &CommandTask{
+			Lock: &sync.RWMutex{},
+		}
 		err := Rows.Scan(
 			&CommandTask.Id,
+			&CommandTask.Title,
 			&CommandTask.Type,
 			&CommandTask.Status,
 			&CommandTask.FromChannelId,
@@ -545,6 +582,8 @@ func DB_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
 		if err != nil {
 			return nil, err
 		}
+		
+		DB_PopulateCommandTaskInfo(CommandTask)
 		
 		TasksList = append(TasksList, CommandTask)
 	}
@@ -580,6 +619,10 @@ func OpenDB() error {
 		fmt.Printf("err: %v\n", err)
 	}
 	_, err = db.Exec("ALTER TABLE Videos ADD COLUMN Filename TEXT DEFAULT ''")
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
+	_, err = db.Exec("ALTER TABLE CommandTasks ADD COLUMN Title TEXT DEFAULT ''")
 	if err != nil {
 		fmt.Printf("err: %v\n", err)
 	}

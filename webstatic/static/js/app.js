@@ -1,8 +1,20 @@
+
+function truncateString(str, num) {
+  if (str.length > num) {
+    return str.slice(0, num) + "...";
+  } else {
+    return str;
+  }
+}
+
 // ========== API helpers ==========
 const API = {
   async get(url) {
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`API GET ${url}: ${res.status}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API GET ${truncateString(url, 128)}: ${res.status} - ${text}`);
+    }
     return res.json();
   },
   async post(url, body) {
@@ -13,7 +25,7 @@ const API = {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API POST ${url}: ${res.status} - ${text}`);
+      throw new Error(`API POST ${truncateString(url, 128)}: ${res.status} - ${text}`);
     }
     return res.json();
   },
@@ -25,7 +37,7 @@ const API = {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API PATCH ${url}: ${res.status} - ${text}`);
+      throw new Error(`API PATCH ${truncateString(url, 128)}: ${res.status} - ${text}`);
     }
     return res.json();
   },
@@ -35,7 +47,7 @@ const API = {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API DELETE ${url}: ${res.status} - ${text}`);
+      throw new Error(`API DELETE ${truncateString(url, 128)}: ${res.status} - ${text}`);
     }
     return res.json();
   },
@@ -59,7 +71,11 @@ let _pgCallbacks = {}
 let _pgId = 0
 
 function _registerPgCbs(cbs) {
-  const id = ++_pgId
+  let id = ++_pgId
+  if (id > 20) {
+    _pgId = 1
+    id = _pgId
+  }
   _pgCallbacks[id] = cbs
   return id
 }
@@ -214,7 +230,6 @@ function closeStatusDropdown() {
   hideAllStatusDropdowns();
   _dropdownListenerActive = false;
   statusDropdownIsActive = false;
-  console.log("closeStatusDropdown");
 }
 
 function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
@@ -409,14 +424,14 @@ function closeChannelModal() {
 
 async function saveChannel(e) {
   e.preventDefault();
-  const id = document.getElementById('channelId').value;
+  const id   = document.getElementById('channelId').value;
   const name = document.getElementById('channelName').value.trim();
-  const url = document.getElementById('channelUrl').value.trim();
+  const url  = document.getElementById('channelUrl').value.trim();
   const type = parseInt(document.getElementById('channelType').value);
   const quality = parseInt(document.getElementById('channelQuality').value);
   const downloadDir = document.getElementById('channelDownloadDir').value.trim();
   const outputTemplate = document.getElementById('channelOutputTemplate').value.trim();
-  const checkInterval = document.getElementById('channelCheckInterval').value ? parseInt(document.getElementById('channelCheckInterval').value) : 900;
+  const checkInterval  = document.getElementById('channelCheckInterval').value ? parseInt(document.getElementById('channelCheckInterval').value) : 1800;
   const fullCheckInterval = document.getElementById('channelFullCheckInterval').value ? parseInt(document.getElementById('channelFullCheckInterval').value) : 172800;
 
   const body = {
@@ -566,18 +581,18 @@ function onVideoFilterChange() {
 }
 
 let lastVideoPage = 0;
-let lastVideoPageCount = 0;
+let lastVideosCount = 0;
 
 function renderVideoPagination() {
   const container_top    = document.getElementById('videoPagination-top');
   const container_bottom = document.getElementById('videoPagination-bottom');
   const totalPages = Math.ceil(videoTotalCount / VIDEO_PAGE_SIZE) || 1;
-  if (lastVideoPageCount == totalPages && lastVideoPage == videoPage) {
+  if (lastVideosCount == videoTotalCount && lastVideoPage == videoPage) {
     // Nothing has changed.
     return;
   }
   lastVideoPage = videoPage;
-  lastVideoPageCount = totalPages;
+  lastVideosCount = videoTotalCount;
   
   const cbsId = _registerPgCbs({
     prev: () => { if (!areVideosLoading && videoPage > 0) { videoPage--; loadVideos(); } },
@@ -676,18 +691,18 @@ function buildPaginationHTML(cfg) {
 }
 
 let lastTaskPage = 0;
-let lastTaskPageCount = 0;
+let lastTasksCount = 0;
 
 function renderTaskPagination() {
   const container_top    = document.getElementById('taskPagination-top');
   const container_bottom = document.getElementById('taskPagination-bottom');
   const totalPages = Math.ceil(taskTotalCount / TASK_PAGE_SIZE) || 1;
-  if (lastTaskPageCount == totalPages && lastTaskPage == taskPage) {
+  if (lastTasksCount == taskTotalCount && lastTaskPage == taskPage) {
     // Nothing has changed.
     return;
   }
   lastTaskPage = taskPage;
-  lastTaskPageCount = totalPages;
+  lastTasksCount = taskTotalCount;
   
   const cbsId = _registerPgCbs({
     prev: () => { if (!areTasksLoading && taskPage > 0) { taskPage--; loadTasks(); } },
@@ -758,9 +773,8 @@ let realtimeOutputTimer = null;
 let realtimeOutputOffset = 0;
 
 const TASK_TYPE_LABELS = { 0: 'Generic', 1: 'Listing', 2: 'Download' };
-const TASK_STATUS_LABELS = { 0: 'Running', 1: 'Failed', 2: 'Finished' };
 const TASK_STATUS_BADGE = {
-  0: ['downloading', 'Downloading...'],
+  0: ['downloading', 'Running'],
   1: ['failed', 'Failed'],
   2: ['downloaded', 'Finished'],
 };
@@ -833,7 +847,7 @@ function renderTasks() {
   container.innerHTML = allTasks.map(t => `
     <div class="task-item ${selectedTaskId === t.id ? 'active' : ''}" onclick="selectTask('${t.id}')">
       <div class="task-item-header">
-        <span class="task-item-id">${escHtml(t.id)}</span>
+        <span class="task-item-title">${escHtml(t.title || t.id)}</span>
         <span class="task-item-time">${formatRelative(t.start_time)}</span>
       </div>
       <div class="task-item-status">
@@ -886,6 +900,9 @@ function formatTerminalOutput(text, status, run_args) {
   const lines = text.split('\n');
   const formatted = lines.map(line => {
     let cls = 'terminal-line';
+    if (line.trim() === "") {
+      return `<span class="${cls}"><br></span>`
+    }
     /*
     if (status === 0) cls += ' terminal-line-running';
     if (/error|fail|exception/i.test(line)) cls = 'terminal-line-error';
@@ -896,7 +913,10 @@ function formatTerminalOutput(text, status, run_args) {
     return `<span class="${cls}">${escHtml(line)}</span>`;
   }).join('\n');
   
-  const runArgsContent = `<span class="terminal-line">${escHtml(run_args)}</span><br><span class="terminal-line"></span>`;
+  let runArgsContent = `<span class="terminal-line">${escHtml(run_args)}</span><br><span class="terminal-line"></span>`;
+  if (run_args === "") {
+    runArgsContent = ""
+  }
   return runArgsContent + formatted;
 }
 
@@ -968,7 +988,7 @@ async function init() {
   
   const lastTab = window.location.pathname.replace(/^\//, '') || 'channels';
   //setTimeout(() => showPage(lastTab), 1);
-  showPage(lastTab)
+  showPage(lastTab, true)
   
   updateChannelFilter();
   // Auto-refresh videos every 10s
@@ -998,6 +1018,9 @@ async function init() {
   
   // Check search updates every 300ms (at best)
   setInterval(() => {
+    if (areVideosLoading) {
+      return;
+    }
     if (videoSearchDidUpdate) {
       videoSearchDidUpdate = false;
       videoPage = 0;

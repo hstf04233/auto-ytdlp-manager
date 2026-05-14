@@ -583,7 +583,7 @@ func API_GetTaskOutput(w http.ResponseWriter, r *http.Request) {
 	
 	Task.Lock.RLock()
 	w.Header().Set("Content-Type", "text/plain")
-	if Task.Status == TASK_STATUS_RUNNING {
+	if Task.Status == TASK_STATUS_RUNNING && Task.RealtimeOutput != "" {
 		w.Write([]byte(TruncateOutput(Task.RealtimeOutput)))
 	} else {
 		w.Write([]byte(TruncateOutput(Task.Output)))

@@ -50,7 +50,7 @@
       <div class="stats-row" id="videoStats"></div>
 
       <div class="filter-bar">
-        <input type="text" id="videoSearch" placeholder="Search videos..." oninput="videoSearchFilterUpdate()">
+        <input type="text" id="videoSearch" maxlength="1024" placeholder="Search videos..." oninput="videoSearchFilterUpdate()">
         <select id="videoStatusFilter" onchange="onVideoFilterChange()">
           <option value="">All Statuses</option>
           <option value="0">Queued</option>
@@ -169,7 +169,7 @@
         <div class="form-row">
           <div class="form-group">
             <label for="channelCheckInterval">Check Interval (seconds)</label>
-            <input type="number" id="channelCheckInterval" placeholder="900" min="0">
+            <input type="number" id="channelCheckInterval" placeholder="1800" min="0">
           </div>
           <div class="form-group">
             <label for="channelFullCheckInterval">Full Check Interval (seconds)</label>

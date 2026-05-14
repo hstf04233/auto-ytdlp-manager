@@ -95,14 +95,14 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	}
 }
 
-func GetDownloadDir(AChannel ArchiveChannel) string {
+func GetDownloadDir(AChannel *ArchiveChannel) string {
 	DownloadDir := AChannel.DownloadDir
 	if DownloadDir == "" {
 		DownloadDir = DEFAULT_DOWNLOAD_DIR
 	}
 	return DownloadDir
 }
-func GetOutputTemplate(AChannel ArchiveChannel) string {
+func GetOutputTemplate(AChannel *ArchiveChannel) string {
 	OutputTemplate := AChannel.OutputTemplate
 	if OutputTemplate == "" {
 		OutputTemplate = DEFAULT_YT_DLP_OUTPUT_TEMPLATE
@@ -110,7 +110,7 @@ func GetOutputTemplate(AChannel ArchiveChannel) string {
 	return OutputTemplate
 }
 
-func RequestVideoInfo(AChannel ArchiveChannel, VideoUrl string, Video *VideoInfo) (error) {
+func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInfo) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
 	OutputTemplate := GetOutputTemplate(AChannel)
 	
@@ -142,7 +142,13 @@ func RequestVideoInfo(AChannel ArchiveChannel, VideoUrl string, Video *VideoInfo
 		return err
 	}
 	
+	OldVideoId := OutVideo.Id
 	PopulateVideoInfoFromOutVideo(Video, OutVideo)
+	
+	// Some platforms (like twitch) might give out a completely different video ids...
+	if OldVideoId != "" {
+		OutVideo.Id = OldVideoId
+	}
 	
 	if Video.VideoType == VIDEO_TYPE_ISLIVE || Video.VideoType == VIDEO_TYPE_WASLIVE {
 		DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
@@ -152,7 +158,7 @@ func RequestVideoInfo(AChannel ArchiveChannel, VideoUrl string, Video *VideoInfo
 	return nil
 }
 
-func yt_dlp_ListVideos(ChannelUrl string, ChannelId string, PlaylistEnd int) ([]VideoInfo, error) {
+func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([]VideoInfo, error) {
 	Args := []string{
 		ChannelUrl,
 		"--ignore-config",
@@ -166,11 +172,18 @@ func yt_dlp_ListVideos(ChannelUrl string, ChannelId string, PlaylistEnd int) ([]
 	}
 	
 	Cmd := exec.Command(CMD_YT_DLP, Args...)
-	CL_ListTask(Cmd, ChannelId)
+	if Task != nil {
+		CL_Logf(Task, fmt.Sprintf(">%s\n\n", GetRealArgs(Cmd.Args)))
+	}
 	
 	Out, err := Cmd.Output()
 	if err != nil {
-		fmt.Printf("Failed to list videos from channel: %s, Error: %v\n", ChannelUrl, err)
+		ErrorMsg := fmt.Sprintf("Failed to list videos from channel: %s, Error: %v\n", ChannelUrl, err)
+		fmt.Print(ErrorMsg)
+		if Task != nil {
+			CL_Logf(Task, "%s", ErrorMsg)
+			DB_UpdateCommandTaskInfo(Task)
+		}
 		return nil, err
 	}
 	
@@ -181,7 +194,13 @@ func yt_dlp_ListVideos(ChannelUrl string, ChannelId string, PlaylistEnd int) ([]
 		OutVideo := YT_DLP_OUTVIDEO{}
 		err = json.Unmarshal([]byte(scanner.Text()), &OutVideo)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			ErrorMsg := fmt.Sprintf("Error when decoding json: %v\n", err)
+			fmt.Print(ErrorMsg)
+			if Task != nil {
+				CL_Logf(Task, "%s", ErrorMsg)
+				CL_FinishTask(Task, TASK_STATUS_FAILED)
+				//DB_UpdateCommandTaskInfo(Task)
+			}
 			return nil, err
 		}
 		
@@ -189,13 +208,22 @@ func yt_dlp_ListVideos(ChannelUrl string, ChannelId string, PlaylistEnd int) ([]
 		
 		PopulateVideoInfoFromOutVideo(&VideoInfo, OutVideo)
 		OutVideos = append(OutVideos, VideoInfo)
+		/*
+		if Task != nil {
+			CL_Logf(Task, "Found video: \"%s\" %s\n", VideoInfo.Title, VideoInfo.Url)
+		}
+		*/
+	}
+	
+	if Task != nil {
+		DB_UpdateCommandTaskInfo(Task)
 	}
 	
 	return OutVideos, nil
 }
 
 
-func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
+func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
 	OutputTemplate := GetOutputTemplate(AChannel)
 	
@@ -204,13 +232,13 @@ func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		fmt.Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
 	}
 	
-	if v.VideoType == VIDEO_TYPE_ISLIVE || v.VideoType == VIDEO_TYPE_WASLIVE {
-		DateAndTime := time.Unix(v.ReleaseDate, 0).Format("2006-01-02")
+	if Video.VideoType == VIDEO_TYPE_ISLIVE || Video.VideoType == VIDEO_TYPE_WASLIVE {
+		DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
 		OutputTemplate = fmt.Sprintf("%s %s", DateAndTime, OutputTemplate)
 	}
 	
 	Args := []string{
-		v.Url,
+		Video.Url,
 		"--ignore-config",
 		"--external-downloader-args", "ffmpeg: -loglevel warning -stats",
 		"-o", OutputTemplate,
@@ -221,23 +249,23 @@ func yt_dlp_DownloadVideo(AChannel ArchiveChannel, v *VideoInfo) (error) {
 	
 	Cmd := exec.Command(CMD_YT_DLP, Args...)
 	Cmd.Dir = DownloadDir
-	CL_DownloadTask(Cmd, v.Id, AChannel.Id)
+	CL_RunDownloadTask(Cmd, Video, AChannel.Id)
 	
 	err = Cmd.Start()
 	if err != nil {
-		fmt.Printf("Failed to start download video from url: %s, Error: %v\n", v.Url, err)
+		fmt.Printf("Failed to start download video from url: %s, Error: %v\n", Video.Url, err)
 		return err
 	}
 	err = Cmd.Wait()
 	if err != nil {
-		fmt.Printf("Failed to download video from url: %s, Error: %v\n", v.Url, err)
+		fmt.Printf("Failed to download video from url: %s, Error: %v\n", Video.Url, err)
 		return err
 	}
 	//fmt.Printf("Output: %s\n", Out)
 	
 	return nil
 }
-func ytarchive_DownloadLive(AChannel ArchiveChannel, v *VideoInfo) (error) {
+func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	DownloadDir := AChannel.DownloadDir
 	if DownloadDir == "" {
 		DownloadDir = DEFAULT_DOWNLOAD_DIR
@@ -269,7 +297,7 @@ func ytarchive_DownloadLive(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		QualityString = "best"
 	}
 	
-	DateAndTime := time.Unix(v.ReleaseDate, 0).Format("2006-01-02")
+	DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
 	
 	Cmd := exec.Command(
 		CMD_YT_ARCHIVE,
@@ -279,20 +307,20 @@ func ytarchive_DownloadLive(AChannel ArchiveChannel, v *VideoInfo) (error) {
 		"--threads", "2",
 		"-o", fmt.Sprintf("%s %%(title)s %%(id)s", DateAndTime),
 		
-		v.Url,
+		Video.Url,
 		QualityString,
 	)
 	Cmd.Dir = DownloadDir
-	CL_DownloadTask(Cmd, v.Id, AChannel.Id)
+	CL_RunDownloadTask(Cmd, Video, AChannel.Id)
 	
 	err = Cmd.Start()
 	if err != nil {
-		fmt.Printf("Failed to start live download from url: %s, Error: %v\n", v.Url, err)
+		fmt.Printf("Failed to start live download from url: %s, Error: %v\n", Video.Url, err)
 		return err
 	}
 	err = Cmd.Wait()
 	if err != nil {
-		fmt.Printf("Failed to live download from url: %s, Error: %v\n", v.Url, err)
+		fmt.Printf("Failed to live download from url: %s, Error: %v\n", Video.Url, err)
 		return err
 	}
 	//fmt.Printf("Output: %s\n", Out)
