@@ -240,6 +240,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 		}
 	}()
 	Task.Type = TASK_TYPE_LISTING
+	Task.FromChannelId = AChannel.Id
 	Task.Title = fmt.Sprintf("Checking channel: \"%s\"", AChannel.Name)
 	DB_UpdateCommandTaskInfo(Task)
 	

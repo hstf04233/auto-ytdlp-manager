@@ -11,7 +11,6 @@ var (
 	APPLICATION_VERSION = "release"
 )
 const (
-	
 	SERVER_PORT = 8867
 	SERVER_PORT_DEBUG = 6788
 	
@@ -48,7 +47,6 @@ func main() {
 	}
 	
 	go StartDownloading()
-	
 	
 	fmt.Printf("APPLICATION_VERSION: %s\n", APPLICATION_VERSION)
 	ServerPort := SERVER_PORT

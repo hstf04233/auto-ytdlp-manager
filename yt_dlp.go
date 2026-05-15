@@ -24,6 +24,7 @@ type VideoInfo struct {
 	Id           string  `json:"id"`
 	Availability string  `json:"availability"`  // public, unlisted, private etc...
 	Resolution   string  `json:"resolution"`
+	Thumbnail    string  `json:"thumbnail_url"`
 	
 	Filename     string  `json:"filename"`		// Where the video is stored on device
 	
@@ -46,6 +47,7 @@ type YT_DLP_OUTVIDEO struct {
 	Id           string  `json:"id"`
 	Availability string  `json:"availability"`
 	Resolution   string  `json:"resolution"`
+	Thumbnail    string  `json:"thumbnail"`
 	Filename     string  `json:"filename"`
 	
 	Duration     float64  `json:"duration"`
@@ -83,6 +85,9 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	if OutVideo.Resolution != "" {
 		VideoInfo.Resolution = OutVideo.Resolution
 	}
+	if OutVideo.Thumbnail != "" {
+		VideoInfo.Thumbnail = OutVideo.Thumbnail
+	}
 	if OutVideo.Filename != "" && VideoInfo.Filename == "" {
 		// TODO Filename is unfinished...
 		VideoInfo.Filename = OutVideo.Filename
@@ -114,6 +119,11 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 	DownloadDir    := GetDownloadDir(AChannel)
 	OutputTemplate := GetOutputTemplate(AChannel)
 	
+	err := os.MkdirAll(DownloadDir, 0755)
+	if err != nil {
+		fmt.Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
+	}
+	
 	Args := []string{
 		VideoUrl,
 		"--ignore-config",
@@ -142,12 +152,12 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 		return err
 	}
 	
-	OldVideoId := OutVideo.Id
+	OldVideoId := Video.Id
 	PopulateVideoInfoFromOutVideo(Video, OutVideo)
 	
 	// Some platforms (like twitch) might give out a completely different video ids...
 	if OldVideoId != "" {
-		OutVideo.Id = OldVideoId
+		Video.Id = OldVideoId
 	}
 	
 	if Video.VideoType == VIDEO_TYPE_ISLIVE || Video.VideoType == VIDEO_TYPE_WASLIVE {
@@ -175,6 +185,21 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 	if Task != nil {
 		CL_Logf(Task, fmt.Sprintf(">%s\n\n", GetRealArgs(Cmd.Args)))
 	}
+	
+	stderr, err := Cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+	
+	go func() {
+		Buf := make([]byte, 512)
+		for {
+			count, err := stderr.Read(Buf)
+			if err != nil { return }
+			
+			fmt.Printf("%s", Buf[0:count])
+		}
+	}()
 	
 	Out, err := Cmd.Output()
 	if err != nil {

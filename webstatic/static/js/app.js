@@ -64,7 +64,7 @@ let allVideos = [];
 let videoPage = 0;
 let videoTotalCount = 0;
 let videoStats = {};
-const VIDEO_PAGE_SIZE = 40;
+const VIDEO_PAGE_SIZE = 30;
 
 let lastPageOpen = ''
 let _pgCallbacks = {}
@@ -84,9 +84,9 @@ function showPage(page, dontSaveHistory) {
   if (!dontSaveHistory) {
     if (page != lastPageOpen) {
       history.pushState({}, '', '/' + page);
-      lastPageOpen = page
     }
   }
+  lastPageOpen = page
   
   document.querySelectorAll('.sidebar nav a').forEach(l => l.classList.remove('active'));
   document.querySelectorAll('.sidebar nav a').forEach(l => {
@@ -174,6 +174,11 @@ function formatDate(ts) {
   if (!ts) return '\u2014';
   return new Date(ts * 1000).toLocaleDateString();
 }
+function formatDateAndTime(ts) {
+  if (!ts) return '\u2014';
+  let date = new Date(ts * 1000);
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+}
 
 function formatRelative(isoStr) {
   if (!isoStr) return '\u2014';
@@ -205,6 +210,20 @@ function formatDuration(sec) {
   const s = Math.floor(sec % 60);
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
   return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function getFormatedTaskDuration(task) {
+  startDate = new Date(task.start_time)
+  if (task.status == 0) {
+    // Task is currently running
+    const now = new Date();
+    const diffMs = now - startDate;
+    return formatDuration(diffMs/1000)
+  }
+  
+  endDate = new Date(task.end_time)
+  const diffMs = endDate - startDate;
+  return formatDuration(diffMs/1000)
 }
 
 function videoStatusBadge(videoId, status) {
@@ -298,6 +317,7 @@ async function loadChannels() {
     const data = await API.get('/api/channels');
     allChannels = data.channels || data;
     renderChannels();
+    updateChannelFilters();
   } catch (err) {
     showToast(`Failed to load channels: ${err.message}`, 'error');
   }
@@ -331,8 +351,8 @@ function renderChannels() {
           ${statusBadge(ch.type)}
           <span>Quality: ${qualityLabel(ch.quality_select)}</span>
           <span>Check: ${intervalLabel(ch.check_interval)}</span>
-          <span>Full: ${intervalLabel(ch.full_check_interval)}</span>
-          ${ch.download_dir ? `<span>Dir: ${escHtml(ch.download_dir)}</span>` : ''}
+          <span>FCheck: ${intervalLabel(ch.full_check_interval)}</span>
+          ${ch.download_dir ? `<span>Dir: "${escHtml(ch.download_dir)}"</span>` : ''}
         </div>
       </div>
       <div class="video-actions">
@@ -491,8 +511,7 @@ async function loadVideos() {
     url += `&order_direction=${orderDir}`;
     const search = document.getElementById('videoSearch').value;
     if (search !== '') {
-      // TODO: This is bad and inappropriate!!! sanitize this out so the user can't do some funky shi
-      url += `&search_query=${search}`
+      url += `&search_query=${encodeURIComponent(search)}`;
     }
     
     const data = await API.get(url);
@@ -505,32 +524,32 @@ async function loadVideos() {
   } catch (err) {
     showToast(`Failed to load videos: ${err.message}`, 'error');
   }
-  areVideosLoading = false
+  areVideosLoading = false;
 }
 
 function renderVideos() {
   const container = document.getElementById('videosList');
-  const filtered = getFilteredVideos();
 
-  if (filtered.length === 0) {
+  if (allVideos.length === 0) {
     container.innerHTML = '<div class="loading">No videos found.</div>';
     return;
   }
 
-  container.innerHTML = filtered.map(v => {
-    var thumbUrl = `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
+  container.innerHTML = allVideos.map(v => {
+    var thumbnailUrl = v.thumbnail_url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
+    
     const channel = allChannels.find(c => c.id === v.from_channel);
     const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
     const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
     return `
       <div class="card video-card">
         <div class="video-thumb">
-          <img src="${thumbUrl}" alt="" onerror="this.style.display='none';this.parentElement.textContent='No thumbnail'">
+          <img src="${thumbnailUrl}" alt="" onerror="this.style.display='none';this.parentElement.textContent='No thumbnail'">
         </div>
         <div class="video-info">
           <h3 title="${escHtml(v.title)}">${escHtml(v.title)}</h3>
           <p>From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
-          <p>Released: ${formatDate(v.release_date)} \u00b7 ${formatDuration(v.duration)}</p>
+          <p>Released: ${formatDateAndTime(v.release_date)} \u00b7 ${formatDuration(v.duration)}</p>
           <p>${escHtml(v.availability)}</p>
           <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
         </div>
@@ -546,19 +565,6 @@ function renderVideos() {
   }).join('');
 }
 
-function getFilteredVideos() {
-  //const search = document.getElementById('videoSearch').value.toLowerCase();
-  const statusFilter = document.getElementById('videoStatusFilter').value;
-  const channelFilter = document.getElementById('videoChannelFilter').value;
-
-  return allVideos.filter(v => {
-    //if (search && !v.title.toLowerCase().includes(search)) return false;
-    //if (statusFilter !== '' && String(v.status) !== statusFilter) return false;
-    //if (channelFilter && v.from_channel !== channelFilter) return false;
-    return true;
-  });
-}
-
 function clearVideoFilters() {
   document.getElementById('videoSearch').value = '';
   document.getElementById('videoStatusFilter').value = '';
@@ -572,8 +578,6 @@ function clearVideoFilters() {
 let videoSearchDidUpdate = false;
 function videoSearchFilterUpdate() {
   videoSearchDidUpdate = true;
-  // videoPage = 0;
-  // loadVideos();
 }
 function onVideoFilterChange() {
   videoPage = 0;
@@ -747,7 +751,7 @@ function updateVideoStats() {
 }
 
 // ========== Channel filter dropdown ==========
-function updateChannelFilter() {
+function updateChannelFilters() {
   const select = document.getElementById('videoChannelFilter');
   const current = select.value;
   select.innerHTML = '<option value="">All Channels</option>';
@@ -844,18 +848,42 @@ function renderTasks() {
     container.innerHTML = '<div class="loading">No tasks found.</div>';
     return;
   }
-  container.innerHTML = allTasks.map(t => `
+  container.innerHTML = allTasks.map(t => {
+    formatedDuration = getFormatedTaskDuration(t);
+    
+    let channelInfo = '';
+    if (t.basic_channel_info && t.basic_channel_info.name) {
+      const chName = escHtml(t.basic_channel_info.name);
+      const chId = t.basic_channel_info.id;
+      channelInfo = `<span class="task-channel" onclick="event.stopPropagation();navigateToChannel('${chId}')" title="Go to channel">${chName}</span>`;
+    }
+    let videoInfo = '';
+    if (t.basic_video_info) {
+      const vTitle = escHtml(t.basic_video_info.title || "");
+      const vId = t.basic_video_info.id;
+      const vUrl = t.basic_video_info.url;
+      const displayTitle = vTitle.length > 40 ? vTitle.slice(0, 40) + '...' : vTitle;
+      videoInfo = `<span class="task-video" title="${escHtml(vTitle)}">${displayTitle}</span>`;
+      if (vUrl) {
+        videoInfo += ` <a href="${escHtml(vUrl)}" target="_blank" class="task-video-link" onclick="event.stopPropagation()" title="Open video">[OPEN VIDEO]</a>`;
+      }
+    }
+    return `
     <div class="task-item ${selectedTaskId === t.id ? 'active' : ''}" onclick="selectTask('${t.id}')">
       <div class="task-item-header">
         <span class="task-item-title">${escHtml(t.title || t.id)}</span>
         <span class="task-item-time">${formatRelative(t.start_time)}</span>
+        <span class="task-item-time">${formatedDuration}</span>
       </div>
       <div class="task-item-status">
         ${taskStatusBadge(t.status)}
         ${taskTypeBadge(t.type)}
       </div>
+      ${channelInfo ? `<div class="task-item-channel">${channelInfo}</div>` : ''}
+      ${videoInfo ? `<div class="task-item-video">${videoInfo}</div>` : ''}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function selectTask(id) {
@@ -903,13 +931,6 @@ function formatTerminalOutput(text, status, run_args) {
     if (line.trim() === "") {
       return `<span class="${cls}"><br></span>`
     }
-    /*
-    if (status === 0) cls += ' terminal-line-running';
-    if (/error|fail|exception/i.test(line)) cls = 'terminal-line-error';
-    else if (/warn/i.test(line)) cls = 'terminal-line-warning';
-    else if (/info|downloaded|saved/i.test(line)) cls = 'terminal-line-info';
-    else if (/^\s*$/.test(line)) cls = 'terminal-line-dim';
-    */
     return `<span class="${cls}">${escHtml(line)}</span>`;
   }).join('\n');
   
@@ -923,12 +944,16 @@ function formatTerminalOutput(text, status, run_args) {
 function startRealtimePolling() {
   if (realtimeOutputTimer) {
     clearInterval(realtimeOutputTimer);
+    realtimeOutputTimer = null;
   }
   
   let canRefresh = true;
   
   realtimeOutputTimer = setInterval(async () => {
     if (!selectedTaskId || !selectedTask || selectedTask.status !== 0 || lastPageOpen !== "tasks" || !canRefresh) {
+      return;
+    }
+    if (document.hidden) {
       return;
     }
     
@@ -971,6 +996,13 @@ function stopRealtimePolling() {
   }
 }
 
+function navigateToChannel(channelId) {
+  document.getElementById('videoChannelFilter').value = channelId;
+  videoPage = 0;
+  loadVideos();
+  showPage('videos');
+}
+
 function escHtml(str) {
   if (!str) return '';
   const div = document.createElement('div');
@@ -987,10 +1019,9 @@ async function init() {
   await loadChannels();
   
   const lastTab = window.location.pathname.replace(/^\//, '') || 'channels';
-  //setTimeout(() => showPage(lastTab), 1);
   showPage(lastTab, true)
   
-  updateChannelFilter();
+  updateChannelFilters();
   // Auto-refresh videos every 10s
   setInterval(() => {
     if (areVideosLoading || document.hidden) {

@@ -149,8 +149,9 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if Body.Enabled != nil {
+		LastEnabled := AChannel.Enabled
 		AChannel.Enabled = *Body.Enabled
-		if AChannel.Enabled {
+		if !LastEnabled && AChannel.Enabled {
 			AChannel.NextCheckMSEC = time.Now().UnixMilli() + (1000 * 4)
 		}
 	}

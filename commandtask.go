@@ -498,6 +498,10 @@ func CL_Logf(Task *CommandTask, format string, a ... any) {
 	//DB_UpdateCommandTaskInfo(Task)
 }
 
+func CleanUpListingTasksInDatabase() {
+	
+}
+
 func init() {
 	AllRunningCommandTasks = make(map[string]*CommandTask)
 }

@@ -675,6 +675,43 @@ body {
   color: var(--text-secondary);
 }
 
+.task-item-channel {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  color: var(--info);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s;
+}
+
+.task-item-channel:hover {
+  color: var(--accent-hover);
+}
+
+.task-item-video {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.task-item-video .task-video-link {
+  display: inline-block;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.7rem;
+  margin-left: 2px;
+  transition: color 0.15s;
+}
+
+.task-item-video .task-video-link:hover {
+  color: var(--accent-hover);
+}
+
 /* ========== Terminal Output ========== */
 .task-output-container {
   flex: 1;
