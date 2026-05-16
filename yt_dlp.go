@@ -1,13 +1,14 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
-	"time"
-	"fmt"
-	"bufio"
+	"path/filepath"
 	"strings"
-	"encoding/json"
+	"time"
 )
 
 const (
@@ -20,13 +21,15 @@ const (
 type VideoInfo struct {
 	FromChannel  string  `json:"from_channel"`	// Channel id
 	Title        string  `json:"title"`
+	Description  string  `json:"description"`
 	Url          string  `json:"url"`
 	Id           string  `json:"id"`
 	Availability string  `json:"availability"`  // public, unlisted, private etc...
 	Resolution   string  `json:"resolution"`
 	Thumbnail    string  `json:"thumbnail_url"`
 	
-	Filename     string  `json:"filename"`		// Where the video is stored on device
+	Filename           string  `json:"-"`
+	DownloadedFilename string  `json:"filename"`		// Where the video is stored on device
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
@@ -43,6 +46,7 @@ type VideoInfo struct {
 type YT_DLP_OUTVIDEO struct {
 	Title        string  `json:"title"`
 	FullTitle    string  `json:"fulltitle"`
+	Description  string  `json:"description"`
 	Url          string  `json:"webpage_url"`
 	Id           string  `json:"id"`
 	Availability string  `json:"availability"`
@@ -64,6 +68,9 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 		VideoInfo.Title = OutVideo.FullTitle
 	} else {
 		VideoInfo.Title = OutVideo.Title
+	}
+	if OutVideo.Description != "" {
+		VideoInfo.Description = OutVideo.Description
 	}
 	VideoInfo.Url      = OutVideo.Url
 	VideoInfo.Id       = OutVideo.Id
@@ -88,10 +95,9 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	if OutVideo.Thumbnail != "" {
 		VideoInfo.Thumbnail = OutVideo.Thumbnail
 	}
-	if OutVideo.Filename != "" && VideoInfo.Filename == "" {
-		// TODO Filename is unfinished...
+	//if OutVideo.Filename != "" && VideoInfo.Filename == "" {
 		VideoInfo.Filename = OutVideo.Filename
-	}
+	//}
 	
 	if OutVideo.ReleaseTimestamp != 0 {
 		VideoInfo.ReleaseDate = OutVideo.ReleaseTimestamp
@@ -175,6 +181,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 		"--flat-playlist",
 		"--dump-json",
 		"--skip-download",
+		//"--restrict-filenames",
 		"--extractor-args", "youtubetab:approximate_date",
 	}
 	if PlaylistEnd > 0 {
@@ -185,23 +192,6 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 	if Task != nil {
 		CL_Logf(Task, fmt.Sprintf(">%s\n\n", GetRealArgs(Cmd.Args)))
 	}
-	
-	/*
-	stderr, err := Cmd.StderrPipe()
-	if err != nil {
-		return nil, err
-	}
-	
-	go func() {
-		Buf := make([]byte, 512)
-		for {
-			count, err := stderr.Read(Buf)
-			if err != nil { return }
-			
-			fmt.Printf("%s", Buf[0:count])
-		}
-	}()
-	*/
 	
 	Out, err := Cmd.Output()
 	if err != nil {
@@ -250,6 +240,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 }
 
 
+// This must be called with a Video that has been passed through RequestVideoInfo()
 func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
 	OutputTemplate := GetOutputTemplate(AChannel)
@@ -264,11 +255,20 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 		OutputTemplate = fmt.Sprintf("%s %s", DateAndTime, OutputTemplate)
 	}
 	
+	Filename := Video.Filename
+	
+	FileExtension := filepath.Ext(Filename)
+	FilenameWithoutExt := strings.TrimSuffix(Filename, FileExtension)
+	fmt.Printf("FilenameWithoutExt: '%s'\n", FilenameWithoutExt)
+	DB_UpdateVideoFilename(Video, Filename)
+	
 	Args := []string{
 		Video.Url,
+		//"--ffmpeg-location", CMD_FFMPEG,
 		"--ignore-config",
+		"--embed-metadata",
 		"--external-downloader-args", "ffmpeg: -loglevel warning -stats",
-		"-o", OutputTemplate,
+		"-o", fmt.Sprintf("%s.%%(ext)s", FilenameWithoutExt),
 	}
 	if AChannel.QualitySelect > 0 {
 		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
@@ -292,6 +292,8 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	
 	return nil
 }
+
+// This must be called with a Video that has been passed through RequestVideoInfo()
 func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	DownloadDir := AChannel.DownloadDir
 	if DownloadDir == "" {
@@ -324,15 +326,26 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 		QualityString = "best"
 	}
 	
-	DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
+	//DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
+	
+	Filename := Video.Filename
+	if Video.DownloadedFilename != "" {
+		Filename = Video.DownloadedFilename
+	}
+	
+	FileExtension := filepath.Ext(Filename)
+	FilenameWithoutExt := strings.TrimSuffix(Filename, FileExtension)
+	DB_UpdateVideoFilename(Video, Filename)
 	
 	Cmd := exec.Command(
 		CMD_YT_ARCHIVE,
+		"--ffmpeg-path", CMD_FFMPEG,
+		"--ytdlp-path",  CMD_YT_DLP,
 		"--no-wait",
 		"--add-metadata",
 		"--save-state",
 		"--threads", "2",
-		"-o", fmt.Sprintf("%s %%(title)s %%(id)s", DateAndTime),
+		"-o", FilenameWithoutExt,
 		
 		Video.Url,
 		QualityString,

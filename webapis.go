@@ -75,6 +75,12 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 		CheckInterval: Body.CheckInterval,
 		FullCheckInterval: Body.FullCheckInterval,
 	}
+	if NewChannel.CheckInterval < 0 {
+		NewChannel.CheckInterval = 0
+	}
+	if NewChannel.FullCheckInterval < 0 {
+		NewChannel.FullCheckInterval = 0
+	}
 	// This is intended behavior. I want all newly created channels to be paused by default ! (Even if the request wants it to be enabled...)
 	NewChannel.Enabled = false
 	
@@ -138,14 +144,22 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	if Body.CheckInterval != -1 {
 		AChannel.CheckInterval = Body.CheckInterval
-		if AChannel.NextCheckMSEC > time.Now().UnixMilli()+AChannel.CheckInterval {
-			AChannel.NextCheckMSEC = time.Now().UnixMilli()+AChannel.CheckInterval
+		if AChannel.CheckInterval < 0 {
+			AChannel.CheckInterval = 0
+		}
+		CheckTime := time.Now().UnixMilli()+(AChannel.CheckInterval*1000)
+		if AChannel.NextCheckMSEC > CheckTime {
+			AChannel.NextCheckMSEC = CheckTime
 		}
 	}
 	if Body.FullCheckInterval != -1 {
 		AChannel.FullCheckInterval = Body.FullCheckInterval
-		if AChannel.NextFullChannelCheckMSEC > time.Now().UnixMilli()+AChannel.FullCheckInterval {
-			AChannel.NextFullChannelCheckMSEC = time.Now().UnixMilli()+AChannel.FullCheckInterval
+		if AChannel.FullCheckInterval < 0 {
+			AChannel.FullCheckInterval = 0
+		}
+		CheckTime := time.Now().UnixMilli()+(AChannel.FullCheckInterval*1000)
+		if AChannel.NextFullChannelCheckMSEC > CheckTime {
+			AChannel.NextFullChannelCheckMSEC = CheckTime
 		}
 	}
 	if Body.Enabled != nil {
@@ -646,4 +660,47 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	} else {
 		http.NotFound(w, r)
 	}
+}
+
+func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
+	RequestId := path.Base(r.URL.Path)
+	if RequestId == "" {
+		http.Error(w, "Video id required.", http.StatusBadRequest)
+		return
+	}
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid video id.", http.StatusBadRequest)
+		return
+	}
+	
+	VideoInfo, err := DB_GetVideo(RequestId)
+	if err != nil {
+		http.Error(w, "Internal error when getting video details.", http.StatusInternalServerError)
+		return
+	}
+	if VideoInfo == nil {
+		http.Error(w, "Video not found.", http.StatusNotFound)
+		return
+	}
+	if VideoInfo.DownloadedFilename == "" {
+		http.Error(w, "Video contains no file attached.", http.StatusNotFound)
+		return
+	}
+	AChannel := GetArchiveChannelFromId(&WatchedDownloading, VideoInfo.FromChannel)
+	if AChannel == nil {
+		http.Error(w, "Video exists but no channel is attached to it?", http.StatusNotFound)
+		return
+	}
+	FilePath, err := GetDownloadedVideoFilePath(VideoInfo, AChannel)
+	if err != nil {
+		http.Error(w, "Error getting full video file path...", http.StatusInternalServerError)
+		return
+	}
+	if FilePath == "" {
+		http.Error(w, "Could not find video file.", http.StatusNotFound)
+		return
+	}
+	
+	fmt.Printf("Serving file '%s' ! \n", FilePath)
+	http.ServeFile(w, r, FilePath)
 }

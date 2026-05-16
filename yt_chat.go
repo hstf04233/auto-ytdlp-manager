@@ -359,9 +359,15 @@ func yt_chat_Run(VideoUrl string, OutputPath string, Task *CommandTask) {
 	
 	nextContinuation := ThisChatContext.ReloadContinuation
 	
-	ChatFile, err := os.Create(OutputPath)
-	if err != nil {
-		CL_Logf(Task, "Failed to create file \"%s\" error: %v\n", OutputPath, err)
+	ChatFile, err := os.Open(OutputPath)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		ChatFile, err = os.Create(OutputPath)
+		if err != nil {
+			CL_Logf(Task, "Failed to create file \"%s\" error: %v\n", OutputPath, err)
+			return
+		}
+	} else if err != nil {
+		CL_Logf(Task, "Failed to open file \"%s\" error: %v\n", OutputPath, err)
 		return
 	}
 	defer ChatFile.Close()

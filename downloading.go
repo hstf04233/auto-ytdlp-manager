@@ -1,7 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -104,8 +108,57 @@ func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
 	return  nil
 }
 
-func CheckIsVideoDownloaded(v VideoInfo) bool {
-	DB_VideoInfo, err := DB_GetVideo(v.Id)
+func DoesFileExist(FilePath string) bool {
+	fmt.Printf("DoesFileExist: '%s'\n", FilePath) // TODO: Temp debug print statement
+	
+	_, err := os.Stat(FilePath)
+	if err == nil {
+		// File exists!
+		return true
+	}
+	
+	fmt.Printf("DoesFileExist error %v\n", err)
+	if errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	fmt.Printf("DoesFileExist error %v\n", err)
+	return false
+}
+
+func GetDownloadedVideoFilePath(Video *VideoInfo, AChannel *ArchiveChannel) (string, error) {
+	var err error
+	DownloadDir := GetDownloadDir(AChannel)
+	DownloadDir, err = filepath.Abs(DownloadDir)
+	if err != nil {
+		return "", err
+	}
+	
+	Filename := Video.DownloadedFilename
+	if Filename == "" {
+		return "", nil
+	}
+	
+	FilePath := filepath.Join(DownloadDir, Filename)
+	if DoesFileExist(FilePath) {
+		return FilePath, nil
+	}
+	
+	// Sneaky video might have an entirely different file extension
+	FileExtension := filepath.Ext(Filename)
+	FilenameWithoutExt := strings.TrimSuffix(Filename, FileExtension)
+	
+	AlternativeFileExtensions := []string{".mp4", ".mkv", ".webm", ".mov"}
+	for _, Ext := range(AlternativeFileExtensions) {
+		FilePath = filepath.Join(DownloadDir, fmt.Sprintf("%s%s", FilenameWithoutExt, Ext))
+		if DoesFileExist(FilePath) {
+			return FilePath, nil
+		}
+	}
+	return "", nil
+}
+
+func CheckIsVideoDownloaded(Video *VideoInfo) bool {
+	DB_VideoInfo, err := DB_GetVideo(Video.Id)
 	if err != nil {
 		fmt.Printf("CheckIsVideoDownloaded err: %v\n", err)
 		return false
@@ -123,46 +176,46 @@ func CheckIsVideoDownloaded(v VideoInfo) bool {
 	return false
 }
 
-func RefreshVideoInfo(AChannel *ArchiveChannel, v *VideoInfo) {
-	err := RequestVideoInfo(AChannel, v.Url, v)
+func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo) {
+	err := RequestVideoInfo(AChannel, Video.Url, Video)
 	if err != nil {
 		fmt.Printf("Failed to grab video info... err: %v\n", err)
-		DB_UpdateVideoAvalibility(v, "UNKNOWN")
-		DB_UpdateVideoRefreshState(v, 0)
+		DB_UpdateVideoAvalibility(Video, "UNKNOWN")
+		DB_UpdateVideoRefreshState(Video, 0)
 		return
 	}
-	DB_UpdateVideoInfo(v)
-	DB_UpdateVideoRefreshState(v, 0)
+	DB_UpdateVideoInfo(Video)
+	DB_UpdateVideoRefreshState(Video, 0)
 }
 
-func DownloadVideo(AChannel *ArchiveChannel, v *VideoInfo) error {
+func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) error {
 	if AChannel.Type == ACHANNEL_TYPE_LIST_NO_DOWNLOAD || AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
 		fmt.Printf("DownloadVideo tried to download from a channel that doesn't allow downloads? Name: \"%s\"\n", AChannel.Name)
 		return nil
 	}
-	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADING)
-	err := yt_dlp_DownloadVideo(AChannel, v)
+	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
+	err := yt_dlp_DownloadVideo(AChannel, Video)
 	if err != nil {
-		DB_UpdateVideoStatus(v, VIDEO_STATUS_FAILED)
+		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		return err
 	}
-	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADED)
+	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADED)
 	
 	return nil
 }
-func DownloadYTLive(AChannel *ArchiveChannel, v *VideoInfo) {
-	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADING)
-	err := ytarchive_DownloadLive(AChannel, v)
+func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo) {
+	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
+	err := ytarchive_DownloadLive(AChannel, Video)
 	if err != nil {
-		DB_UpdateVideoStatus(v, VIDEO_STATUS_FAILED)
+		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		return
 	}
-	DB_UpdateVideoStatus(v, VIDEO_STATUS_DOWNLOADED)
-	RefreshVideoInfo(AChannel, v)
+	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADED)
+	RefreshVideoInfo(AChannel, Video)
 }
 
 func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
-	if CheckIsVideoDownloaded(*Video) {
+	if CheckIsVideoDownloaded(Video) {
 		return
 	}
 	
@@ -248,7 +301,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	Url := AChannel.Url
 	AChannel.Lock.RUnlock()
 	
-	PlaylistEnd := 6
+	PlaylistEnd := 20
 	if AChannel.FullCheckInterval > 0 && TimeNow > AChannel.NextFullChannelCheckMSEC {
 		PlaylistEnd = -1
 		AChannel.NextFullChannelCheckMSEC = TimeNow + (AChannel.FullCheckInterval * 1000)
@@ -334,7 +387,7 @@ func CheckChannels(WD *WatchingBundle) {
 		if !AChannel.Enabled {
 			continue
 		}
-		if time.Now().UnixMilli() < AChannel.NextCheckMSEC {
+		if time.Now().UnixMilli() < AChannel.NextCheckMSEC || AChannel.CheckInterval <= 0 {
 			continue
 		}
 		go CheckChannel(AChannel)

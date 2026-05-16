@@ -497,6 +497,7 @@ func CL_Logf(Task *CommandTask, format string, a ... any) {
 	
 	Task.Lock.Lock()
 	Task.Output += Msg
+	Task.RealtimeOutput += Msg
 	Task.UpdatedAt = time.Now().UTC()
 	Task.Lock.Unlock()
 	

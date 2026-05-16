@@ -40,9 +40,10 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 CREATE TABLE IF NOT EXISTS Videos (
 	Id           TEXT PRIMARY KEY,
 	FromChannel  TEXT NOT NULL,
-	Title        TEXT NOT NULL,
+	Title        TEXT DEFAULT '',
+	Description  TEXT DEFAULT '',
 	Url          TEXT NOT NULL,
-	Availability TEXT NOT NULL,
+	Availability TEXT DEFAULT '',
 	Filename     TEXT DEFAULT '',
 	Resolution   TEXT DEFAULT '',
 	Thumbnail    TEXT DEFAULT '',
@@ -184,22 +185,22 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	defer VideoDBLock.Unlock()
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT INTO Videos(Id, FromChannel, Title, Url, Availability, Resolution, Thumbnail, Filename, ReleaseDate, Duration, VideoType, UpdatedAt, AddedAt)
+	INSERT INTO Videos(Id, FromChannel, Title, Description, Url, Availability, Resolution, Thumbnail, ReleaseDate, Duration, VideoType, UpdatedAt, AddedAt)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	FromChannel=excluded.FromChannel,
 	Title=excluded.Title,
+	Description=excluded.Description,
 	Url=excluded.Url,
 	Availability=excluded.Availability,
 	Resolution=excluded.Resolution,
 	Thumbnail=excluded.Thumbnail,
-	Filename=excluded.Filename,
 	
 	ReleaseDate=excluded.ReleaseDate,
 	Duration=excluded.Duration,
 	VideoType=excluded.VideoType,
 	UpdatedAt=excluded.UpdatedAt
-	`, Video.Id, Video.FromChannel, Video.Title, Video.Url, Video.Availability, Video.Resolution, Video.Thumbnail, Video.Filename, Video.ReleaseDate, Video.Duration, Video.VideoType, TimeNow, TimeNow)
+	`, Video.Id, Video.FromChannel, Video.Title, Video.Description, Video.Url, Video.Availability, Video.Resolution, Video.Thumbnail, Video.ReleaseDate, Video.Duration, Video.VideoType, TimeNow, TimeNow)
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateVideoInfo ERR: %v\n", err)
@@ -234,6 +235,16 @@ func DB_UpdateVideoAvalibility(Video *VideoInfo, Availability string) error {
 	return err
 }
 
+func DB_UpdateVideoFilename(Video *VideoInfo, Filename string) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
+	Video.DownloadedFilename = Filename
+	_, err := GDB.Exec(`
+	UPDATE Videos SET Filename = ?, UpdatedAt = ? WHERE Id = ?
+	`, Filename, time.Now().UTC(), Video.Id)
+	return err
+}
+
 func DB_UpdateVideoRefreshState(Video *VideoInfo, RefreshState int) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
@@ -261,18 +272,19 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Url, Availability, Resolution, Thumbnail, Filename, Status, ReleaseDate, Duration, VideoType,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, ReleaseDate, Duration, VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
 	`, VideoId)
 	err := VideoRow.Scan(
 		&VideoInfo.FromChannel,
 		&VideoInfo.Id,
 		&VideoInfo.Title,
+		&VideoInfo.Description,
 		&VideoInfo.Url,
 		&VideoInfo.Availability,
 		&VideoInfo.Resolution,
 		&VideoInfo.Thumbnail,
-		&VideoInfo.Filename,
+		&VideoInfo.DownloadedFilename,
 		
 		&VideoInfo.Status,
 		&VideoInfo.ReleaseDate,
@@ -314,7 +326,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	
 	// ORDER BY ReleaseDate DESC
 	Statement := `
-	SELECT FromChannel, Id, Title, Url, Availability, Resolution, Thumbnail, Filename, Status, ReleaseDate, Duration, VideoType,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, ReleaseDate, Duration, VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos`
 	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 {
 		Statement += " WHERE "
@@ -390,11 +402,12 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			&VideoInfo.FromChannel,
 			&VideoInfo.Id,
 			&VideoInfo.Title,
+			&VideoInfo.Description,
 			&VideoInfo.Url,
 			&VideoInfo.Availability,
 			&VideoInfo.Resolution,
 			&VideoInfo.Thumbnail,
-			&VideoInfo.Filename,
+			&VideoInfo.DownloadedFilename,
 			
 			&VideoInfo.Status,
 			&VideoInfo.ReleaseDate,
@@ -623,6 +636,8 @@ func OpenDB() error {
 		"ALTER TABLE Videos ADD COLUMN Filename TEXT DEFAULT ''",
 		"ALTER TABLE Videos ADD COLUMN Thumbnail TEXT DEFAULT ''",
 		"ALTER TABLE CommandTasks ADD COLUMN Title TEXT DEFAULT ''",
+		
+		"ALTER TABLE Videos ADD COLUMN Description TEXT DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>YT Stream Archiver</title>
+  <title>Auto yt-dlp Downloader</title>
   <link rel="icon" href="/favicon.ico" type="image/png">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
   <div class="sidebar">
-    <h1>YT Stream Archiver</h1>
+    <h1>Auto yt-dlp Downloader</h1>
     <nav>
       <a href="#" data-page="channels" class="active">
         <span>&#9776;</span> <span>Channels</span>
@@ -19,6 +19,9 @@
       </a>
       <a href="#" data-page="tasks">
         <span>&#9733;</span> <span>Tasks</span>
+      </a>
+      <a href="#" data-page="chat">
+        <span>&#128172;</span> <span>Chat</span>
       </a>
     </nav>
   </div>
@@ -111,6 +114,34 @@
         </div>
       </div>
     </div>
+
+    <!-- CHAT PAGE -->
+    <div class="page" id="page-chat">
+      <div class="page-header">
+        <h2>Chat Viewer</h2>
+      </div>
+
+      <div class="chat-layout">
+        <div class="chat-input-panel" id="chatInputPanel">
+          <div class="chat-id-input-row">
+            <input type="text" id="chatIdInput" placeholder="Enter Chat ID" value="EXAMPLE">
+            <button class="btn btn-primary btn-sm" onclick="loadChat()">Load Chat</button>
+          </div>
+          <div class="chat-stats" id="chatStats"></div>
+          <div class="chat-actions">
+            <button class="btn btn-secondary btn-sm" onclick="clearChatView()">Clear</button>
+            <label class="toggle toggle-sm">
+              <input type="checkbox" id="autoScrollToggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Auto-scroll</span>
+          </div>
+        </div>
+        <div class="chat-messages-container" id="chatMessagesContainer">
+          <div class="chat-placeholder">Enter a Chat ID and click "Load Chat" to view messages.</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ADD/EDIT CHANNEL MODAL -->
@@ -186,5 +217,6 @@
   </div>
 
   <script src="/static/js/app.js"></script>
+  <script src="/static/js/chat.js"></script>
 </body>
 </html>
