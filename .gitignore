@@ -7,3 +7,9 @@ yt_download_manager_DEBUG.db
 yt_download_manager_DEBUG.db-wal
 yt_download_manager_DEBUG.db-shm
 yt-stream-manager-debug.exe
+
+# Debug stuff ignore
+test-chat-output - Copy.json
+test-chat-output.json
+EXAMPLE_CHAT_JSON.json
+output.html

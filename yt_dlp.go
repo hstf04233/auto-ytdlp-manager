@@ -186,6 +186,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 		CL_Logf(Task, fmt.Sprintf(">%s\n\n", GetRealArgs(Cmd.Args)))
 	}
 	
+	/*
 	stderr, err := Cmd.StderrPipe()
 	if err != nil {
 		return nil, err
@@ -200,6 +201,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 			fmt.Printf("%s", Buf[0:count])
 		}
 	}()
+	*/
 	
 	Out, err := Cmd.Output()
 	if err != nil {

@@ -488,6 +488,11 @@ func CL_GetCommandTask(TaskId string) (*CommandTask, error) {
 }
 
 func CL_Logf(Task *CommandTask, format string, a ... any) {
+	if Task == nil {
+		fmt.Printf(format, a ...)
+		return
+	}
+	
 	Msg := fmt.Sprintf(format, a ...)
 	
 	Task.Lock.Lock()

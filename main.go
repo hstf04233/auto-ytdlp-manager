@@ -54,5 +54,7 @@ func main() {
 		ServerPort = SERVER_PORT_DEBUG
 	}
 	
+	go yt_chat_Run("https://www.youtube.com/watch?v=G5oz2dQLi00", "./test-chat-output.json", nil)
+	
 	StartServer(ServerPort)
 }
