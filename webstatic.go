@@ -1,4 +1,4 @@
-package webstatic
+package main
 
 import (
 	"net/http"
@@ -16,11 +16,14 @@ var WebStaticContent embed.FS
 // TODO: ! this could be set at build time but I'm lazy rn
 var ETag string
 
-func ServeStaticContent(w http.ResponseWriter, r *http.Request) {
+func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	//fmt.Printf("Serving \"%s\"\n", path)
 	if path == "favicon.ico" {
 		path = "favicon.png"
+		if APPLICATION_VERSION == "debug" {
+			path = "favicon_debog.png"
+		}
 	} else if path == "" || path == "/" {
 		path = "index.html"
 	} else {

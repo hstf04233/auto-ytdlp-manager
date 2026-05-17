@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"time"
-	"yt-stream-manager/webstatic"
+	//"yt-stream-manager/webstatic"
 
 	//"yt-stream-manager/database"
 	"fmt"
@@ -57,13 +57,13 @@ func findCommand(cmd string) string {
 func StartServer(ServerPort int) {
 	Mux := http.NewServeMux()
 	
-	Mux.HandleFunc("/static/", webstatic.ServeStaticContent)
+	Mux.HandleFunc("/static/", webstatic_ServeStaticContent)
 	
 	// This should serve index.html
-	Mux.HandleFunc("/", webstatic.ServeStaticContent)
+	Mux.HandleFunc("/", webstatic_ServeStaticContent)
 	
 	// This should serve favicon.png
-	Mux.HandleFunc("/favicon.ico", webstatic.ServeStaticContent)
+	Mux.HandleFunc("/favicon.ico", webstatic_ServeStaticContent)
 	Mux.HandleFunc("/api/", ServeApi)
 	Mux.HandleFunc("/video/", ServeVideoDownload)
 	
