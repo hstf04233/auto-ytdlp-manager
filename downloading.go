@@ -148,7 +148,7 @@ func GetDownloadedVideoFilePath(Video *VideoInfo, AChannel *ArchiveChannel) (str
 	FileExtension := filepath.Ext(Filename)
 	FilenameWithoutExt := strings.TrimSuffix(Filename, FileExtension)
 	
-	AlternativeFileExtensions := []string{".mp4", ".mkv", ".webm", ".mov"}
+	AlternativeFileExtensions := []string{".mp4", ".mkv", ".webm", ".mov", ".mp4.part"}
 	for _, Ext := range(AlternativeFileExtensions) {
 		FilePath = filepath.Join(DownloadDir, fmt.Sprintf("%s%s", FilenameWithoutExt, Ext))
 		if DoesFileExist(FilePath) {
@@ -180,8 +180,8 @@ func CheckIsVideoDownloaded(Video *VideoInfo) bool {
 func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo) {
 	err := RequestVideoInfo(AChannel, Video.Url, Video)
 	if err != nil {
-		fmt.Printf("Failed to grab video info... err: %v\n", err)
-		DB_UpdateVideoAvalibility(Video, "UNKNOWN")
+		//fmt.Printf("Failed to grab video info... err: %v\n", err)
+		//DB_UpdateVideoAvalibility(Video, "UNKNOWN")
 		DB_UpdateVideoRefreshState(Video, 0)
 		return
 	}

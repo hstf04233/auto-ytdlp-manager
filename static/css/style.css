@@ -472,7 +472,7 @@ body {
   font-size: 0.85rem;
 }
 
-.filter-bar input {
+.search-bar {
   flex: 1;
   min-width: 200px;
 }
@@ -612,7 +612,7 @@ body {
   flex: 0 0 450px;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 240px);
+  max-height: calc(100vh - 175px);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -795,7 +795,7 @@ body {
   overflow-y: auto;
   /* white-space: pre-wrap; */
   word-break: break-all;
-  min-height: 400px;
+  min-height: 300px;
   /*max-height: calc(100vh - 240px);*/
   scroll-behavior: smooth;
 }
@@ -1068,8 +1068,10 @@ body {
 }
 
 .vd-preview {
+  position: relative;
   width: 100%;
-  height: 200px;
+  max-height: 400px;
+  /*height: 321px;*/
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg-input);
@@ -1080,9 +1082,35 @@ body {
 }
 
 .vd-preview img {
+  cursor: pointer;
+  
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.vd-preview span {
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-input);
+  
+  height: 48px;
+  width:  48px;
+  line-height: 48px;
+  
+  text-align: center;
+  user-select: none;
+  pointer-events: none;
+  
+  font-size: 1.5rem;
+  
+  position: absolute;
+}
+.vd-preview video {
+  width: 100%;
+  height: 100%;
+  max-height: 400px;
+  
+  /*object-fit: cover;*/
 }
 
 .vd-preview-placeholder {

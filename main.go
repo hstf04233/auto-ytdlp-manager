@@ -16,18 +16,7 @@ var (
 	CURRENT_WORKING_DIRECTORY = ""
 )
 const (
-	APPLICATION_NAME = "YT Video Manager"
-	
-	SERVER_PORT = 8867
-	SERVER_PORT_DEBUG = 6788
-	
-	C_CMD_YT_DLP = "yt-dlp"
-	C_CMD_YT_ARCHIVE = "ytarchive"
-	C_CMD_FFMPEG = "ffmpeg"
-	
-	DEFAULT_DOWNLOAD_DIR = "./downloads"
-	DEFAULT_YT_DLP_OUTPUT_TEMPLATE      = "%(title)s %(id)s.%(ext)s"
-	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(release_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
+	APPLICATION_NAME = "Auto yt-dlp Manager"
 )
 var (
 	CMD_YT_DLP = C_CMD_YT_DLP
@@ -119,6 +108,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	
+	CleanUpListingTasksInDatabase()
 	
 	go StartDownloading()
 	

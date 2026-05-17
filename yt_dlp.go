@@ -35,7 +35,10 @@ type VideoInfo struct {
 	Duration     float64 `json:"duration"`
 	Status       int     `json:"status"`
 	
-	VideoType   int32   `json:"video_type"`
+	TasksCount   int `json:"tasks_count"`
+	ActiveTaskId string `json:"active_task"`
+	
+	VideoType int32 `json:"video_type"`
 	
 	AddedAt   time.Time `json:"added_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -124,6 +127,15 @@ func GetOutputTemplate(AChannel *ArchiveChannel) string {
 	return OutputTemplate
 }
 
+func ShouldLiveFromStart(AChannel *ArchiveChannel, VideoUrl string) bool {
+	if strings.Contains(VideoUrl, "twitch.tv/") {
+		
+		return false
+	}
+	
+	return true
+}
+
 func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInfo) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
 	OutputTemplate := GetOutputTemplate(AChannel)
@@ -138,21 +150,44 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 		"--ignore-config",
 		"--dump-json",
 		"--skip-download",
-		"--live-from-start",
 		//"--restrict-filenames",
 		"-o", OutputTemplate,
 	}
 	if AChannel.QualitySelect > 0 {
 		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
 	}
+	if ShouldLiveFromStart(AChannel, VideoUrl) {
+		Args = append(Args, "--live-from-start")
+	}
 	
 	Cmd := exec.Command(CMD_YT_DLP, Args...)
 	Cmd.Dir = DownloadDir
 	
+	stderr, err := Cmd.StderrPipe()
+	if err != nil {
+		fmt.Printf("Error when creating StderrPipe: %v\n", err)
+		return err
+	}
+	ErrOut := CL_BasicWatchStdPipe(stderr)
+	
 	Out, err := Cmd.Output()
 	if err != nil {
+		ErrOut.Lock.RLock()
+		ErrOutput := ErrOut.RawOutput
+		ErrOut.Lock.RUnlock()
+		
+		if strings.Contains(ErrOutput, "Private video.") {
+			Video.Availability = "private"
+			return fmt.Errorf("%s", ErrOutput)
+		} else if strings.Contains(ErrOutput, "Sign in to confirm your age.") ||
+				  strings.Contains(ErrOutput, "This video may be inappropriate for some users.") {
+			Video.Availability = "Age-restricted"
+			return fmt.Errorf("%s", ErrOutput)
+		}
+		
+		fmt.Printf("%s\n", ErrOutput)
 		fmt.Printf("Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
-		return err
+		return fmt.Errorf("%s", ErrOutput)
 	}
 	var OutVideo YT_DLP_OUTVIDEO
 	err = json.Unmarshal(Out, &OutVideo)
@@ -198,8 +233,37 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 		CL_Logf(Task, fmt.Sprintf(">%s\n\n", GetRealArgs(Cmd.Args)))
 	}
 	
+	stderr, err := Cmd.StderrPipe()
+	if err != nil {
+		CL_Logf(Task, "Error when creating StderrPipe: %v\n", err)
+		return nil, err
+	}
+	ErrOut := CL_BasicWatchStdPipe(stderr)
+	
+	var OutVideos []VideoInfo
+	
 	Out, err := Cmd.Output()
 	if err != nil {
+		ErrOut.Lock.RLock()
+		ErrOutput := ErrOut.RawOutput
+		ErrOut.Lock.RUnlock()
+		
+		if Task != nil {
+			CL_Logf(Task, "%v\n", ErrOutput)
+			DB_UpdateCommandTaskInfo(Task)
+		}
+		
+		// Very crude way of checking if yt-dlp errored because of no videos in the list...
+		if strings.Contains(ChannelUrl, "youtube.com/") {
+			if strings.Contains(ErrOutput, "This channel does not have a streams tab") {
+				return OutVideos, nil
+			}
+		} else if strings.Contains(ChannelUrl, "twitch.tv/") {
+			if strings.Contains(ErrOutput, "The channel is not currently live") {
+				return OutVideos, nil
+			}
+		}
+		
 		ErrorMsg := fmt.Sprintf("Failed to list videos from channel: %s, Error: %v\n", ChannelUrl, err)
 		//fmt.Print(ErrorMsg)
 		if Task != nil {
@@ -208,8 +272,6 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 		}
 		return nil, err
 	}
-	
-	var OutVideos []VideoInfo
 	
 	scanner := bufio.NewScanner(strings.NewReader(string(Out)))
 	for scanner.Scan() {
@@ -336,8 +398,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 	FilenameWithoutExt := strings.TrimSuffix(Filename, FileExtension)
 	DB_UpdateVideoFilename(Video, Filename)
 	
-	Cmd := exec.Command(
-		CMD_YT_ARCHIVE,
+	Args := []string{
 		"--ffmpeg-path", CMD_FFMPEG,
 		"--ytdlp-path",  CMD_YT_DLP,
 		"--no-wait",
@@ -345,9 +406,17 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 		"--save-state",
 		"--threads", "2",
 		"-o", FilenameWithoutExt,
-		
-		Video.Url,
-		QualityString,
+	}
+	
+	if QualitySelect != 0 && QualitySelect <= 1080 {
+		Args = append(Args, "--h264")
+	}
+	
+	Args = append(Args, Video.Url, QualityString)
+	
+	Cmd := exec.Command(
+		CMD_YT_ARCHIVE,
+		Args ...,
 	)
 	Cmd.Dir = DownloadDir
 	CL_RunDownloadTask(Cmd, Video, AChannel.Id)

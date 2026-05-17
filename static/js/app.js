@@ -72,7 +72,7 @@ let _pgId = 0
 
 function _registerPgCbs(cbs) {
   let id = ++_pgId
-  if (id > 20) {
+  if (id > 40) {
     _pgId = 1
     id = _pgId
   }
@@ -80,11 +80,24 @@ function _registerPgCbs(cbs) {
   return id
 }
 
+let lastVideoPage = 0;
+let lastVideosCount = 0;
+
+let lastTaskPage = 0;
+let lastTasksCount = 0;
+
 function showPage(page, dontSaveHistory) {
   if (!dontSaveHistory) {
     if (page != lastPageOpen) {
       history.pushState({}, '', '/' + page);
     }
+  }
+  if (page != lastPageOpen) {
+    lastVideoPage = 0;
+    lastVideosCount = 0;
+    
+    lastTaskPage = 0;
+    lastTasksCount = 0;
   }
   lastPageOpen = page
   
@@ -219,17 +232,22 @@ function formatDuration(sec) {
 }
 
 function getFormatedTaskDuration(task) {
-  startDate = new Date(task.start_time)
+  let startDate = new Date(task.start_time);
   if (task.status == 0) {
     // Task is currently running
     const now = new Date();
     const diffMs = now - startDate;
-    return formatDuration(diffMs/1000)
+    return formatDuration(diffMs/1000);
   }
   
-  endDate = new Date(task.end_time)
+  let endDate = new Date(task.end_time);
+  let updatedDate = new Date(task.updated_at);
+  if (updatedDate > endDate) {
+    endDate = updatedDate;
+  }
+  
   const diffMs = endDate - startDate;
-  return formatDuration(diffMs/1000)
+  return formatDuration(diffMs/1000);
 }
 
 function videoStatusBadge(videoId, status) {
@@ -410,6 +428,18 @@ async function refreshVideoInfo(id,) {
   }
 }
 
+function videoPreviewClick(videoId) {
+  let modalVideoPreview = document.getElementById('modal-video-preview');
+  if (modalVideoPreview) {
+    modalVideoPreview.innerHTML = `
+    <video controls autoplay>
+      <source src="/video-file/${escHtml(videoId)}" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+    `
+  }
+}
+
 function openVideoDetailsModal(videoId) {
   const v = allVideos.find(x => x.id === videoId);
   if (!v) return;
@@ -426,11 +456,19 @@ function openVideoDetailsModal(videoId) {
   const descHtml = v.description
     ? escHtml(v.description).replace(/\n/g, '<br>')
     : '\u2014';
-
-  //<div class="vd-field"><span class="vd-field-label">Channel</span><span class="vd-field-value">${channelUrl ? '<a href="' + channelUrl + '" target="_blank">' + channelName + '</a>' : channelName}</span></div>
+  
+  let videoPreviewOnClick = "";
+  if (v.filename) {
+    videoPreviewOnClick = `event.preventDefault(); videoPreviewClick('${videoId}');`;
+  }
+  
+  var thumbnailUrl = v.thumbnail_url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
+  
   document.getElementById('videoDetailsContent').innerHTML = `
-    <div class="vd-preview">
-      <img src="${escHtml(v.thumbnail_url || '')}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+    <div class="vd-preview" id="modal-video-preview">
+      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+        ${v.filename ? `<span>&#9654;</span>` : ''}
+      </img>
       <div class="vd-preview-placeholder" style="display:none">No thumbnail</div>
     </div>
     <h3 class="vd-title">${escHtml(v.title)}</h3>
@@ -474,6 +512,12 @@ function openVideoDetailsModal(videoId) {
 }
 
 function closeVideoDetailsModal() {
+  let modalVideoPreview = document.getElementById('modal-video-preview');
+  if (modalVideoPreview) {
+    // Remove any video playing
+    modalVideoPreview.innerHTML = "";
+  }
+  
   document.getElementById('videoDetailsModal').classList.remove('active');
 }
 
@@ -631,6 +675,25 @@ function renderVideos() {
     const channel = allChannels.find(c => c.id === v.from_channel);
     const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
     const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
+    
+    let tasksButtonText = "View Task"
+    if (v.active_task) {
+      tasksButtonText = "View Active Task"
+    } else if (v.tasks_count > 1) {
+      tasksButtonText = `View Tasks[${v.tasks_count}]`
+    }
+    let tasksButtonOnClick = `
+      event.preventDefault();
+      gotoTasksPageAndFilterVideo('${v.id}');
+    `
+    if (v.active_task) {
+      tasksButtonOnClick = `
+        event.preventDefault();
+        gotoTasksPageAndFilterVideo('${v.id}');
+        selectTask('${v.active_task}')
+      `
+    }
+    
     return `
       <div class="card video-card">
         <div class="video-thumb">
@@ -639,10 +702,12 @@ function renderVideos() {
         </div>
         <div class="video-info">
           <h3 title="${escHtml(v.title)}">${escHtml(v.title)} <a href="${escHtml(v.url)}" target="_blank">[VideoLink]</a></h3>
-          <p>From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
+          <p title="Filter by this channel">From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
           <p>Released: ${formatDateAndTime(v.release_date)}</p>
           <p>${escHtml(v.availability)}</p>
           <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
+          
+          ${(v.tasks_count > 0 || v.active_task) ? `<p><a href="#" onclick="${tasksButtonOnClick}">${tasksButtonText}</a></p>` : ''}
         </div>
         <div class="video-actions">
           ${videoStatusBadge(v.id, v.status)}
@@ -681,9 +746,6 @@ function onVideoFilterChange() {
   videoPage = 0;
   loadVideos();
 }
-
-let lastVideoPage = 0;
-let lastVideosCount = 0;
 
 function renderVideoPagination() {
   const container_top    = document.getElementById('videoPagination-top');
@@ -792,9 +854,6 @@ function buildPaginationHTML(cfg) {
   return prevBtn + pageButtons.join('') + nextBtn + `<span class="single-page-msg">${countMsg}</span>`;
 }
 
-let lastTaskPage = 0;
-let lastTasksCount = 0;
-
 function renderTaskPagination() {
   const container_top    = document.getElementById('taskPagination-top');
   const container_bottom = document.getElementById('taskPagination-bottom');
@@ -899,21 +958,31 @@ function taskTypeBadge(type) {
   return `<span class="badge badge-${cls}">${taskTypeLabel(type)}</span>`;
 }
 
+function gotoTasksPageAndFilterVideo(videoId) {
+  clearTaskFilters(true)
+  
+  document.getElementById('taskVideoFilter').value = videoId;
+  
+  showPage("tasks")
+  loadTasks();
+}
+
 function onTaskFilterChange() {
   taskPage = 0;
   loadTasks();
 }
 
-function clearTaskFilters() {
+function clearTaskFilters(dontLoadTasks) {
   //document.getElementById('taskSearch').value = '';
   document.getElementById('taskStatusFilter').value = '';
   document.getElementById('taskTypeFilter').value = '';
   document.getElementById('taskChannelFilter').value = '';
+  document.getElementById('taskVideoFilter').value = '';
   document.getElementById('taskOrderBy').value = 'end_time';
   document.getElementById('taskOrderDirection').value = '-1';
   videoPage = 0;
-  if (!areVideosLoading) {
-    loadVideos();
+  if (!areVideosLoading && !dontLoadTasks) {
+    loadTasks();
   }
 }
 
@@ -923,6 +992,7 @@ async function loadTasks() {
     const statusFilter  = document.getElementById('taskStatusFilter').value;
     const typeFilter    = document.getElementById('taskTypeFilter').value;
     const channelFilter = document.getElementById('taskChannelFilter').value;
+    const videoFilter   = document.getElementById('taskVideoFilter').value.trim();
     const orderBy  = document.getElementById('taskOrderBy').value;
     const orderDir = document.getElementById('taskOrderDirection').value;
     
@@ -935,6 +1005,9 @@ async function loadTasks() {
     }
     if (channelFilter !== '') {
       url += `&from_channel=${channelFilter}`;
+    }
+    if (videoFilter !== '') {
+      url += `&from_video=${videoFilter}`;
     }
     if (orderBy) {
       url += `&order_by=${orderBy}`;
@@ -1004,7 +1077,7 @@ function renderTasks() {
       const displayTitle = vTitle.length > 40 ? vTitle.slice(0, 40) + '...' : vTitle;
       videoInfo = `<span class="task-video" title="${escHtml(vTitle)}">${displayTitle}</span>`;
       if (vUrl) {
-        videoInfo += ` <a href="${escHtml(vUrl)}" target="_blank" class="task-video-link" onclick="event.stopPropagation()" title="Open video">[OPEN VIDEO]</a>`;
+        videoInfo += ` <a href="${escHtml(vUrl)}" target="_blank" class="task-video-link" onclick="event.stopPropagation()" title="Open video">[VideoLink]</a>`;
       }
     }
     return `
@@ -1032,14 +1105,24 @@ function selectTask(id) {
     if (t.id == selectedTaskId) {
       selectedTask = t;
     }
-  })
+  });
   renderTasks();
   
   const outputContainer = document.getElementById('taskOutputContent');
   const statusEl = document.getElementById('taskOutputStatus');
+  const taskTitleEl = document.getElementById('taskOutputTitle');
   
   outputContainer.innerHTML = '<span class="terminal-prompt">Loading output...</span>';
   statusEl.textContent = '';
+  
+  if (taskTitleEl) {
+    if (selectedTask) {
+      formatedDuration = getFormatedTaskDuration(selectedTask);
+      taskTitleEl.textContent = escHtml(selectedTask.title) + " " + formatedDuration;
+    } else {
+      taskTitleEl.textContent = "Task Output - " + id;
+    }
+  }
   
   // Start polling for real-time output
   startRealtimePolling();
@@ -1097,6 +1180,7 @@ function startRealtimePolling() {
     }
     
     const statusEl = document.getElementById('taskOutputStatus');
+    const taskTitleEl = document.getElementById('taskOutputTitle');
     canRefresh = false;
     try {
       const res = await fetch(`/api/get-realtime-task-output/${selectedTaskId}`);
@@ -1104,6 +1188,8 @@ function startRealtimePolling() {
         if (statusEl) statusEl.textContent = 'No output available';
         return;
       }
+      
+      const formatedDuration = getFormatedTaskDuration(selectedTask);
       
       const text = await res.text();
       const outputContainer = document.getElementById('taskOutputContent');
@@ -1113,11 +1199,14 @@ function startRealtimePolling() {
       outputContainer.scrollTop = outputContainer.scrollHeight;
       
       if (statusEl) statusEl.textContent = 'Live';
+      if (taskTitleEl) {
+        taskTitleEl.textContent = escHtml(selectedTask.title) + " " + formatedDuration;
+      }
     } catch (err) {
       if (statusEl) statusEl.textContent = 'Poll error';
     }
     canRefresh = true;
-  }, 200);
+  }, 500);
 }
 
 function stopRealtimePolling() {
@@ -1128,8 +1217,12 @@ function stopRealtimePolling() {
   selectedTaskId = null;
   selectedTaskType = null;
   const statusEl = document.getElementById('taskOutputStatus');
+  const taskTitleEl = document.getElementById('taskOutputTitle');
   const outputContainer = document.getElementById('taskOutputContent');
   if (statusEl) statusEl.textContent = '';
+  if (taskTitleEl) {
+    taskTitleEl.textContent = "Task Output"
+  }
   if (outputContainer) {
     outputContainer.innerHTML = '<span class="terminal-prompt">Select a task to view its output</span>';
   }

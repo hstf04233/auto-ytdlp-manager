@@ -263,6 +263,26 @@ type TAPI_VideoListStats struct{
 
 var VideosListCache = NewCache(time.Second * 4)
 
+func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoInfo) {
+	TasksList, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
+		FromVideoId: Video.Id,
+		Status: -1,
+		Type: -1,
+	})
+	if err != nil {
+		return
+	}
+	if TasksList != nil {
+		Video.TasksCount = len(TasksList)
+		for _, Task := range(TasksList) {
+			if Task.Status == TASK_STATUS_RUNNING {
+				Video.ActiveTaskId = Task.Id
+				break
+			}
+		}
+	}
+}
+
 func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if strings.HasPrefix(r.URL.Path, "videos/") && RequestId != "" {
@@ -281,6 +301,7 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Video not found.", http.StatusNotFound)
 			return
 		}
+		API_SpiceUpVideoInfo(w, r, VideoInfo)
 		
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(VideoInfo)
@@ -329,6 +350,13 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		} else if o == "updated_at" {
 			OrderBy = DB_VIDEO_ORDERBY_UpdatedAt
 		}
+	}
+	
+	if Offset < 0 {
+		Offset = 0
+	}
+	if Limit == -1 || Limit > 100 {
+		Limit = 100
 	}
 	
 	VideosList, err := DB_ListVideos(Limit, Offset, ListVideosQuery{
@@ -388,6 +416,10 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		}
 		
 		VideosListCache.Set(CacheKey, Stats)
+	}
+	
+	for _, Video := range(VideosList) {
+		API_SpiceUpVideoInfo(w, r, Video)
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
@@ -574,6 +606,13 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		Query.OrderBy = OrderBy
 	}
 	
+	if Offset < 0 {
+		Offset = 0
+	}
+	if Limit == -1 || Limit > 50 {
+		Limit = 50
+	}
+	
 	TasksList, err := CL_ListCommandTasks(Limit, Offset, Query)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error when trying to list videos, err: %v", err), http.StatusInternalServerError)
@@ -741,6 +780,7 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if DownloadVal := r.URL.Query().Get("download"); DownloadVal != "" {
+		// User wants to download this video
 		DownloadVal = strings.ToLower(DownloadVal)
 		if DownloadVal == "true" || DownloadVal == "1" || DownloadVal == "yes" {
 			Filename := filepath.Base(FilePath)

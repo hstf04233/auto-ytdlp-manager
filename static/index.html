@@ -11,16 +11,16 @@
   <div class="sidebar">
     <h1>Auto yt-dlp Manager</h1>
     <nav>
-      <a href="#" data-page="channels" class="active">
+      <a href="/channels" data-page="channels" class="active">
         <span>&#9776;</span> <span>Channels</span>
       </a>
-      <a href="#" data-page="videos">
+      <a href="/videos" data-page="videos">
         <span>&#9654;</span> <span>Videos</span>
       </a>
-      <a href="#" data-page="tasks">
+      <a href="/tasks" data-page="tasks">
         <span>&#9733;</span> <span>Tasks</span>
       </a>
-      <a href="#" data-page="chat">
+      <a href="/chat" data-page="chat">
         <span>&#128172;</span> <span>Chat</span>
       </a>
     </nav>
@@ -53,7 +53,7 @@
       <div class="stats-row" id="videoStats"></div>
 
       <div class="filter-bar">
-        <input type="text" id="videoSearch" maxlength="1024" placeholder="Search videos..." oninput="videoSearchFilterUpdate()">
+        <input class="search-bar" type="text" id="videoSearch" maxlength="1024" placeholder="Search videos..." oninput="videoSearchFilterUpdate()">
         <select id="videoStatusFilter" onchange="onVideoFilterChange()">
           <option value="">All Statuses</option>
           <option value="0">Queued</option>
@@ -92,7 +92,7 @@
         <h2>Tasks</h2>
       </div>
 
-      <div class="stats-row" id="taskStats"></div>
+      <div class="stats-row" id="taskStats" style="display: none;"></div>
       
       <div class="filter-bar">
         <!-- <input type="text" id="taskSearch" maxlength="1024" placeholder="Search videos..." oninput="taskSearchFilterUpdate()"> -->
@@ -114,6 +114,7 @@
         <select id="taskChannelFilter" onchange="onTaskFilterChange()">
           <option value="">All Channels</option>
         </select>
+        <input type="text" id="taskVideoFilter" class="task-video-text" maxlength="1024" placeholder="VideoId" oninput="onTaskFilterChange()">
         <select id="taskOrderBy" onchange="onTaskFilterChange()">
           <option value="end_time">Sort: End Time</option>
           <option value="start_time">Sort: Start Time</option>
@@ -136,7 +137,7 @@
 
        <div class="task-output-container" id="taskOutputPanel">
           <div class="terminal-header">
-            <span class="terminal-title">Task Output</span>
+            <span class="terminal-title"  id="taskOutputTitle">Task Output</span>
             <span class="terminal-status" id="taskOutputStatus"></span>
           </div>
           <div class="terminal-body" id="taskOutputContent">

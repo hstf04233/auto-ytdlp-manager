@@ -55,8 +55,8 @@ CREATE TABLE IF NOT EXISTS Videos (
 	
 	ReleaseDate BIGINT NOT NULL,
 	
-	AddedAt     DATETIME NOT NULL DEFAULT (datetime('now')),
-	UpdatedAt   DATETIME
+	AddedAt   DATETIME NOT NULL DEFAULT (datetime('now')),
+	UpdatedAt DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS CommandTasks (
@@ -65,14 +65,15 @@ CREATE TABLE IF NOT EXISTS CommandTasks (
 	Type   INTEGER NOT NULL DEFAULT 0,
 	Status INTEGER NOT NULL DEFAULT 0,
 	
-	FromChannel TEXT,
-	FromVideo   TEXT,
+	FromChannel TEXT default '',
+	FromVideo   TEXT default '',
 	
-	RunArgs TEXT NOT NULL,
-	Output  TEXT NOT NULL,
+	RunArgs TEXT default '',
+	Output  TEXT default '',
 	
 	StartTime DATETIME NOT NULL DEFAULT (datetime('now')),
-	EndTime   DATETIME NOT NULL DEFAULT (datetime('now'))
+	EndTime   DATETIME NOT NULL DEFAULT (datetime('now')),
+	UpdatedAt DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
 /*
@@ -479,8 +480,8 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	}
 	
 	_, err := GDB.Exec(`
-	INSERT INTO CommandTasks(Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output, StartTime, EndTime)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO CommandTasks(Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output, StartTime, EndTime, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Type=excluded.Type,
 	Title=excluded.Title,
@@ -493,8 +494,9 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	Output=excluded.Output,
 	
 	StartTime=excluded.StartTime,
-	EndTime=excluded.EndTime
-	`, Task.Id, Task.Title, Task.Type, Status, Task.FromChannelId, Task.FromVideoId, Task.RunArgs, Output, Task.StartTime, Task.EndTime)
+	EndTime=excluded.EndTime,
+	UpdatedAt=excluded.UpdatedAt
+	`, Task.Id, Task.Title, Task.Type, Status, Task.FromChannelId, Task.FromVideoId, Task.RunArgs, Output, Task.StartTime, Task.EndTime, time.Now().UTC())
 	
 	if err != nil {
 		fmt.Printf("DB_UpdateCommandTaskInfo ERR: %v\n", err)
@@ -538,7 +540,7 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 	}
 	TaskRow := GDB.QueryRow(`
 	SELECT Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output,
-	StartTime, EndTime FROM CommandTasks WHERE Id = ?
+	StartTime, EndTime, UpdatedAt FROM CommandTasks WHERE Id = ?
 	`, TaskId)
 	
 	err := TaskRow.Scan(
@@ -555,6 +557,7 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 		
 		&CommandTask.StartTime,
 		&CommandTask.EndTime,
+		&CommandTask.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -565,6 +568,23 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 	DB_PopulateCommandTaskInfo(CommandTask)
 	
 	return CommandTask, nil
+}
+func DB_GetCommandTaskOutput(TaskId string) (string, error) {
+	TaskRow := GDB.QueryRow(`
+	SELECT Output FROM CommandTasks WHERE Id = ?
+	`, TaskId)
+	
+	var Output string
+	
+	err := TaskRow.Scan(&Output,)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "", nil
+		}
+		return "", err
+	}
+	
+	return Output, nil
 }
 
 const (
@@ -586,12 +606,12 @@ type ListCommandTasksQuery struct {
 
 func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery, Statement *string, Args *[]interface{}) {
 	WhereAdded := false
-	if Query.Status == -2 && Query.Type == -1 {
+	if Query.Status == -2 && Query.Type == -1 && Query.FromVideoId == "" {
 		if !WhereAdded {
 			WhereAdded = true
 			*Statement += " WHERE "
 		}
-		*Statement += " (Status = 0 OR Status == 1) OR Type == 2 "
+		*Statement += " ((Status = 0 OR Status == 1) OR Type == 2) "
 	}
 	
 	if Query.Status >= 0 || Query.Type != -1 || Query.FromChannelId != "" || Query.FromVideoId != "" {
@@ -599,7 +619,7 @@ func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommand
 		if !WhereAdded {
 			WhereAdded = true
 			*Statement += " WHERE "
-		} else {
+		} else if WhereAdded {
 			AddAnd = true
 		}
 		if Query.Status >= 0 {
@@ -652,14 +672,15 @@ func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommand
 	
 	*Statement += fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
 	*Args = append(*Args, Limit, Offset)
+	//fmt.Printf("Statement: %s\n Args: %+v\n", *Statement, *Args)
 }
 
 func DB_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]*CommandTask, error) {
 	Args := []interface{}{}
 	
 	Statement := `
-	SELECT Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output,
-	StartTime, EndTime FROM CommandTasks`
+	SELECT Id, Title, Type, Status, FromChannel, FromVideo, RunArgs,
+	StartTime, EndTime, UpdatedAt FROM CommandTasks`
 	
 	DB_ConstructQuery_ListCommandTasks(Limit, Offset, Query, &Statement, &Args)
 	
@@ -683,10 +704,10 @@ func DB_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]
 			&CommandTask.FromVideoId,
 			
 			&CommandTask.RunArgs,
-			&CommandTask.Output,
 			
 			&CommandTask.StartTime,
 			&CommandTask.EndTime,
+			&CommandTask.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -728,6 +749,7 @@ func OpenDB() error {
 		"ALTER TABLE Videos ADD COLUMN Filename TEXT DEFAULT ''",
 		"ALTER TABLE Videos ADD COLUMN Thumbnail TEXT DEFAULT ''",
 		"ALTER TABLE CommandTasks ADD COLUMN Title TEXT DEFAULT ''",
+		"ALTER TABLE CommandTasks ADD COLUMN UpdatedAt DATETIME NOT NULL DEFAULT 0",
 		
 		"ALTER TABLE Videos ADD COLUMN Description TEXT DEFAULT ''",
 	}

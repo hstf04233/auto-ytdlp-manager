@@ -248,6 +248,36 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 	DB_UpdateCommandTaskInfo(Task)
 }
 
+type Task_StdOut struct {
+	Lock sync.RWMutex
+	RawOutput string
+}
+
+func CL_BasicWatchStdPipe(StdPipe io.ReadCloser) *Task_StdOut {
+	StdOut := &Task_StdOut{}
+	
+	go func(){
+		buf := make([]byte, 4096)
+		for {
+			count, err := StdPipe.Read(buf)
+			if count > 0 {
+				StdOut.Lock.Lock()
+				StdOut.RawOutput += string(buf[0:count])
+				StdOut.Lock.Unlock()
+			}
+			
+			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.ErrUnexpectedEOF) {
+				break
+			} else if err != nil {
+				fmt.Printf("Unknown error? : %v\n", err)
+				break
+			}
+		}
+	}()
+	
+	return StdOut
+}
+
 // Create a blank command task with a random id
 func CL_NewTask() *CommandTask {
 	return &CommandTask{
@@ -451,17 +481,20 @@ func CL_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]
 			ActiveTask.Lock.RLock()
 			
 			if ActiveTask.RealtimeOutput != "" {
-				Task.Output  = TruncateOutput(ActiveTask.RealtimeOutput)
+				Task.Output = TruncateOutput(ActiveTask.RealtimeOutput)
 			} else {
-				Task.Output  = TruncateOutput(ActiveTask.Output)
+				Task.Output = TruncateOutput(ActiveTask.Output)
 			}
 			Task.Status  = ActiveTask.Status
 			Task.EndTime = ActiveTask.EndTime
 			
 			ActiveTask.Lock.RUnlock()
 		} else {
-			if len(Task.Output) > MAX_TASK_OUTPUT_LOG+100 {
-				Task.Output = TruncateOutput(Task.Output)
+			if Limit > 0 && Limit <= 30 {	// Don't send out the output if the request size is too big...
+				Task.Output, err = DB_GetCommandTaskOutput(Task.Id)
+				if len(Task.Output) > MAX_TASK_OUTPUT_LOG+100 {
+					Task.Output = TruncateOutput(Task.Output)
+				}
 			}
 		}
 	}
@@ -503,7 +536,37 @@ func CL_Logf(Task *CommandTask, format string, a ... any) {
 }
 
 func CleanUpListingTasksInDatabase() {
+	TasksList, err := DB_ListCommandTasks(-1, 0, ListCommandTasksQuery{
+		Type: TASK_TYPE_LISTING,
+		Status: -1,
+	})
+	if err != nil {
+		fmt.Printf("CleanUpListingTasksInDatabase error: %v\n", err)
+		return
+	}
+	ARCT_Lock.RLock()
+	defer ARCT_Lock.RUnlock()
 	
+	DeleteTime := time.Now().UTC().Add(time.Duration(time.Second * -MAX_CHANNEL_LISTING_LIFETIME))
+	
+	NumDeleted := 0
+	for _, Task := range(TasksList) {
+		ActiveTask := AllRunningCommandTasks[Task.Id]
+		if ActiveTask != nil {
+			// This task is still running?
+			continue
+		}
+		
+		if DeleteTime.Unix() > Task.EndTime.Unix() {
+			err := DB_DeleteCommandTask(Task.Id)
+			if err != nil {
+				fmt.Printf("DB_DeleteCommandTask error: %v\n", err)
+				continue
+			}
+			NumDeleted += 1
+		}
+	}
+	fmt.Printf("len(TasksList): %d NumDeleted: %d\n", len(TasksList), NumDeleted)
 }
 
 func init() {
