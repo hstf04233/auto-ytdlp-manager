@@ -550,7 +550,7 @@ function renderVideos() {
   container.innerHTML = allVideos.map(v => {
     var thumbnailUrl = v.thumbnail_url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
     var durationText = formatDuration(v.duration)
-    if (v.type == 2 && (v.duration <= 1)) {  // VIDEO_TYPE_ISLIVE
+    if (v.video_type == 2 && (v.duration <= 1)) {  // VIDEO_TYPE_ISLIVE
       durationText = "LIVE"
     }
     
