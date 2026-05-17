@@ -43,6 +43,8 @@ type ArchiveChannel struct {
 	CheckInterval  int64  `json:"check_interval"`
 	FullCheckInterval int64 `json:"full_check_interval"`
 	
+	NeedsRefreshing bool `json:"-"`
+	
 	Enabled        bool `json:"enabled"`
 	IsBeingChecked bool `json:"-"`
 	
@@ -379,10 +381,53 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	CL_FinishTask(Task, TASK_STATUS_FINISHED)
 }
 
+func CheckChannelRefreshes(AChannel *ArchiveChannel) {
+	if AChannel.Url == "" { return }
+	if AChannel.IsBeingChecked { return }
+	AChannel.NeedsRefreshing = false
+	
+	AChannel.IsBeingChecked = true
+	defer func() {AChannel.IsBeingChecked = false}()
+	
+	Task := CL_NewGenericTask()
+	defer func() {
+		if Task.Status == TASK_STATUS_RUNNING {
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
+		}
+	}()
+	Task.Type = TASK_TYPE_LISTING
+	Task.FromChannelId = AChannel.Id
+	Task.Title = fmt.Sprintf("Refreshing videos for: \"%s\"", AChannel.Name)
+	DB_UpdateCommandTaskInfo(Task)
+	
+	RefreshableVideos, err := DB_ListVideos(10, 0, ListVideosQuery{
+		RefreshState: 1,
+		FromChannelId: AChannel.Id,
+		Status: -1,
+	})
+	if err != nil {
+		CL_Logf(Task, "Failed to grab refreshable videos from DB_ListVideos, error: %v\n", err)
+	}
+	if err == nil && len(RefreshableVideos) > 0 {
+		for _, Video := range(RefreshableVideos) {
+			if !AChannel.Enabled { break }
+			
+			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
+			DB_UpdateCommandTaskInfo(Task)
+			RefreshVideoInfo(AChannel, Video)
+		}
+	}
+	
+	CL_FinishTask(Task, TASK_STATUS_FINISHED)
+}
+
 func CheckChannels(WD *WatchingBundle) {
 	WD.ChannelsLock.RLock()
 	
 	for _, AChannel := range(WD.Channels) {
+		if AChannel.NeedsRefreshing {
+			go CheckChannelRefreshes(AChannel)
+		}
 		if !AChannel.Enabled {
 			continue
 		}

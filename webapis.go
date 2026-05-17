@@ -468,6 +468,11 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 		} else {
 			DB_UpdateVideoRefreshState(VideoInfo, 0)
 		}
+		
+		AChannel := GetArchiveChannelFromId(&WatchedDownloading, VideoInfo.FromChannel)
+		if AChannel != nil {
+			AChannel.NeedsRefreshing = true
+		}
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
