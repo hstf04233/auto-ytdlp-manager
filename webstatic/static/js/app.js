@@ -404,6 +404,14 @@ async function refreshVideoInfo(id,) {
   }
 }
 
+function updateChannelModalPlaceholders() {
+   if (document.getElementById('channelType').value == 1) { // ACHANNEL_TYPE_LIVE
+    document.getElementById('channelOutputTemplate').placeholder = '%(release_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s';
+  } else {
+    document.getElementById('channelOutputTemplate').placeholder = '%(title)s %(id)s.%(ext)s';
+  }
+}
+
 // ========== Channel Modal ==========
 function openAddChannelModal() {
   document.getElementById('channelModalTitle').textContent = 'Add Channel';
@@ -418,6 +426,8 @@ function openAddChannelModal() {
   document.getElementById('channelFullCheckInterval').value = '';
   document.getElementById('channelSubmitBtn').textContent = 'Add Channel';
   document.getElementById('channelModal').classList.add('active');
+  
+  updateChannelModalPlaceholders();
 }
 
 function openEditChannelModal(id) {
@@ -436,6 +446,8 @@ function openEditChannelModal(id) {
   document.getElementById('channelFullCheckInterval').value = ch.full_check_interval !== -1 ? ch.full_check_interval : '';
   document.getElementById('channelSubmitBtn').textContent = 'Save Changes';
   document.getElementById('channelModal').classList.add('active');
+  
+  updateChannelModalPlaceholders();
 }
 
 function closeChannelModal() {
@@ -537,6 +549,10 @@ function renderVideos() {
 
   container.innerHTML = allVideos.map(v => {
     var thumbnailUrl = v.thumbnail_url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
+    var durationText = formatDuration(v.duration)
+    if (v.type == 2 && (v.duration <= 1)) {  // VIDEO_TYPE_ISLIVE
+      durationText = "LIVE"
+    }
     
     const channel = allChannels.find(c => c.id === v.from_channel);
     const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
@@ -545,11 +561,12 @@ function renderVideos() {
       <div class="card video-card">
         <div class="video-thumb">
           <img src="${thumbnailUrl}" alt="" onerror="this.style.display='none';this.parentElement.textContent='No thumbnail'">
+          <span class="video-duration">${durationText}</span>
         </div>
         <div class="video-info">
           <h3 title="${escHtml(v.title)}">${escHtml(v.title)}</h3>
           <p>From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
-          <p>Released: ${formatDateAndTime(v.release_date)} \u00b7 ${formatDuration(v.duration)}</p>
+          <p>Released: ${formatDateAndTime(v.release_date)}</p>
           <p>${escHtml(v.availability)}</p>
           <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
         </div>
