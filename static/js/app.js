@@ -176,7 +176,13 @@ function formatDate(ts) {
 }
 function formatDateAndTime(ts) {
   if (!ts) return '\u2014';
-  let date = new Date(ts * 1000);
+  var date = null;
+  if (typeof(ts) == "string") {
+    date = new Date(ts);
+  } else {
+    // time in seconds.
+    date = new Date(ts * 1000);
+  }
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 }
 
@@ -404,6 +410,69 @@ async function refreshVideoInfo(id,) {
   }
 }
 
+function openVideoDetailsModal(videoId) {
+  const v = allVideos.find(x => x.id === videoId);
+  if (!v) return;
+
+  const channel = allChannels.find(c => c.id === v.from_channel);
+  const channelName = channel ? escHtml(channel.name) : 'Unknown Channel';
+  const channelUrl = channel ? escHtml(channel.url) : '';
+
+  const resolutionParts = (v.resolution || '').split('x');
+  const resolutionText = resolutionParts.length === 2
+    ? `${resolutionParts[0].trim()} x ${resolutionParts[1].trim()}`
+    : (v.resolution || '\u2014');
+
+  const descHtml = v.description
+    ? escHtml(v.description).replace(/\n/g, '<br>')
+    : '\u2014';
+
+  //<div class="vd-field"><span class="vd-field-label">Channel</span><span class="vd-field-value">${channelUrl ? '<a href="' + channelUrl + '" target="_blank">' + channelName + '</a>' : channelName}</span></div>
+  document.getElementById('videoDetailsContent').innerHTML = `
+    <div class="vd-preview">
+      <img src="${escHtml(v.thumbnail_url || '')}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+      <div class="vd-preview-placeholder" style="display:none">No thumbnail</div>
+    </div>
+    <h3 class="vd-title">${escHtml(v.title)}</h3>
+    <div class="vd-grid">
+      <div class="vd-field"><span class="vd-field-label">From: <a href="${channelUrl}" target="_blank">${escHtml(channelName)}</a></span></div>
+      <div class="vd-field"><span class="vd-field-label">Video ID</span><span class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(v.id)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Video URL</span><span class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(v.url)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Duration</span><span class="vd-field-value">${formatDuration(v.duration)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Availability</span><span class="vd-field-value">${escHtml(v.availability)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Video Type</span><span class="vd-field-value">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : '\u2014'}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Status</span><span class="vd-field-value">${videoStatusBadge(v.id, v.status)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Filename</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Resolution</span><span class="vd-field-value">${resolutionText}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Release Date</span><span class="vd-field-value">${formatDateAndTime(v.release_date)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Added</span><span class="vd-field-value">${formatDateAndTime(v.added_at)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Updated</span><span class="vd-field-value">${formatDateAndTime(v.updated_at)}</span></div>
+    </div>
+
+    
+    <div class="vd-description">
+      <span class="vd-field-label">Description</span>
+      <div class="vd-description-text">${descHtml}</div>
+    </div>
+  `;
+
+  const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
+  const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
+
+  document.getElementById('videoDetailsActions').innerHTML = `
+    <button type="button" class="btn btn-secondary" onclick="closeVideoDetailsModal()">Close</button>
+    <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary" title="Open video on YouTube">Open Video</a>
+    <button type="button" class="btn btn-secondary" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}');closeVideoDetailsModal();" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
+    <button type="button" class="btn btn-danger" onclick="deleteVideo('${v.id}');closeVideoDetailsModal();">Delete</button>
+  `;
+
+  document.getElementById('videoDetailsModal').classList.add('active');
+}
+
+function closeVideoDetailsModal() {
+  document.getElementById('videoDetailsModal').classList.remove('active');
+}
+
 function updateChannelModalPlaceholders() {
    if (document.getElementById('channelType').value == 1) { // ACHANNEL_TYPE_LIVE
     document.getElementById('channelOutputTemplate').placeholder = '%(release_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s';
@@ -575,6 +644,7 @@ function renderVideos() {
           ${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}
           <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video on YouTube">Open Video</a>
           <button class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
+          <button class="btn btn-secondary btn-sm" onclick="openVideoDetailsModal('${v.id}')">Details</button>
           <button class="btn btn-danger btn-sm" onclick="deleteVideo('${v.id}')">Delete</button>
         </div>
       </div>
@@ -1030,6 +1100,13 @@ function escHtml(str) {
 window.addEventListener('popstate', function (e) {
   const tab = window.location.pathname.replace(/^\//, '') || '';
   showPage(tab, true);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeVideoDetailsModal();
+    closeChannelModal();
+  }
 });
 
 async function init() {

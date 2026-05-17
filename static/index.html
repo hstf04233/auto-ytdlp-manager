@@ -145,7 +145,7 @@
   </div>
 
   <!-- ADD/EDIT CHANNEL MODAL -->
-  <div class="modal-overlay" id="channelModal">
+  <div class="modal-overlay" id="channelModal" onclick="if(event.target===this)closeChannelModal()">
     <div class="modal">
       <h2 id="channelModalTitle">Add Channel</h2>
       <form id="channelForm" onsubmit="saveChannel(event)">
@@ -213,6 +213,24 @@
           <button type="submit" class="btn btn-primary" id="channelSubmitBtn">Add Channel</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- VIDEO DETAILS MODAL -->
+  <div class="modal-overlay" id="videoDetailsModal" onclick="if(event.target===this)closeVideoDetailsModal()">
+    <div class="modal modal-video-details">
+      <div class="modal-header">
+        <h2>Video Details</h2>
+        <button class="modal-close" onclick="closeVideoDetailsModal()">&times;</button>
+      </div>
+
+      <div class="video-details-body" id="videoDetailsContent">
+        <!-- filled dynamically -->
+      </div>
+
+      <div class="modal-actions" id="videoDetailsActions">
+        <!-- filled dynamically -->
+      </div>
     </div>
   </div>
 
