@@ -541,7 +541,12 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		Offset, _ = strconv.Atoi(o)
 	}
 	
-	TasksList, err := CL_ListCommandTasks(Limit, Offset)
+	Query := ListCommandTasksQuery{
+		Status: -2,
+		Type: -1,
+	}
+	
+	TasksList, err := CL_ListCommandTasks(Limit, Offset, Query)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error when trying to list videos, err: %v", err), http.StatusInternalServerError)
 		return
@@ -551,7 +556,7 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 	if (len(TasksList) >= Limit || Offset > 0) {
 		// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every task...
 		// (Or maybe cache the results aswell...)
-		TasksListAll, err := DB_ListCommandTasks(-1, 0)
+		TasksListAll, err := DB_ListCommandTasks(-1, 0, Query)
 		if err == nil {
 			TasksListStats = TasksListAll
 		} else if err != nil {
@@ -703,7 +708,7 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if FilePath == "" {
-		http.Error(w, "Could not find video file.", http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("Could not find video file '%s' The video must've been moved or deleted.", VideoInfo.DownloadedFilename), http.StatusNotFound)
 		return
 	}
 	

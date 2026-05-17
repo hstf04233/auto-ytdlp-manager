@@ -437,8 +437,8 @@ func CL_NewGenericTask() *CommandTask {
 	return Task
 }
 
-func CL_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
-	TasksList, err := DB_ListCommandTasks(Limit, Offset)
+func CL_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]*CommandTask, error) {
+	TasksList, err := DB_ListCommandTasks(Limit, Offset, Query)
 	if err != nil {
 		return nil, err
 	}

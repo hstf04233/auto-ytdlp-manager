@@ -312,7 +312,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	
 	VideoList, err := yt_dlp_ListVideos(Url, PlaylistEnd, Task)
 	if err != nil {
-		fmt.Printf("Error when grabbing videos for channel \"%s\": %v\n", AChannel.Name, err)
+		//fmt.Printf("Error when grabbing videos for channel \"%s\": %v\n", AChannel.Name, err)
 		CL_FinishTask(Task, TASK_STATUS_FAILED)
 		return
 	}
@@ -415,6 +415,10 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
 			RefreshVideoInfo(AChannel, Video)
+		}
+		
+		if len(RefreshableVideos) >= 10 {
+			AChannel.NeedsRefreshing = true
 		}
 	}
 	

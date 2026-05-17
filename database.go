@@ -321,35 +321,29 @@ type ListVideosQuery struct {
 	OrderDirection int
 }
 
-func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, error) {
-	Args := []interface{}{}
-	
-	// ORDER BY ReleaseDate DESC
-	Statement := `
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, ReleaseDate, Duration, VideoType,
-	AddedAt, UpdatedAt, RefreshState FROM Videos`
+func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, Statement *string, Args *[]interface{}) {
 	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 {
-		Statement += " WHERE "
+		*Statement += " WHERE "
 		AddAnd := false
 		if Query.Status != -1 {
-			Statement += " Status = ?"
-			Args = append(Args, Query.Status)
+			*Statement += " Status = ?"
+			*Args = append(*Args, Query.Status)
 			AddAnd = true
 		}
 		if Query.FromChannelId != "" {
 			if AddAnd {
-				Statement += " AND "
+				*Statement += " AND "
 			}
-			Statement += " FromChannel = ?"
-			Args = append(Args, Query.FromChannelId)
+			*Statement += " FromChannel = ?"
+			*Args = append(*Args, Query.FromChannelId)
 			AddAnd = true
 		}
 		if Query.RefreshState != -1 {
 			if AddAnd {
-				Statement += " AND "
+				*Statement += " AND "
 			}
-			Statement += " RefreshState = ?"
-			Args = append(Args, Query.RefreshState)
+			*Statement += " RefreshState = ?"
+			*Args = append(*Args, Query.RefreshState)
 			AddAnd = true
 		}
 	}
@@ -370,7 +364,17 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 		}
 	}
 	
-	Statement = Statement + fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
+	*Statement += fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
+	*Args = append(*Args, Limit, Offset)
+}
+
+func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, error) {
+	Args := []interface{}{}
+	
+	Statement := `
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, ReleaseDate, Duration, VideoType,
+	AddedAt, UpdatedAt, RefreshState FROM Videos`
+	
 	QLimit := Limit
 	QOffset := Offset
 	
@@ -385,7 +389,8 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			SearchWords[i] = strings.ToLower(SearchWords[i])
 		}
 	}
-	Args = append(Args, QLimit, QOffset)
+	DB_ConstructQuery_ListVideos(QLimit, QOffset, Query, &Statement, &Args)
+	
 	Rows, err := GDB.Query(Statement, Args...)
 	if err != nil {
 		return nil, err
@@ -547,6 +552,7 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 		
 		&CommandTask.RunArgs,
 		&CommandTask.Output,
+		
 		&CommandTask.StartTime,
 		&CommandTask.EndTime,
 	)
@@ -561,15 +567,101 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 	return CommandTask, nil
 }
 
-func DB_ListCommandTasks(Limit int, Offset int) ([]*CommandTask, error) {
+const (
+	DB_CTASK_ORDERBY_StartTime = 0
+	DB_CTASK_ORDERBY_EndTime   = 1
+	//DB_CTASK_ORDERBY_UpdatedAt = 2
+)
+
+type ListCommandTasksQuery struct {
+	Status int
+	Type int
+	FromChannelId string
+	FromVideoId string
+	SearchQuery string
+	
+	OrderBy int
+	OrderDirection int
+}
+
+func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery, Statement *string, Args *[]interface{}) {
+	WhereAdded := false
+	if Query.Status == -2 {
+		if !WhereAdded {
+			WhereAdded = true
+			*Statement += " WHERE "
+		}
+		*Statement += " (Status = 0 OR Status == 1) OR Type == 2 "
+	}
+	
+	if Query.Status >= 0 || Query.Type != -1 || Query.FromChannelId != "" || Query.FromVideoId != "" {
+		AddAnd := false
+		if !WhereAdded {
+			WhereAdded = true
+			*Statement += " WHERE "
+		} else {
+			AddAnd = true
+		}
+		if Query.Status != -1 {
+			if AddAnd {
+				*Statement += " AND "
+			}
+			*Statement += " Status = ?"
+			*Args = append(*Args, Query.Status)
+			AddAnd = true
+		}
+		if Query.Type != -1 {
+			if AddAnd {
+				*Statement += " AND "
+			}
+			*Statement += " Type = ?"
+			*Args = append(*Args, Query.Type)
+			AddAnd = true
+		}
+		if Query.FromChannelId != "" {
+			if AddAnd {
+				*Statement += " AND "
+			}
+			*Statement += " FromChannel = ?"
+			*Args = append(*Args, Query.FromChannelId)
+			AddAnd = true
+		}
+		if Query.FromVideoId != "" {
+			if AddAnd {
+				*Statement += " AND "
+			}
+			*Statement += " FromVideo = ?"
+			*Args = append(*Args, Query.FromVideoId)
+			AddAnd = true
+		}
+	}
+	
+	OrderBy := "EndTime"
+	switch Query.OrderBy {
+	case DB_CTASK_ORDERBY_StartTime:
+		OrderBy = "StartTime"
+	}
+	
+	OrderDirection := "DESC"
+	if Query.OrderDirection != 0 {
+		OrderDirection = "ASC"
+		if Query.OrderDirection == -1 {
+			OrderDirection = "DESC"
+		}
+	}
+	
+	*Statement += fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
+	*Args = append(*Args, Limit, Offset)
+}
+
+func DB_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]*CommandTask, error) {
 	Args := []interface{}{}
 	
 	Statement := `
 	SELECT Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output,
 	StartTime, EndTime FROM CommandTasks`
 	
-	Statement = Statement + " ORDER BY EndTime DESC LIMIT ? OFFSET ?"
-	Args = append(Args, Limit, Offset)
+	DB_ConstructQuery_ListCommandTasks(Limit, Offset, Query, &Statement, &Args)
 	
 	Rows, err := GDB.Query(Statement, Args...)
 	if err != nil {
@@ -647,7 +739,7 @@ func OpenDB() error {
 	
 	for i, Upgrade := range(DatabaseUpgrades) {
 		_, err = db.Exec(Upgrade)
-		if err != nil {
+		if err != nil && APPLICATION_VERSION == "debug" {
 			fmt.Printf("Upgrade[%d] failed, error: %v\n", i, err)
 		}
 	}
