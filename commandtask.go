@@ -246,8 +246,6 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 	Task.Lock.Unlock()
 	
 	DB_UpdateCommandTaskInfo(Task)
-	
-	fmt.Printf("Output for task: '%s' has stopped!\n", Task.Id)
 }
 
 // Create a blank command task with a random id

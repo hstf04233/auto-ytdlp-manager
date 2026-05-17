@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -701,6 +702,13 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	fmt.Printf("Serving file '%s' ! \n", FilePath)
+	if DownloadVal := r.URL.Query().Get("download"); DownloadVal != "" {
+		DownloadVal = strings.ToLower(DownloadVal)
+		if DownloadVal == "true" || DownloadVal == "1" || DownloadVal == "yes" {
+			Filename := filepath.Base(FilePath)
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", Filename))
+		}
+	}
+	
 	http.ServeFile(w, r, FilePath)
 }

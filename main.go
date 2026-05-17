@@ -26,7 +26,8 @@ const (
 	C_CMD_FFMPEG = "ffmpeg"
 	
 	DEFAULT_DOWNLOAD_DIR = "./downloads"
-	DEFAULT_YT_DLP_OUTPUT_TEMPLATE = "%(title)s %(id)s.%(ext)s"
+	DEFAULT_YT_DLP_OUTPUT_TEMPLATE      = "%(title)s %(id)s.%(ext)s"
+	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(release_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
 )
 var (
 	CMD_YT_DLP = C_CMD_YT_DLP

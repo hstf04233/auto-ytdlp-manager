@@ -117,6 +117,9 @@ func GetOutputTemplate(AChannel *ArchiveChannel) string {
 	OutputTemplate := AChannel.OutputTemplate
 	if OutputTemplate == "" {
 		OutputTemplate = DEFAULT_YT_DLP_OUTPUT_TEMPLATE
+		if AChannel.Type == ACHANNEL_TYPE_LIVE {
+			OutputTemplate = DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE
+		}
 	}
 	return OutputTemplate
 }
@@ -166,10 +169,12 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 		Video.Id = OldVideoId
 	}
 	
+	/*
 	if Video.VideoType == VIDEO_TYPE_ISLIVE || Video.VideoType == VIDEO_TYPE_WASLIVE {
 		DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
 		Video.Filename = fmt.Sprintf("%s %s", DateAndTime, Video.Filename)
 	}
+	*/
 	
 	return nil
 }
@@ -196,7 +201,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 	Out, err := Cmd.Output()
 	if err != nil {
 		ErrorMsg := fmt.Sprintf("Failed to list videos from channel: %s, Error: %v\n", ChannelUrl, err)
-		fmt.Print(ErrorMsg)
+		//fmt.Print(ErrorMsg)
 		if Task != nil {
 			CL_Logf(Task, "%s", ErrorMsg)
 			DB_UpdateCommandTaskInfo(Task)
@@ -243,23 +248,17 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 // This must be called with a Video that has been passed through RequestVideoInfo()
 func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
-	OutputTemplate := GetOutputTemplate(AChannel)
+	//OutputTemplate := GetOutputTemplate(AChannel)
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
 		fmt.Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
 	}
 	
-	if Video.VideoType == VIDEO_TYPE_ISLIVE || Video.VideoType == VIDEO_TYPE_WASLIVE {
-		DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
-		OutputTemplate = fmt.Sprintf("%s %s", DateAndTime, OutputTemplate)
-	}
-	
 	Filename := Video.Filename
 	
 	FileExtension := filepath.Ext(Filename)
 	FilenameWithoutExt := strings.TrimSuffix(Filename, FileExtension)
-	fmt.Printf("FilenameWithoutExt: '%s'\n", FilenameWithoutExt)
 	DB_UpdateVideoFilename(Video, Filename)
 	
 	Args := []string{

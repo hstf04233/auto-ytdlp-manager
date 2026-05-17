@@ -109,7 +109,7 @@ func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
 }
 
 func DoesFileExist(FilePath string) bool {
-	fmt.Printf("DoesFileExist: '%s'\n", FilePath) // TODO: Temp debug print statement
+	//fmt.Printf("DoesFileExist: '%s'\n", FilePath) // TODO: Temp debug print statement
 	
 	_, err := os.Stat(FilePath)
 	if err == nil {
@@ -117,7 +117,6 @@ func DoesFileExist(FilePath string) bool {
 		return true
 	}
 	
-	fmt.Printf("DoesFileExist error %v\n", err)
 	if errors.Is(err, os.ErrNotExist) {
 		return false
 	}
