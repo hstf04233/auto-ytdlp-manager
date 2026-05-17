@@ -308,6 +308,11 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.video-info h3 a {
+  color: var(--accent);
+  text-decoration: none;
+  /* transition: color 0.2s; */
+}
 
 .video-info p {
   color: var(--text-secondary);
@@ -443,9 +448,9 @@ body {
 
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
-  margin-top: 20px;
+  margin-bottom: 15px;
 }
 
 /* Filter bar */
@@ -1119,12 +1124,12 @@ body {
   word-break: break-all;
 }
 
-.vd-field-value a {
+.vd-field a {
   color: var(--accent);
   text-decoration: none;
 }
 
-.vd-field-value a:hover {
+.vd-field a:hover {
   text-decoration: underline;
 }
 

@@ -586,7 +586,7 @@ type ListCommandTasksQuery struct {
 
 func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery, Statement *string, Args *[]interface{}) {
 	WhereAdded := false
-	if Query.Status == -2 {
+	if Query.Status == -2 && Query.Type == -1 {
 		if !WhereAdded {
 			WhereAdded = true
 			*Statement += " WHERE "
@@ -602,7 +602,7 @@ func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommand
 		} else {
 			AddAnd = true
 		}
-		if Query.Status != -1 {
+		if Query.Status >= 0 {
 			if AddAnd {
 				*Statement += " AND "
 			}

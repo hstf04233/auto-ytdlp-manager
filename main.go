@@ -65,7 +65,7 @@ func StartServer(ServerPort int) {
 	// This should serve favicon.png
 	Mux.HandleFunc("/favicon.ico", webstatic_ServeStaticContent)
 	Mux.HandleFunc("/api/", ServeApi)
-	Mux.HandleFunc("/video/", ServeVideoDownload)
+	Mux.HandleFunc("/video-file/", ServeVideoDownload)
 	
 	fmt.Printf("Starting server at http://localhost:%d\n", ServerPort)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", ServerPort), Mux); err != nil {

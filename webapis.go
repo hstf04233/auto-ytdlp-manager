@@ -546,6 +546,34 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		Type: -1,
 	}
 	
+	if fc := r.URL.Query().Get("from_channel"); fc != "" {
+		Query.FromChannelId = fc
+	}
+	if fv := r.URL.Query().Get("from_video"); fv != "" {
+		Query.FromVideoId = fv
+	}
+	if s := r.URL.Query().Get("status"); s != "" {
+		Status, _ := strconv.Atoi(s)
+		Query.Status = Status
+	}
+	if t := r.URL.Query().Get("type"); t != "" {
+		Type, _ := strconv.Atoi(t)
+		Query.Type = Type
+	}
+	if o := r.URL.Query().Get("order_direction"); o != "" {
+		OrderDirection, _ := strconv.Atoi(o)
+		Query.OrderDirection = OrderDirection
+	}
+	if o := r.URL.Query().Get("order_by"); o != "" {
+		var OrderBy int
+		if o == "start_time" {
+			OrderBy = DB_CTASK_ORDERBY_StartTime
+		} else if o == "end_time" {
+			OrderBy = DB_CTASK_ORDERBY_EndTime
+		}
+		Query.OrderBy = OrderBy
+	}
+	
 	TasksList, err := CL_ListCommandTasks(Limit, Offset, Query)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error when trying to list videos, err: %v", err), http.StatusInternalServerError)

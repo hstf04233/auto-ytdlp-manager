@@ -410,8 +410,6 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 	}
 	if err == nil && len(RefreshableVideos) > 0 {
 		for _, Video := range(RefreshableVideos) {
-			if !AChannel.Enabled { break }
-			
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
 			RefreshVideoInfo(AChannel, Video)

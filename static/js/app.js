@@ -460,10 +460,14 @@ function openVideoDetailsModal(videoId) {
   const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
 
   document.getElementById('videoDetailsActions').innerHTML = `
-    <button type="button" class="btn btn-secondary" onclick="closeVideoDetailsModal()">Close</button>
-    <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary" title="Open video on YouTube">Open Video</a>
-    <button type="button" class="btn btn-secondary" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}');closeVideoDetailsModal();" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
-    <button type="button" class="btn btn-danger" onclick="deleteVideo('${v.id}');closeVideoDetailsModal();">Delete</button>
+    <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open original video link">Open Video</a>
+    ${
+      v.filename ?
+    `<a href="/video-file/${escHtml(v.id)}?download=true" target="_blank" class="btn btn-secondary btn-sm" title="Download video file">Download Video</a>` :
+    ''
+    }
+    <button type="button" class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}');closeVideoDetailsModal();" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
+    <button type="button" class="btn btn-danger btn-sm" onclick="deleteVideo('${v.id}');closeVideoDetailsModal();">Delete</button>
   `;
 
   document.getElementById('videoDetailsModal').classList.add('active');
@@ -579,6 +583,7 @@ async function loadVideos() {
     const channelFilter = document.getElementById('videoChannelFilter').value;
     const orderBy = document.getElementById('videoOrderBy').value;
     const orderDir = document.getElementById('videoOrderDirection').value;
+    
     let url = `/api/videos?limit=${VIDEO_PAGE_SIZE}&offset=${videoPage * VIDEO_PAGE_SIZE}`;
     if (statusFilter !== '') {
       url += `&status=${statusFilter}`;
@@ -633,7 +638,7 @@ function renderVideos() {
           <span class="video-duration">${durationText}</span>
         </div>
         <div class="video-info">
-          <h3 title="${escHtml(v.title)}">${escHtml(v.title)}</h3>
+          <h3 title="${escHtml(v.title)}">${escHtml(v.title)} <a href="${escHtml(v.url)}" target="_blank">[VideoLink]</a></h3>
           <p>From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
           <p>Released: ${formatDateAndTime(v.release_date)}</p>
           <p>${escHtml(v.availability)}</p>
@@ -642,7 +647,11 @@ function renderVideos() {
         <div class="video-actions">
           ${videoStatusBadge(v.id, v.status)}
           ${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}
-          <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video on YouTube">Open Video</a>
+          ${
+            v.filename ?
+            `<a href="/video-file/${escHtml(v.id)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video file">Video File</a>` :
+            ''
+          }
           <button class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
           <button class="btn btn-secondary btn-sm" onclick="openVideoDetailsModal('${v.id}')">Details</button>
           <button class="btn btn-danger btn-sm" onclick="deleteVideo('${v.id}')">Delete</button>
@@ -656,6 +665,8 @@ function clearVideoFilters() {
   document.getElementById('videoSearch').value = '';
   document.getElementById('videoStatusFilter').value = '';
   document.getElementById('videoChannelFilter').value = '';
+  document.getElementById('videoOrderBy').value = 'release_date';
+  document.getElementById('videoOrderDirection').value = '-1';
   videoPage = 0;
   if (!areVideosLoading) {
     loadVideos();
@@ -849,6 +860,9 @@ function updateChannelFilters() {
     if (ch.id === current) opt.selected = true;
     select.appendChild(opt);
   });
+  
+  const taskSelect = document.getElementById('taskChannelFilter');
+  taskSelect.innerHTML = select.innerHTML;
 }
 
 // ========== Tasks ==========
@@ -885,10 +899,48 @@ function taskTypeBadge(type) {
   return `<span class="badge badge-${cls}">${taskTypeLabel(type)}</span>`;
 }
 
+function onTaskFilterChange() {
+  taskPage = 0;
+  loadTasks();
+}
+
+function clearTaskFilters() {
+  //document.getElementById('taskSearch').value = '';
+  document.getElementById('taskStatusFilter').value = '';
+  document.getElementById('taskTypeFilter').value = '';
+  document.getElementById('taskChannelFilter').value = '';
+  document.getElementById('taskOrderBy').value = 'end_time';
+  document.getElementById('taskOrderDirection').value = '-1';
+  videoPage = 0;
+  if (!areVideosLoading) {
+    loadVideos();
+  }
+}
+
 async function loadTasks() {
   areTasksLoading = true;
   try {
-    const url = `/api/tasks?limit=${TASK_PAGE_SIZE}&offset=${taskPage * TASK_PAGE_SIZE}`;
+    const statusFilter  = document.getElementById('taskStatusFilter').value;
+    const typeFilter    = document.getElementById('taskTypeFilter').value;
+    const channelFilter = document.getElementById('taskChannelFilter').value;
+    const orderBy  = document.getElementById('taskOrderBy').value;
+    const orderDir = document.getElementById('taskOrderDirection').value;
+    
+    let url = `/api/tasks?limit=${TASK_PAGE_SIZE}&offset=${taskPage * TASK_PAGE_SIZE}`;
+    if (statusFilter !== '') {
+      url += `&status=${statusFilter}`;
+    }
+    if (typeFilter !== '') {
+      url += `&type=${typeFilter}`;
+    }
+    if (channelFilter !== '') {
+      url += `&from_channel=${channelFilter}`;
+    }
+    if (orderBy) {
+      url += `&order_by=${orderBy}`;
+    }
+    url += `&order_direction=${orderDir}`;
+    
     const data = await API.get(url);
     allTasks = data.tasks || data;
     if (data.stats) {

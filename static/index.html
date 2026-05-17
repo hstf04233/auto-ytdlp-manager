@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auto yt-dlp Downloader</title>
+  <title>Auto yt-dlp Manager</title>
   <link rel="icon" href="/favicon.ico" type="image/png">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
   <div class="sidebar">
-    <h1>Auto yt-dlp Downloader</h1>
+    <h1>Auto yt-dlp Manager</h1>
     <nav>
       <a href="#" data-page="channels" class="active">
         <span>&#9776;</span> <span>Channels</span>
@@ -66,8 +66,8 @@
           <option value="">All Channels</option>
         </select>
         <select id="videoOrderBy" onchange="onVideoFilterChange()">
-          <option value="added_at">Sort: Added</option>
           <option value="release_date">Sort: Release Date</option>
+          <option value="added_at">Sort: Added</option>
           <option value="updated_at">Sort: Updated</option>
         </select>
         <select id="videoOrderDirection" onchange="onVideoFilterChange()">
@@ -93,6 +93,37 @@
       </div>
 
       <div class="stats-row" id="taskStats"></div>
+      
+      <div class="filter-bar">
+        <!-- <input type="text" id="taskSearch" maxlength="1024" placeholder="Search videos..." oninput="taskSearchFilterUpdate()"> -->
+        <select id="taskStatusFilter" onchange="onTaskFilterChange()">
+          <option value="">Status: Default</option>
+          <option value="-1">Status: Show All</option>
+          <hr>
+          <option value="0">Status: Running</option>
+          <option value="2">Status: Finished</option>
+          <option value="3">Status: Canceled</option>
+          <option value="1">Status: Failed</option>
+        </select>
+        <select id="taskTypeFilter" onchange="onTaskFilterChange()">
+          <option value="">Type: All</option>
+          <option value="2">Type: Downloads</option>
+          <option value="1">Type: Channel Check</option>
+          <option value="0">Type: Generic</option>
+        </select>
+        <select id="taskChannelFilter" onchange="onTaskFilterChange()">
+          <option value="">All Channels</option>
+        </select>
+        <select id="taskOrderBy" onchange="onTaskFilterChange()">
+          <option value="end_time">Sort: End Time</option>
+          <option value="start_time">Sort: Start Time</option>
+        </select>
+        <select id="taskOrderDirection" onchange="onTaskFilterChange()">
+          <option value="-1">Newest</option>
+          <option value="1">Oldest</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="clearTaskFilters()">Clear Filters</button>
+      </div>
 
       <div class="task-layout">
         <div class="task-list-container">
@@ -223,12 +254,12 @@
         <h2>Video Details</h2>
         <button class="modal-close" onclick="closeVideoDetailsModal()">&times;</button>
       </div>
-
-      <div class="video-details-body" id="videoDetailsContent">
+      
+      <div class="modal-actions" id="videoDetailsActions">
         <!-- filled dynamically -->
       </div>
 
-      <div class="modal-actions" id="videoDetailsActions">
+      <div class="video-details-body" id="videoDetailsContent">
         <!-- filled dynamically -->
       </div>
     </div>
