@@ -2,7 +2,9 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"time"
+
 	//"yt-stream-manager/webstatic"
 
 	//"yt-stream-manager/database"
@@ -15,9 +17,6 @@ var (
 	APPLICATION_VERSION = "release"
 	CURRENT_WORKING_DIRECTORY = ""
 )
-const (
-	APPLICATION_NAME = "Auto yt-dlp Manager"
-)
 var (
 	CMD_YT_DLP = C_CMD_YT_DLP
 	CMD_YT_ARCHIVE = C_CMD_YT_ARCHIVE
@@ -29,10 +28,12 @@ func commandExists(cmd string) bool {
 	return err == nil
 }
 func findCommand(cmd string) string {
-	LocalCmd := fmt.Sprintf("%s/%s", CURRENT_WORKING_DIRECTORY, cmd)
-	if commandExists(LocalCmd) {
-		// Program exists in working directory
-		return LocalCmd
+	if filepath.IsLocal(cmd) {
+		LocalCmd := fmt.Sprintf("%s/%s", CURRENT_WORKING_DIRECTORY, cmd)
+		if commandExists(LocalCmd) {
+			// Program exists in working directory
+			return LocalCmd
+		}
 	}
 	
 	if commandExists(cmd) {
@@ -70,9 +71,19 @@ func main() {
 		panic(err)
 	}
 	
-	CMD_YT_DLP = findCommand(C_CMD_YT_DLP)
+	ConfigPath := CONFIG_PATH
+	if APPLICATION_VERSION == "debug" {
+		ConfigPath = CONFIG_PATH_DEBUG
+	}
+	
+	err = OpenConfig(ConfigPath)
+	if err != nil {
+		panic(err)
+	}
+	
+	CMD_YT_DLP     = findCommand(C_CMD_YT_DLP)
 	CMD_YT_ARCHIVE = findCommand(C_CMD_YT_ARCHIVE)
-	CMD_FFMPEG = findCommand(C_CMD_FFMPEG)
+	CMD_FFMPEG     = findCommand(C_CMD_FFMPEG)
 	
 	Exit := false
 	
@@ -85,17 +96,8 @@ func main() {
 		fmt.Printf("You need '%s' (and possibly 'ffprobe') to run this program! Get both from https://www.ffmpeg.org/ \n", C_CMD_FFMPEG)
 	}
 	if !commandExists(CMD_YT_ARCHIVE) {
-		AlternativeYT_ARCHIVE_Cmds := []string{"ytarchive", "ytarchive_arm64"}
-		for _, AltCmd := range(AlternativeYT_ARCHIVE_Cmds) {
-			CMD_YT_ARCHIVE = findCommand(AltCmd)
-			if commandExists(CMD_YT_ARCHIVE) {
-				break
-			}
-		}
-		if !commandExists(CMD_YT_ARCHIVE) {
-			Exit = true
-			fmt.Printf("You need '%s' to run this program! https://github.com/dreammu/ytarchive\n", C_CMD_YT_ARCHIVE)
-		}
+		Exit = true
+		fmt.Printf("You need '%s' to run this program! https://github.com/dreammu/ytarchive\n", C_CMD_YT_ARCHIVE)
 	}
 	
 	if Exit {
@@ -109,17 +111,13 @@ func main() {
 		panic(err)
 	}
 	
-	CleanUpListingTasksInDatabase()
+	//CleanUpTasksInDatabase()
 	
 	go StartDownloading()
 	
 	fmt.Printf("APPLICATION_VERSION: %s\n", APPLICATION_VERSION)
-	ServerPort := SERVER_PORT
-	if APPLICATION_VERSION == "debug" {
-		ServerPort = SERVER_PORT_DEBUG
-	}
 	
-	//go yt_chat_Run("https://www.youtube.com/watch?v=G5oz2dQLi00", "./test-chat-output.json", nil)
+	// TODO: THIS IS TEMP! go yt_chat_Run("https://www.youtube.com/watch?v=G5oz2dQLi00", "./test-chat-output.json", nil)
 	
-	StartServer(ServerPort)
+	StartServer(int(G_Config.ServerPort))
 }

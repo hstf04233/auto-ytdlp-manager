@@ -192,6 +192,9 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	AChannel.NextCheckMSEC = time.Now().UnixMilli()-1
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte("{\"Success\":true}"))
 }
 func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
@@ -685,6 +688,15 @@ func API_GetTaskOutput(w http.ResponseWriter, r *http.Request) {
 	return
 }
 
+func API_GetConfig(w http.ResponseWriter, r *http.Request) {
+	var RequestConfig ProgramConfig
+	RequestConfig = *G_Config
+	RequestConfig.ServerPort = 0
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(RequestConfig)
+}
+
 func ServeApi(w http.ResponseWriter, r *http.Request) {
 	r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/")
 	Path := r.URL.Path
@@ -703,8 +715,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		// api/channels will give the entire list of channels !
 		// api/channels/{channel_id} will give you a specific channel.
 		API_GetChannels(w, r)
-	} else if strings.HasPrefix(Path, "check-channel-now/") && Method == "PATCH" {
-		// PATCHing to api/check-channel-now/{channel_id} make the channel be checked first chance it gets.
+	} else if strings.HasPrefix(Path, "check-channel-now/") && Method == "POST" {
+		// PPOSTing to api/check-channel-now/{channel_id} make the channel be checked first chance it gets.
 		API_CheckChannel(w, r)
 	} else if (Path == "videos" || strings.HasPrefix(Path, "videos/")) && Method == "GET" {
 		/*
@@ -728,13 +740,15 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		API_GetVideoStatus(w, r)
 	} else if (Path == "tasks" || strings.HasPrefix(Path, "tasks/")) && Method == "GET" {
 		/*
-		  api/tasks?limit={int}&offset={int} Returns a list of videos. (There are no filter at the moment... but there will be swoon)
+		  api/tasks?limit={int}&offset={int}&status={int}&type={int}&from_channel={channel_id}&from_video={video_id}&order_by={order}&order_direction={1, -1}
 		  
 		  api/tasks/{video_id} will give you a specific task.
 		*/
 		API_GetTasks(w, r)
 	} else if strings.HasPrefix(Path, "get-realtime-task-output/") && Method == "GET" {
 		API_GetTaskOutput(w, r)
+	} else if strings.HasPrefix(Path, "config") && Method == "GET" {
+		API_GetConfig(w, r)
 	} else {
 		http.NotFound(w, r)
 	}

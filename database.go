@@ -576,7 +576,7 @@ func DB_GetCommandTaskOutput(TaskId string) (string, error) {
 	
 	var Output string
 	
-	err := TaskRow.Scan(&Output,)
+	err := TaskRow.Scan(&Output)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return "", nil

@@ -53,12 +53,19 @@ const API = {
   },
 };
 
+const isLocalhost = Boolean(
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '[::1]' || // IPv6
+  window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/) // IPv4 127.0.0.1 range
+);
+
 // ========== State ==========
 
 // These are to stop spamming the api endpoints until the last call is finished!
 let areVideosLoading = false;
 let areTasksLoading  = false;
 
+let programConfig = {};
 let allChannels = [];
 let allVideos = [];
 let videoPage = 0;
@@ -335,6 +342,15 @@ function videoTypeBadge(vtype) {
   return `<span class="badge badge-${cls}">${label}</span>`;
 }
 
+async function loadConfig() {
+  try {
+    const data = await API.get('/api/config');
+    programConfig = data.channels || data;
+  } catch (err) {
+    showToast(`Failed to load program config: ${err.message}`, 'error');
+  }
+}
+
 // ========== Channels ==========
 async function loadChannels() {
   try {
@@ -384,6 +400,7 @@ function renderChannels() {
           <input type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="toggleChannel('${ch.id}', this.checked)">
           <span class="toggle-slider"></span>
         </label>
+        <button class="btn btn-secondary btn-sm" onclick="runChannelCheck('${ch.id}')">Run Check now</button>
         <button class="btn btn-secondary btn-sm" onclick="openEditChannelModal('${ch.id}')">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}', '${ch.name}')">Delete</button>
       </div>
@@ -397,6 +414,15 @@ async function toggleChannel(id, enabled) {
     showToast(`Channel ${enabled ? 'enabled' : 'disabled'}`, 'success');
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+async function runChannelCheck(id, name) {
+  try {
+    await API.post(`/api/check-channel-now/${id}`, {});
+    loadChannels();
+  } catch (err) {
+    showToast(`Failed to check channel: ${err.message}`, 'error');
   }
 }
 
@@ -522,10 +548,17 @@ function closeVideoDetailsModal() {
 }
 
 function updateChannelModalPlaceholders() {
-   if (document.getElementById('channelType').value == 1) { // ACHANNEL_TYPE_LIVE
-    document.getElementById('channelOutputTemplate').placeholder = '%(release_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s';
-  } else {
-    document.getElementById('channelOutputTemplate').placeholder = '%(title)s %(id)s.%(ext)s';
+  let channelDownloadDir = document.getElementById('channelDownloadDir');
+  if (channelDownloadDir) {
+    channelDownloadDir.placeholder = programConfig.Default_DownloadDir || "./downloads"
+  }
+  let channelOutputTemplate = document.getElementById('channelOutputTemplate');
+  if (channelOutputTemplate) {
+    if (document.getElementById('channelType').value == 1) { // ACHANNEL_TYPE_LIVE
+      channelOutputTemplate.placeholder = programConfig.Default_YtDlp_OutputTemplate_Live || '%(title)s %(id)s.%(ext)s';
+    } else {
+      channelOutputTemplate.placeholder = programConfig.Default_YtDlp_OutputTemplate || '%(title)s %(id)s.%(ext)s';
+    }
   }
 }
 
@@ -1255,6 +1288,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 async function init() {
+  await loadConfig();
   await loadChannels();
   
   const lastTab = window.location.pathname.replace(/^\//, '') || 'channels';

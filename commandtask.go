@@ -535,38 +535,51 @@ func CL_Logf(Task *CommandTask, format string, a ... any) {
 	//DB_UpdateCommandTaskInfo(Task)
 }
 
-func CleanUpListingTasksInDatabase() {
+func CleanUpTasksInDatabase() {
+	if !G_Config.TaskLog_AutoDelete_Enabled {
+		// Auto deleting for task logs isn't enabled.
+		return
+	}
+	
 	TasksList, err := DB_ListCommandTasks(-1, 0, ListCommandTasksQuery{
-		Type: TASK_TYPE_LISTING,
+		Type: -1,
 		Status: -1,
 	})
 	if err != nil {
 		fmt.Printf("CleanUpListingTasksInDatabase error: %v\n", err)
 		return
 	}
+	
+	DeleteTime         := time.Now().UTC().Add(time.Second * -time.Duration(G_Config.TaskLog_AudoDelete_Seconds))
+	Listing_DeleteTime := time.Now().UTC().Add(time.Second * -time.Duration(G_Config.TaskLog_List_AutoDelete_Seconds))
+	
+	DeleteCount := 0
+	
 	ARCT_Lock.RLock()
 	defer ARCT_Lock.RUnlock()
 	
-	DeleteTime := time.Now().UTC().Add(time.Duration(time.Second * -MAX_CHANNEL_LISTING_LIFETIME))
-	
-	NumDeleted := 0
 	for _, Task := range(TasksList) {
-		ActiveTask := AllRunningCommandTasks[Task.Id]
-		if ActiveTask != nil {
-			// This task is still running?
-			continue
-		}
+		DeleteThis := false
 		
-		if DeleteTime.Unix() > Task.EndTime.Unix() {
+		if Task.Type == TASK_TYPE_LISTING {
+			if Listing_DeleteTime.Unix() > Task.EndTime.Unix() {
+				DeleteThis = true
+			}
+		} else {
+			if DeleteTime.Unix() > Task.EndTime.Unix() {
+				DeleteThis = true
+			}
+		}
+		if DeleteThis {
 			err := DB_DeleteCommandTask(Task.Id)
 			if err != nil {
-				fmt.Printf("DB_DeleteCommandTask error: %v\n", err)
+				fmt.Printf("Could not delete task '%s', error: %v\n", err)
 				continue
 			}
-			NumDeleted += 1
+			DeleteCount += 1
 		}
 	}
-	fmt.Printf("len(TasksList): %d NumDeleted: %d\n", len(TasksList), NumDeleted)
+	fmt.Printf("Auto deleted %d tasks for being outdated.\n", DeleteCount)
 }
 
 func init() {

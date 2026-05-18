@@ -112,16 +112,16 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 func GetDownloadDir(AChannel *ArchiveChannel) string {
 	DownloadDir := AChannel.DownloadDir
 	if DownloadDir == "" {
-		DownloadDir = DEFAULT_DOWNLOAD_DIR
+		DownloadDir = G_Config.Default_DownloadDir
 	}
 	return DownloadDir
 }
 func GetOutputTemplate(AChannel *ArchiveChannel) string {
 	OutputTemplate := AChannel.OutputTemplate
 	if OutputTemplate == "" {
-		OutputTemplate = DEFAULT_YT_DLP_OUTPUT_TEMPLATE
+		OutputTemplate = G_Config.Default_YtDlp_OutputTemplate
 		if AChannel.Type == ACHANNEL_TYPE_LIVE {
-			OutputTemplate = DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE
+			OutputTemplate = G_Config.Default_YtDlp_OutputTemplate_Live
 		}
 	}
 	return OutputTemplate
