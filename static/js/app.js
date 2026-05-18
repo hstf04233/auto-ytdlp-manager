@@ -734,7 +734,10 @@ function renderVideos() {
           <span class="video-duration">${durationText}</span>
         </div>
         <div class="video-info">
-          <h3 title="${escHtml(v.title)}">${escHtml(v.title)} <a href="${escHtml(v.url)}" target="_blank">[VideoLink]</a></h3>
+          <h3 class="video-title">
+            <span title="${escHtml(v.title)}">${escHtml(v.title)}</span>
+            <a href="${escHtml(v.url)}" target="_blank">[VideoLink]</a>
+          </h3>
           <p title="Filter by this channel">From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
           <p>Released: ${formatDateAndTime(v.release_date)}</p>
           <p>${escHtml(v.availability)}</p>
@@ -806,8 +809,8 @@ function renderVideoPagination() {
     cbsId: cbsId,
   });
   
-  container_top.innerHTML = paginationHtml;
-  container_bottom.innerHTML = paginationHtml;
+  if (container_top)    container_top.innerHTML = paginationHtml;
+  if (container_bottom) container_bottom.innerHTML = paginationHtml;
 }
 
 function buildPaginationHTML(cfg) {
@@ -904,9 +907,6 @@ function renderTaskPagination() {
     page: (p) => { if (!areTasksLoading) { taskPage = p; loadTasks(); } },
   });
   
-  console.log("task total: " + taskTotalCount)
-  console.log("task totalPages: " + totalPages)
-  
   const paginationHtml = buildPaginationHTML({
     currentPage: taskPage,
     totalPages: totalPages,
@@ -916,8 +916,8 @@ function renderTaskPagination() {
     cbsId: cbsId,
   });
   
-  container_top.innerHTML = paginationHtml;
-  container_bottom.innerHTML = paginationHtml;
+  if (container_top)    container_top.innerHTML = paginationHtml;
+  if (container_bottom) container_bottom.innerHTML = paginationHtml;
 }
 
 function updateVideoStats() {
@@ -929,20 +929,24 @@ function updateVideoStats() {
   const downloaded  = videoStats.total_downloaded || 0;
   const failed      = videoStats.total_failed || 0;
   const ignored     = videoStats.total_ignored || 0;
-
-  container.innerHTML = `
-    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--info)">${queued}</div><div class="stat-label">Queued</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--warning)">${downloading}</div><div class="stat-label">Downloading</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--success)">${downloaded}</div><div class="stat-label">Downloaded</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${failed}</div><div class="stat-label">Failed</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--text-secondary)">${ignored}</div><div class="stat-label">Ignored</div></div>
-  `;
+  
+  if (container) {
+    container.innerHTML = `
+      <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--info)">${queued}</div><div class="stat-label">Queued</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--warning)">${downloading}</div><div class="stat-label">Downloading</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--success)">${downloaded}</div><div class="stat-label">Downloaded</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--danger)">${failed}</div><div class="stat-label">Failed</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--text-secondary)">${ignored}</div><div class="stat-label">Ignored</div></div>
+    `;
+  }
 }
 
 // ========== Channel filter dropdown ==========
 function updateChannelFilters() {
   const select = document.getElementById('videoChannelFilter');
+  if (!select) return;
+  
   const current = select.value;
   select.innerHTML = '<option value="">All Channels</option>';
   allChannels.forEach(ch => {
@@ -954,7 +958,8 @@ function updateChannelFilters() {
   });
   
   const taskSelect = document.getElementById('taskChannelFilter');
-  taskSelect.innerHTML = select.innerHTML;
+  if (taskSelect) taskSelect.innerHTML = select.innerHTML;
+  
 }
 
 // ========== Tasks ==========

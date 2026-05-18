@@ -301,19 +301,6 @@ body {
   min-width: 0;
 }
 
-.video-info h3 {
-  font-size: 1rem;
-  margin-bottom: 4px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.video-info h3 a {
-  color: var(--accent);
-  text-decoration: none;
-  /* transition: color 0.2s; */
-}
-
 .video-info p {
   color: var(--text-secondary);
   font-size: 0.8rem;
@@ -328,6 +315,29 @@ body {
 .video-info p a:hover {
   color: var(--accent-hover);
   text-decoration: underline;
+}
+
+.video-title {
+  display: flex;
+  /*align-items: center;*/
+  gap: 6px;
+  min-width: 0;
+}
+
+.video-title span {
+  font-size: 1rem;
+  margin-bottom: 4px;
+  overflow: hidden;
+  
+  text-overflow: ellipsis;
+  /*white-space: nowrap;*/
+  min-width: 0;
+}
+.video-title a {
+  font-size: 1rem;
+  color: var(--accent);
+  text-decoration: none;
+  /* transition: color 0.2s; */
 }
 
 .status-badge {
