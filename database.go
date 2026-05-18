@@ -87,7 +87,10 @@ WHERE Status = 1;
 	Set all tasks that were previously "running" videos to canceled.
 */
 UPDATE CommandTasks
-SET Status = 3
+SET Status = 3,
+    Output = IFNULL(Output, '') || '
+This task was abruptly canceled because the server closed before this task could finish.
+'
 WHERE Status = 0;
 
 `

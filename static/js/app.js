@@ -948,7 +948,7 @@ function updateChannelFilters() {
   if (!select) return;
   
   const current = select.value;
-  select.innerHTML = '<option value="">All Channels</option>';
+  select.innerHTML = '<option value="">All Channels</option><hr>';
   allChannels.forEach(ch => {
     const opt = document.createElement('option');
     opt.value = ch.id;

@@ -56,11 +56,12 @@
         <input class="search-bar" type="text" id="videoSearch" maxlength="1024" placeholder="Search videos..." oninput="videoSearchFilterUpdate()">
         <select id="videoStatusFilter" onchange="onVideoFilterChange()">
           <option value="">All Statuses</option>
-          <option value="0">Queued</option>
-          <option value="1">Downloading</option>
-          <option value="2">Downloaded</option>
-          <option value="3">Failed</option>
-          <option value="4">Ignored</option>
+          <hr>
+          <option value="0">Status: Queued</option>
+          <option value="1">Status: Downloading</option>
+          <option value="2">Status: Downloaded</option>
+          <option value="3">Status: Failed</option>
+          <option value="4">Status: Ignored</option>
         </select>
         <select id="videoChannelFilter" onchange="onVideoFilterChange()">
           <option value="">All Channels</option>
@@ -107,6 +108,7 @@
         </select>
         <select id="taskTypeFilter" onchange="onTaskFilterChange()">
           <option value="">Type: All</option>
+          <hr>
           <option value="2">Type: Downloads</option>
           <option value="1">Type: Channel Check</option>
           <option value="0">Type: Generic</option>
