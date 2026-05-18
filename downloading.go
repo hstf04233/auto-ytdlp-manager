@@ -455,8 +455,8 @@ func StartDownloading() {
 		NextTasksDatabaseCleanUp -= 1
 		if NextTasksDatabaseCleanUp <= 0 {
 			NextTasksDatabaseCleanUp = (60*10)
-			if NextTasksDatabaseCleanUp > G_Config.TaskLog_AudoDelete_Seconds {
-				NextTasksDatabaseCleanUp = G_Config.TaskLog_AudoDelete_Seconds
+			if NextTasksDatabaseCleanUp > G_Config.TaskLog_AutoDelete_Seconds {
+				NextTasksDatabaseCleanUp = G_Config.TaskLog_AutoDelete_Seconds
 			}
 			if NextTasksDatabaseCleanUp > G_Config.TaskLog_List_AutoDelete_Seconds {
 				NextTasksDatabaseCleanUp = G_Config.TaskLog_List_AutoDelete_Seconds

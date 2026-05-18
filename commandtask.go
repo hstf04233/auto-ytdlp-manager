@@ -550,7 +550,7 @@ func CleanUpTasksInDatabase() {
 		return
 	}
 	
-	DeleteTime         := time.Now().UTC().Add(time.Second * -time.Duration(G_Config.TaskLog_AudoDelete_Seconds))
+	DeleteTime         := time.Now().UTC().Add(time.Second * -time.Duration(G_Config.TaskLog_AutoDelete_Seconds))
 	Listing_DeleteTime := time.Now().UTC().Add(time.Second * -time.Duration(G_Config.TaskLog_List_AutoDelete_Seconds))
 	
 	DeleteCount := 0

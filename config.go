@@ -38,7 +38,7 @@ type ProgramConfig struct {
 	Default_YtDlp_OutputTemplate_Live string
 	
 	TaskLog_AutoDelete_Enabled      bool
-	TaskLog_AudoDelete_Seconds      int
+	TaskLog_AutoDelete_Seconds      int
 	TaskLog_List_AutoDelete_Seconds int
 }
 
@@ -54,7 +54,7 @@ var G_Config = &ProgramConfig{
 	Default_YtDlp_OutputTemplate_Live: DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE,
 	
 	TaskLog_AutoDelete_Enabled:      true,
-	TaskLog_AudoDelete_Seconds:      MAX_TASK_LOG_LIFETIME,
+	TaskLog_AutoDelete_Seconds:      MAX_TASK_LOG_LIFETIME,
 	TaskLog_List_AutoDelete_Seconds: MAX_CHANNEL_LISTING_LIFETIME,
 }
 
