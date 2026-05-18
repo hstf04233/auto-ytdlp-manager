@@ -10,8 +10,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const DATABASE_FILE       = "aydm.db"
-const DATABASE_FILE_DEBUG = "aydm_DEBUG.db"
+const DATABASE_FILE       = "autoytdlpmanager.db"
+const DATABASE_FILE_DEBUG = "autoytdlpmanager_DEBUG.db"
 
 const db_SQL_Header = `
 PRAGMA foreign_keys = ON;
