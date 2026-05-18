@@ -979,6 +979,7 @@ const TASK_STATUS_BADGE = {
   0: ['downloading', 'Running'],
   1: ['failed', 'Failed'],
   2: ['downloaded', 'Finished'],
+  3: ['failed', 'Canceled'],
 };
 
 function taskTypeLabel(type) {
@@ -1322,7 +1323,7 @@ async function init() {
     if (tasksPage.classList.contains('active')) {
       loadTasks();
     }
-  }, 7_500);
+  }, 5_000);
   
   
   // Check search updates every 300ms (at best)

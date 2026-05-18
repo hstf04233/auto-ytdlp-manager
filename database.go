@@ -83,6 +83,13 @@ UPDATE Videos
 SET Status = 0
 WHERE Status = 1;
 
+/*
+	Set all tasks that were previously "running" videos to canceled.
+*/
+UPDATE CommandTasks
+SET Status = 3
+WHERE Status = 0;
+
 `
 
 var GDB *sql.DB
@@ -474,10 +481,12 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 		Output = TruncateOutput(Output)
 	}
 	Status := Task.Status
+	/*
 	if Status == TASK_STATUS_RUNNING {
 		// Don't save the running status incase the program abruptly quits!
-		Status = TASK_STATUS_FAILED
+		Status = TASK_STATUS_CANCELED
 	}
+	*/
 	
 	_, err := GDB.Exec(`
 	INSERT INTO CommandTasks(Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output, StartTime, EndTime, UpdatedAt)
@@ -611,7 +620,7 @@ func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommand
 			WhereAdded = true
 			*Statement += " WHERE "
 		}
-		*Statement += " ((Status = 0 OR Status == 1) OR Type == 2) "
+		*Statement += " ((Status = 0 OR Status == 1 OR Status == 3) OR Type == 2) "
 	}
 	
 	if Query.Status >= 0 || Query.Type != -1 || Query.FromChannelId != "" || Query.FromVideoId != "" {
