@@ -1,4 +1,10 @@
 downloads/
+aydm.db
+aydm.db-wal
+aydm.db-shm
+aydm_DEBUG.db
+aydm_DEBUG.db-wal
+aydm_DEBUG.db-shm
 yt_download_manager.db
 yt_download_manager.db-wal
 yt_download_manager.db-shm
@@ -7,6 +13,8 @@ yt_download_manager_DEBUG.db-wal
 yt_download_manager_DEBUG.db-shm
 yt-stream-manager.exe
 yt-stream-manager-debug.exe
+autoytdlpmanager.exe
+autoytdlpmanager-debug.exe
 
 # Debug stuff ignore
 test-chat-output - Copy.json

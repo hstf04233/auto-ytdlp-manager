@@ -7,4 +7,4 @@ if %ERRORLEVEL% NEQ 0 (
 	exit
 )
 
-yt-stream-manager-debug.exe
+autoytdlpmanager-debug.exe

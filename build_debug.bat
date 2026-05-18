@@ -1,3 +1,3 @@
 @echo off
 
-go build -ldflags "-X 'main.APPLICATION_VERSION=debug'" -o yt-stream-manager-debug.exe .
+go build -ldflags "-X 'main.APPLICATION_VERSION=debug'" -o autoytdlpmanager-debug.exe .

@@ -1,4 +1,4 @@
-module yt-stream-manager
+module autoytdlpmanager
 
 go 1.22.11
 
