@@ -129,11 +129,72 @@ func GetOutputTemplate(AChannel *ArchiveChannel) string {
 
 func ShouldLiveFromStart(AChannel *ArchiveChannel, VideoUrl string) bool {
 	if strings.Contains(VideoUrl, "twitch.tv/") {
-		
 		return false
 	}
 	
 	return true
+}
+
+type VideoFileInfo struct {
+	Width     int `json:"width"`
+	Height    int `json:"height"`
+	Duration  float64 `json:"duration"`
+	RFramerate   string `json:"r_frame_rate"`
+	AvgFramerate string `json:"avg_frame_rate"`
+	Framerate float64
+}
+
+type FFprobe_Output struct {
+	Streams []VideoFileInfo `json:"streams"`
+	Format struct {
+		Duration string `json:"duration"`
+	} `json:"format"`
+}
+
+func GetVideoFileInfo(filePath string) (*VideoFileInfo, error) {
+	cmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-select_streams", "v:0",
+		"-show_entries", "stream=width,height,avg_frame_rate:format=duration",
+		"-of", "json",
+		filePath,
+	)
+	
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("ffprobe error: %w", err)
+	}
+	
+	var data FFprobe_Output
+	if err := json.Unmarshal(out, &data); err != nil {
+		return nil, fmt.Errorf("json parse error: %w", err)
+	}
+	if len(data.Streams) == 0 {
+		return nil, fmt.Errorf("no video stream found")
+	}
+	
+	Info := data.Streams[0]
+	
+	//Info.Duration = Info.Format.Duration
+	fmt.Sscanf(data.Format.Duration, "%f", &Info.Duration)
+	
+	Rate := Info.AvgFramerate
+	if Rate == "0/0" || Rate == "" {
+		Rate = Info.RFramerate
+	}
+	
+	RateParts := strings.Split(Rate, "/")
+	if len(RateParts) > 1 {
+		var n, d float64
+		fmt.Sscanf(RateParts[0], "%f", &n)
+		fmt.Sscanf(RateParts[1], "%f", &d)
+		
+		Info.Framerate = n/d
+	} else {
+		Info.Framerate = 1
+	}
+	
+	return &Info, nil
 }
 
 func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInfo) (error) {
@@ -176,12 +237,31 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 		ErrOutput := ErrOut.RawOutput
 		ErrOut.Lock.RUnlock()
 		
+		if Video.VideoType == VIDEO_TYPE_ISLIVE {
+			Video.VideoType = VIDEO_TYPE_WASLIVE
+		}
+		
+		FilePath, err := GetDownloadedVideoFilePath(Video, AChannel)
+		if err == nil && FilePath != "" {
+			VFileInfo, err := GetVideoFileInfo(FilePath)
+			if err != nil {
+				fmt.Printf("Could not get video file info because: %v\n", err)
+			}
+			if Video.Duration <= 1 {
+				Video.Duration = VFileInfo.Duration
+			}
+		}
+		
 		if strings.Contains(ErrOutput, "Private video.") {
 			Video.Availability = "private"
 			return fmt.Errorf("%s", ErrOutput)
 		} else if strings.Contains(ErrOutput, "Sign in to confirm your age.") ||
 				  strings.Contains(ErrOutput, "This video may be inappropriate for some users.") {
-			Video.Availability = "Age-restricted"
+			Video.Availability = "age-restricted"
+			return fmt.Errorf("%s", ErrOutput)
+		} else if strings.Contains(ErrOutput, "This video has been removed by the uploader") ||
+				  strings.Contains(ErrOutput, "Video unavailable.") {
+			Video.Availability = "removed"
 			return fmt.Errorf("%s", ErrOutput)
 		}
 		

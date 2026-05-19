@@ -346,6 +346,22 @@ async function loadConfig() {
   try {
     const data = await API.get('/api/config');
     programConfig = data.channels || data;
+    
+    const YtDlpPathEl = document.getElementById("config-YtDlpPath")
+    if (YtDlpPathEl) {
+      YtDlpPathEl.placeholder = programConfig.YtDlp_Path
+      YtDlpPathEl.value        = programConfig.YtDlp_Path
+    }
+    const YtArchivePathEl = document.getElementById("config-YtArchivePath")
+    if (YtArchivePathEl) {
+      YtArchivePathEl.placeholder = programConfig.YtArchive_Path
+      YtArchivePathEl.value       = programConfig.YtArchive_Path
+    }
+    const FFmpegPathEl = document.getElementById("config-FFmpegPath")
+    if (FFmpegPathEl) {
+      FFmpegPathEl.placeholder = programConfig.FFmpeg_Path
+      FFmpegPathEl.value       = programConfig.FFmpeg_Path
+    }
   } catch (err) {
     showToast(`Failed to load program config: ${err.message}`, 'error');
   }
@@ -1000,6 +1016,7 @@ function taskTypeBadge(type) {
 function gotoTasksPageAndFilterVideo(videoId) {
   clearTaskFilters(true)
   
+  taskPage = 0
   document.getElementById('taskVideoFilter').value = videoId;
   
   showPage("tasks")
@@ -1019,8 +1036,8 @@ function clearTaskFilters(dontLoadTasks) {
   document.getElementById('taskVideoFilter').value = '';
   document.getElementById('taskOrderBy').value = 'end_time';
   document.getElementById('taskOrderDirection').value = '-1';
-  videoPage = 0;
-  if (!areVideosLoading && !dontLoadTasks) {
+  taskPage = 0;
+  if (!areTasksLoading && !dontLoadTasks) {
     loadTasks();
   }
 }
@@ -1195,7 +1212,7 @@ function formatTerminalOutput(text, status, run_args) {
     return `<span class="${cls}">${escHtml(line)}</span>`;
   }).join('\n');
   
-  let runArgsContent = `<span class="terminal-line">${escHtml(run_args)}</span><br><span class="terminal-line"></span>`;
+  let runArgsContent = `<span class="terminal-line">${escHtml(">") + escHtml(run_args)}</span><br><span class="terminal-line"></span>`;
   if (run_args === "") {
     runArgsContent = ""
   }

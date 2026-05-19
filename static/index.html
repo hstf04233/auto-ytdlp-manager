@@ -23,6 +23,10 @@
       <a href="/chat" data-page="chat">
         <span>&#128172;</span> <span>Chat</span>
       </a>
+      <hr>
+      <a href="/config" data-page="config" class="active">
+        <span>&#9881;</span> <span>Config</span>
+      </a>
     </nav>
   </div>
 
@@ -36,9 +40,9 @@
         <h2>Channels</h2>
         <button class="btn btn-primary" onclick="openAddChannelModal()">+ Add Channel</button>
       </div>
-
+       
       <div class="stats-row" id="channelStats"></div>
-
+      
       <div id="channelsList">
         <div class="loading">Loading channels...</div>
       </div>
@@ -176,6 +180,53 @@
         </div>
       </div>
     </div>
+    
+    <!-- CONFIG PAGE -->
+    <div class="page active" id="page-config">
+      <div class="page-header">
+        <h2>Config</h2>
+      </div>
+      
+      <form id="configForm" onsubmit="saveConfig(event)">
+        <!-- <div class="form-row"> -->
+          <div class="form-group" title="yt-dlp Filepath on the host">
+            <label for="config-YtDlpPath">yt-dlp Path:</label>
+            <input type="text" id="config-YtDlpPath" placeholder="yt-dlp" maxlength="1024" required>
+          </div>
+          <div class="form-group" title="ytarchive Filepath on the host">
+            <label for="config-YtArchivePath">ytarchive Path:</label>
+            <input type="text" id="config-YtArchive" placeholder="ytarchive" maxlength="1024" required>
+          </div>
+          <div class="form-group" title="FFmpeg Filepath on the host">
+            <label for="config-FFmpegPath">FFmpeg Path:</label>
+            <input type="text" id="config-FFmpegPath" placeholder="ffmpeg" maxlength="1024" required>
+          </div>
+        <!-- </div> -->
+        
+        <hr>
+        
+        <div class="form-group" title="Download directory on the host">
+          <label for="config-DownloadDir">Default download directory:</label>
+          <input type="text" id="config-DownloadDir" placeholder="./downloads" maxlength="1024" required>
+        </div>
+        <div class="form-group" title="yt-dlp output template">
+          <label for="config-YtDlpOutputTemplate">Default output template:</label>
+          <input type="text" id="config-YtDlpOutputTemplate" placeholder="%(title)s %(id)s.%(ext)s" maxlength="1024" required>
+        </div>
+        <div class="form-group" title="yt-dlp output template for live streams">
+          <label for="config-YtDlpOutputTemplateLive">Default output template live:</label>
+          <input type="text" id="config-YtDlpOutputTemplateLive" placeholder="%(upload_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s" maxlength="1024" required>
+        </div>
+        
+        <hr>
+        
+        <div class="form-group">
+          <label for="config-AllChannelsDisabled">Disable all channels:</label>
+          <input type="checkbox" id="config-AllChannelsDisabled">
+        </div>
+      </form>
+    </div>
+    
   </div>
 
   <!-- ADD/EDIT CHANNEL MODAL -->
@@ -187,12 +238,12 @@
 
         <div class="form-group">
           <label for="channelName">Channel Name *</label>
-          <input type="text" id="channelName" placeholder="My Favorite Channel" required>
+          <input type="text" id="channelName" placeholder="My Favorite Channel" maxlength="128" required>
         </div>
 
         <div class="form-group">
           <label for="channelUrl">Channel / Playlist URL *</label>
-          <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." required>
+          <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." maxlength="8192" required>
         </div>
 
         <div class="form-row">
@@ -223,25 +274,29 @@
 
         <div class="form-group">
           <label for="channelDownloadDir">Download Directory</label>
-          <input type="text" id="channelDownloadDir" placeholder="./downloads">
+          <input type="text" id="channelDownloadDir" placeholder="./downloads" maxlength="1024">
         </div>
 
         <div class="form-group">
           <label for="channelOutputTemplate">Output Template</label>
-          <input type="text" id="channelOutputTemplate" placeholder="%(title)s %(id)s.%(ext)s">
+          <input type="text" id="channelOutputTemplate" placeholder="%(title)s %(id)s.%(ext)s" maxlength="1024">
         </div>
-
+        
+        <hr>
+        
         <div class="form-row">
-          <div class="form-group">
-            <label for="channelCheckInterval">Check Interval (seconds)<br> 0 = never.</label>
+          <div class="form-group" title="Interval in seconds">
+            <label for="channelCheckInterval">Check Interval<br> 0 = never.</label>
             <input type="number" id="channelCheckInterval" placeholder="1800" min="0">
           </div>
-          <div class="form-group">
-            <label for="channelFullCheckInterval">Full Check Interval (seconds)<br>0 = never.</label>
+          <div class="form-group" title="Interval in seconds">
+            <label for="channelFullCheckInterval">Full Check Interval<br>0 = never.</label>
             <input type="number" id="channelFullCheckInterval" placeholder="172800" min="0">
           </div>
         </div>
-
+        
+        <hr>
+        
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick="closeChannelModal()">Cancel</button>
           <button type="submit" class="btn btn-primary" id="channelSubmitBtn">Add Channel</button>

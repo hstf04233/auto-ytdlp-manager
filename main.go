@@ -23,20 +23,20 @@ var (
 	CMD_FFMPEG = C_CMD_FFMPEG
 )
 
-func commandExists(cmd string) bool {
+func CommandExists(cmd string) bool {
 	_, err := exec.LookPath(cmd)
 	return err == nil
 }
-func findCommand(cmd string) string {
+func FindCommand(cmd string) string {
 	if filepath.IsLocal(cmd) {
 		LocalCmd := fmt.Sprintf("%s/%s", CURRENT_WORKING_DIRECTORY, cmd)
-		if commandExists(LocalCmd) {
+		if CommandExists(LocalCmd) {
 			// Program exists in working directory
 			return LocalCmd
 		}
 	}
 	
-	if commandExists(cmd) {
+	if CommandExists(cmd) {
 		// Program exists in the path environment
 		return cmd
 	}
@@ -81,21 +81,21 @@ func main() {
 		panic(err)
 	}
 	
-	CMD_YT_DLP     = findCommand(C_CMD_YT_DLP)
-	CMD_YT_ARCHIVE = findCommand(C_CMD_YT_ARCHIVE)
-	CMD_FFMPEG     = findCommand(C_CMD_FFMPEG)
+	CMD_YT_DLP     = FindCommand(C_CMD_YT_DLP)
+	CMD_YT_ARCHIVE = FindCommand(C_CMD_YT_ARCHIVE)
+	CMD_FFMPEG     = FindCommand(C_CMD_FFMPEG)
 	
 	Exit := false
 	
-	if !commandExists(CMD_YT_DLP) {
+	if !CommandExists(CMD_YT_DLP) {
 		Exit = true
 		fmt.Printf("You need '%s' to run this program! https://github.com/yt-dlp/yt-dlp \n", C_CMD_YT_DLP)
 	}
-	if !commandExists(CMD_FFMPEG) {
+	if !CommandExists(CMD_FFMPEG) {
 		Exit = true
 		fmt.Printf("You need '%s' (and possibly 'ffprobe') to run this program! Get both from https://www.ffmpeg.org/ \n", C_CMD_FFMPEG)
 	}
-	if !commandExists(CMD_YT_ARCHIVE) {
+	if !CommandExists(CMD_YT_ARCHIVE) {
 		Exit = true
 		fmt.Printf("You need '%s' to run this program! https://github.com/dreammu/ytarchive\n", C_CMD_YT_ARCHIVE)
 	}

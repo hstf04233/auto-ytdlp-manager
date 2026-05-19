@@ -101,6 +101,8 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
 }
 
 func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
+	WD.ChannelsLock.RLock()
+	defer WD.ChannelsLock.RUnlock()
 	for _, AChannel := range(WD.Channels) {
 		if AChannel.Id == Id {
 			return AChannel
@@ -177,11 +179,12 @@ func CheckIsVideoDownloaded(Video *VideoInfo) bool {
 	return false
 }
 
-func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo) {
+func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
 	err := RequestVideoInfo(AChannel, Video.Url, Video)
 	if err != nil {
-		//fmt.Printf("Failed to grab video info... err: %v\n", err)
+		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
 		//DB_UpdateVideoAvalibility(Video, "UNKNOWN")
+		DB_UpdateVideoInfo(Video)
 		DB_UpdateVideoRefreshState(Video, 0)
 		return
 	}
@@ -189,7 +192,7 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo) {
 	DB_UpdateVideoRefreshState(Video, 0)
 }
 
-func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) error {
+func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) error {
 	if AChannel.Type == ACHANNEL_TYPE_LIST_NO_DOWNLOAD || AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
 		fmt.Printf("DownloadVideo tried to download from a channel that doesn't allow downloads? Name: \"%s\"\n", AChannel.Name)
 		return nil
@@ -204,7 +207,7 @@ func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) error {
 	
 	return nil
 }
-func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo) {
+func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
 	err := ytarchive_DownloadLive(AChannel, Video)
 	if err != nil {
@@ -212,17 +215,15 @@ func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo) {
 		return
 	}
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADED)
-	RefreshVideoInfo(AChannel, Video)
+	RefreshVideoInfo(AChannel, Video, Task)
 }
 
-func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
+func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) bool {
 	if CheckIsVideoDownloaded(Video) {
-		return
+		return false
 	}
 	
-	if Task != nil {
-		CL_Logf(Task, "Checking video: \"%s\" %s\n", Video.Title, Video.Url)
-	}
+	CL_Logf(Task, "Checking video: \"%s\" %s\n", Video.Title, Video.Url)
 	
 	if AChannel.Type != ACHANNEL_TYPE_LIST_NO_DOWNLOAD && AChannel.Type != ACHANNEL_TYPE_LIST_AND_IGNORE {
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
@@ -232,10 +233,8 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 	if err != nil {
 		fmt.Printf("Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
-		if Task != nil {
-			CL_Logf(Task, "Failed to grab video info for \"%s\"... Error: %v\n", Video.Title, err)
-		}
-		return
+		CL_Logf(Task, "Failed to grab video info for \"%s\"... Error: %v\n", Video.Title, err)
+		return false
 	}
 	
 	DB_UpdateVideoInfo(Video)
@@ -245,7 +244,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 			DB_UpdateVideoStatus(Video, VIDEO_STATUS_IGNORED)
 		}
 		
-		return
+		return false
 	}
 	
 	switch Video.VideoType {
@@ -256,9 +255,10 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 			if Task != nil {
 				CL_Logf(Task, "Downloading live stream: \"%s\" %s\n", Video.Title, Video.Url)
 			}
-			go DownloadYTLive(AChannel, Video)
+			go DownloadYTLive(AChannel, Video, Task)
 			break
 		}
+		
 		fallthrough
 	case VIDEO_TYPE_WASLIVE: fallthrough
 	case VIDEO_TYPE_VIDEO:   fallthrough
@@ -267,18 +267,27 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 			CL_Logf(Task, "Downloading video: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
 		}
-		err := DownloadVideo(AChannel, Video)
+		err := DownloadVideo(AChannel, Video, Task)
 		if err != nil {
 			if Task != nil {
 				CL_Logf(Task, "Failed to download video \"%s\" because: %v\n", Video.Title, err)
 			}
 		}
 	}
+	
+	return true
 }
 
 func CheckChannel(AChannel *ArchiveChannel) {
-	if AChannel.Url == "" { return }
-	if AChannel.IsBeingChecked { return }
+	AChannel.Lock.Lock()
+	if AChannel.Url == "" {
+		AChannel.Lock.Unlock()
+		return
+	}
+	if AChannel.IsBeingChecked {
+		AChannel.Lock.Unlock()
+		return
+	}
 	
 	AChannel.IsBeingChecked = true
 	defer func() {AChannel.IsBeingChecked = false}()
@@ -298,9 +307,8 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	Task.Title = fmt.Sprintf("Checking channel: \"%s\"", AChannel.Name)
 	DB_UpdateCommandTaskInfo(Task)
 	
-	AChannel.Lock.RLock()
 	Url := AChannel.Url
-	AChannel.Lock.RUnlock()
+	ChannelId := AChannel.Id
 	
 	PlaylistEnd := 20
 	if AChannel.FullCheckInterval > 0 && TimeNow > AChannel.NextFullChannelCheckMSEC {
@@ -309,10 +317,10 @@ func CheckChannel(AChannel *ArchiveChannel) {
 		fmt.Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
 		CL_Logf(Task, "Checking every video for \"%s\" ! \n", AChannel.Name)
 	}
+	AChannel.Lock.Unlock()
 	
 	VideoList, err := yt_dlp_ListVideos(Url, PlaylistEnd, Task)
 	if err != nil {
-		//fmt.Printf("Error when grabbing videos for channel \"%s\": %v\n", AChannel.Name, err)
 		CL_FinishTask(Task, TASK_STATUS_FAILED)
 		return
 	}
@@ -320,8 +328,10 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	
 	// Add the videos to the queued list.
 	for i := len(VideoList)-1; i >= 0; i-- {
+		if Task.Status != TASK_STATUS_RUNNING { return }
+		
 		Video := VideoList[i]
-		Video.FromChannel = AChannel.Id
+		Video.FromChannel = ChannelId
 		Exists, err := DB_GetVideo(Video.Id)
 		if Exists == nil && err == nil {
 			CL_Logf(Task, "Adding new video \"%s\" %s ! \n", Video.Id, Video.Url)
@@ -331,18 +341,23 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	}
 	DB_UpdateCommandTaskInfo(Task)
 	
+	VideosCheckedCount := 0
+	
 	for _, Video := range(VideoList) {
+		if Task.Status != TASK_STATUS_RUNNING { return }
 		if !AChannel.Enabled { break }
-		Video.FromChannel = AChannel.Id
-		//CL_Logf(Task, "Checking video: \"%s\" %s\n", v.Title, v.Url)
-		CheckVideoAndDownload(AChannel, &Video, Task)
+		
+		Video.FromChannel = ChannelId
+		if CheckVideoAndDownload(AChannel, &Video, Task) {
+			VideosCheckedCount += 1
+		}
 	}
 	DB_UpdateCommandTaskInfo(Task)
 	
 	QueuedVideosList, err := DB_ListVideos(-1, 0, ListVideosQuery{
 		RefreshState: -1,
 		Status: 0,
-		FromChannelId: AChannel.Id,
+		FromChannelId: ChannelId,
 	})
 	if err != nil {
 		fmt.Printf("DB_ListVideos err: %v\n", err)
@@ -350,17 +365,21 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	}
 	if len(QueuedVideosList) > 0 {
 		for _, Video := range(QueuedVideosList) {
+			if Task.Status != TASK_STATUS_RUNNING { return }
 			if !AChannel.Enabled { break }
-			Video.FromChannel = AChannel.Id
+			
+			Video.FromChannel = ChannelId
 			//CL_Logf(Task, "Checking old queued video: \"%s\" %s\n", Video.Title, Video.Url)
-			CheckVideoAndDownload(AChannel, Video, Task)
+			if CheckVideoAndDownload(AChannel, Video, Task) {
+				VideosCheckedCount += 1
+			}
 			DB_UpdateCommandTaskInfo(Task)
 		}
 	}
 	
 	RefreshableVideos, err := DB_ListVideos(10, 0, ListVideosQuery{
 		RefreshState: 1,
-		FromChannelId: AChannel.Id,
+		FromChannelId: ChannelId,
 		Status: -1,
 	})
 	if err != nil {
@@ -368,15 +387,18 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	}
 	if err == nil && len(RefreshableVideos) > 0 {
 		for _, Video := range(RefreshableVideos) {
+			if Task.Status != TASK_STATUS_RUNNING { return }
 			if !AChannel.Enabled { break }
 			
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
-			RefreshVideoInfo(AChannel, Video)
+			RefreshVideoInfo(AChannel, Video, Task)
 		}
 	}
 	
+	AChannel.Lock.Lock()
 	AChannel.NextCheckMSEC = time.Now().UnixMilli() + (AChannel.CheckInterval*1000)
+	AChannel.Lock.Unlock()
 	
 	CL_FinishTask(Task, TASK_STATUS_FINISHED)
 }
@@ -412,7 +434,7 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 		for _, Video := range(RefreshableVideos) {
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
-			RefreshVideoInfo(AChannel, Video)
+			RefreshVideoInfo(AChannel, Video, Task)
 		}
 		
 		if len(RefreshableVideos) >= 10 {
@@ -448,19 +470,19 @@ func StartDownloading() {
 		panic(err)
 	}
 	
-	NextTasksDatabaseCleanUp := 10
+	NextTasksDatabaseCleanUp := time.Now().UTC().Unix()+10
 	
 	for true {
 		time.Sleep(1 * time.Second)
-		NextTasksDatabaseCleanUp -= 1
-		if NextTasksDatabaseCleanUp <= 0 {
-			NextTasksDatabaseCleanUp = (60*10)
-			if NextTasksDatabaseCleanUp > G_Config.TaskLog_AutoDelete_Seconds {
-				NextTasksDatabaseCleanUp = G_Config.TaskLog_AutoDelete_Seconds
+		if time.Now().UTC().Unix() > NextTasksDatabaseCleanUp {
+			NextCleanUp := (60*10)   // Clean up old tasks every 10 minutes.
+			if NextCleanUp > G_Config.TaskLog_AutoDelete_Seconds {
+				NextCleanUp = G_Config.TaskLog_AutoDelete_Seconds
 			}
-			if NextTasksDatabaseCleanUp > G_Config.TaskLog_List_AutoDelete_Seconds {
-				NextTasksDatabaseCleanUp = G_Config.TaskLog_List_AutoDelete_Seconds
+			if NextCleanUp > G_Config.TaskLog_List_AutoDelete_Seconds {
+				NextCleanUp = G_Config.TaskLog_List_AutoDelete_Seconds
 			}
+			NextTasksDatabaseCleanUp = time.Now().UTC().Unix() + int64(NextCleanUp)
 			CleanUpTasksInDatabase()
 		}
 		

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"sync"
 )
 
 const (
@@ -20,18 +22,23 @@ const (
 	
 	DEFAULT_DOWNLOAD_DIR = "./downloads"
 	DEFAULT_YT_DLP_OUTPUT_TEMPLATE      = "%(title)s %(id)s.%(ext)s"
-	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(upload_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
+	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(release_date,upload_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
 	
 	MAX_TASK_LOG_LIFETIME        = (60*60*24 * 7*2) // 2 Weeks
 	MAX_CHANNEL_LISTING_LIFETIME = (60*60*24)       // 1 Day
 )
 
 type ProgramConfig struct {
+	Mutex *sync.RWMutex
+	ConfigFile *os.File `json:"-"`
+	
 	ServerPort uint16
 	
 	YtDlp_Path     string
 	YtArchive_Path string
 	FFmpeg_Path    string
+	
+	AllChannels_Disabled bool
 	
 	Default_DownloadDir string
 	Default_YtDlp_OutputTemplate      string
@@ -43,11 +50,14 @@ type ProgramConfig struct {
 }
 
 var G_Config = &ProgramConfig{
+	Mutex: &sync.RWMutex{},
 	ServerPort: DEFAULT_SERVER_PORT,
 	
 	YtDlp_Path:     "yt-dlp",
 	YtArchive_Path: "ytarchive",
 	FFmpeg_Path:    "ffmpeg",
+	
+	AllChannels_Disabled: false,
 	
 	Default_DownloadDir: "./downloads",
 	Default_YtDlp_OutputTemplate:      DEFAULT_YT_DLP_OUTPUT_TEMPLATE,
@@ -58,40 +68,82 @@ var G_Config = &ProgramConfig{
 	TaskLog_List_AutoDelete_Seconds: MAX_CHANNEL_LISTING_LIFETIME,
 }
 
+func Get_YtDlpPath(Config *ProgramConfig) string {
+	Config.Mutex.RLock()
+	defer Config.Mutex.RUnlock()
+	return Config.YtDlp_Path
+}
+func Get_YtArchivePath(Config *ProgramConfig) string {
+	Config.Mutex.RLock()
+	defer Config.Mutex.RUnlock()
+	return Config.YtArchive_Path
+}
+func Get_FFmpegPath(Config *ProgramConfig) string {
+	Config.Mutex.RLock()
+	defer Config.Mutex.RUnlock()
+	return Config.FFmpeg_Path
+}
+
+func UpdateConfig(Config *ProgramConfig) error {
+	Config.Mutex.Lock()
+	defer Config.Mutex.Unlock()
+	
+	err := SaveConfig(Config, Config.ConfigFile)
+	if err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+func SaveConfig(Config *ProgramConfig, File *os.File) error {
+	JsonEncoder := json.NewEncoder(File)
+	JsonEncoder.SetEscapeHTML(false)  // DIE! (I disable this setting because it messes with the YtDlp_OutputTemplate)
+	JsonEncoder.SetIndent("", "\t")
+	
+	err := JsonEncoder.Encode(G_Config)
+	if err != nil {
+		return fmt.Errorf("Could not write config json, error %v\n", err)
+	}
+	return nil
+}
 
 func OpenConfig(ConfigPath string) error {
 	if APPLICATION_VERSION == "debug" {
 		G_Config.ServerPort = DEFAULT_SERVER_PORT_DEBUG
 	}
 	
-	ConfigContent, err := os.ReadFile(ConfigPath)
+	ConfigFile, err := os.Open(ConfigPath)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		// The config doesn't exist! Write the default config.
 		NewConfigFile, err := os.OpenFile(ConfigPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 		if err != nil {
 			return fmt.Errorf("Could not create default config file '%s' %v\n", ConfigPath, err)
 		}
-		defer NewConfigFile.Close()
 		
-		JsonEncoder := json.NewEncoder(NewConfigFile)
-    	JsonEncoder.SetEscapeHTML(false)  // DIE (I disable this setting because it messes with the YtDlp_OutputTemplate!!)
-		JsonEncoder.SetIndent("", "\t")
-		
-		err = JsonEncoder.Encode(G_Config)
+		err = SaveConfig(G_Config, NewConfigFile)
 		if err != nil {
-			return fmt.Errorf("Could not write config json, error %v\n", err)
+			return fmt.Errorf("Could not write config file, error %v\n", err)
 		}
+		
+		G_Config.ConfigFile = NewConfigFile
 		
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("Error when reading config file '%s' %v\n", ConfigPath, err)
+		return fmt.Errorf("Error when opening config file '%s' %v\n", ConfigPath, err)
 	}
 	
+	ConfigContent, err := io.ReadAll(ConfigFile)
+	if err != nil {
+		return fmt.Errorf("Error when reading config file '%s' %v\n", ConfigPath, err)
+	}
 	err = json.Unmarshal(ConfigContent, &G_Config)
 	if err != nil {
 		return fmt.Errorf("Error when decoding config file json '%s' %v\n", ConfigPath, err)
 	}
+	
+	G_Config.ConfigFile = ConfigFile
 	
 	return nil
 }

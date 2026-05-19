@@ -696,6 +696,97 @@ func API_GetConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(RequestConfig)
 }
+func API_SetConfig(w http.ResponseWriter, r *http.Request) {
+	
+	var Body struct {
+		YtDlp_Path     string `json:"YtDlp_Path"`
+		YtArchive_Path string `json:"YtArchive_Path"`
+		FFmpeg_Path    string `json:"FFmpeg_Path"`
+		
+		AllChannels_Disabled *bool `json:"AllChannels_Disabled"`
+		
+		Default_DownloadDir string `json:"Default_DownloadDir"`
+		Default_YtDlp_OutputTemplate      string `json:"Default_YtDlp_OutputTemplate"`
+		Default_YtDlp_OutputTemplate_Live string `json:"Default_YtDlp_OutputTemplate_Live"`
+		
+		TaskLog_AutoDelete_Enabled *bool `json:"TaskLog_AutoDelete_Enabled"`
+		TaskLog_AutoDelete_Seconds      int `json:"TaskLog_AutoDelete_Seconds"`
+		TaskLog_List_AutoDelete_Seconds int `json:"TaskLog_List_AutoDelete_Seconds"`
+	}
+	Body.TaskLog_AutoDelete_Seconds = -1
+	Body.TaskLog_List_AutoDelete_Seconds = -1
+	
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&Body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(Body.YtDlp_Path) > 1024 {
+		http.Error(w, "YtDlp_Path must be shorter than 1024 characters.", http.StatusBadRequest)
+		return
+	}
+	if len(Body.YtArchive_Path) > 1024 {
+		http.Error(w, "YtArchive_Path must be shorter than 1024 characters.", http.StatusBadRequest)
+		return
+	}
+	if len(Body.FFmpeg_Path) > 1024 {
+		http.Error(w, "FFmpeg_Path must be shorter than 1024 characters.", http.StatusBadRequest)
+		return
+	}
+	
+	if len(Body.Default_DownloadDir) > 1024 {
+		http.Error(w, "Default_DownloadDir must be shorter than 1024 characters.", http.StatusBadRequest)
+		return
+	}
+	if len(Body.Default_YtDlp_OutputTemplate) > 1024 {
+		http.Error(w, "Default_YtDlp_OutputTemplate must be shorter than 1024 characters.", http.StatusBadRequest)
+		return
+	}
+	if len(Body.Default_YtDlp_OutputTemplate_Live) > 1024 {
+		http.Error(w, "Default_YtDlp_OutputTemplate_Live must be shorter than 1024 characters.", http.StatusBadRequest)
+		return
+	}
+	
+	if Body.YtDlp_Path != "" {
+		if !CommandExists(FindCommand(Body.YtDlp_Path)) {
+			http.Error(w, fmt.Sprintf("Could not find yt-dlp path '%s'.", Body.YtDlp_Path), http.StatusBadRequest)
+			return
+		}
+		G_Config.YtDlp_Path = Body.YtDlp_Path
+	}
+	if Body.YtArchive_Path != "" {
+		if !CommandExists(FindCommand(Body.YtArchive_Path)) {
+			http.Error(w, fmt.Sprintf("Could not find ytarchive path '%s'.", Body.YtArchive_Path), http.StatusBadRequest)
+			return
+		}
+		G_Config.YtArchive_Path = Body.YtArchive_Path
+	}
+	if Body.FFmpeg_Path != "" {
+		if !CommandExists(FindCommand(Body.FFmpeg_Path)) {
+			http.Error(w, fmt.Sprintf("Could not find ffmpeg path '%s'.", Body.FFmpeg_Path), http.StatusBadRequest)
+			return
+		}
+		G_Config.FFmpeg_Path = Body.FFmpeg_Path
+	}
+	
+	if Body.Default_DownloadDir != "" {
+		G_Config.Default_DownloadDir = Body.Default_DownloadDir
+	}
+	if Body.Default_YtDlp_OutputTemplate != "" {
+		G_Config.Default_YtDlp_OutputTemplate = Body.Default_YtDlp_OutputTemplate
+	}
+	if Body.Default_YtDlp_OutputTemplate_Live != "" {
+		G_Config.Default_YtDlp_OutputTemplate_Live = Body.Default_YtDlp_OutputTemplate_Live
+	}
+	
+	err := UpdateConfig(G_Config)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to update config: %v\n", err), http.StatusInternalServerError)
+		return
+	}
+	
+	API_GetConfig(w, r)
+}
 
 func ServeApi(w http.ResponseWriter, r *http.Request) {
 	r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/")
@@ -749,6 +840,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		API_GetTaskOutput(w, r)
 	} else if strings.HasPrefix(Path, "config") && Method == "GET" {
 		API_GetConfig(w, r)
+	} else if strings.HasPrefix(Path, "config") && Method == "PATCH" {
+		API_SetConfig(w, r)
 	} else {
 		http.NotFound(w, r)
 	}
@@ -780,7 +873,7 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	AChannel := GetArchiveChannelFromId(&WatchedDownloading, VideoInfo.FromChannel)
 	if AChannel == nil {
-		http.Error(w, "Video exists but no channel is attached to it?", http.StatusNotFound)
+		http.Error(w, "Video info exists but no channel is attached to it?", http.StatusNotFound)
 		return
 	}
 	FilePath, err := GetDownloadedVideoFilePath(VideoInfo, AChannel)
