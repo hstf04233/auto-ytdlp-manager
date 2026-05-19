@@ -22,7 +22,7 @@ const (
 	
 	DEFAULT_DOWNLOAD_DIR = "./downloads"
 	DEFAULT_YT_DLP_OUTPUT_TEMPLATE      = "%(title)s %(id)s.%(ext)s"
-	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(release_date,upload_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
+	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(release_date>%Y-%m-%d,upload_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
 	
 	MAX_TASK_LOG_LIFETIME        = (60*60*24 * 7*2) // 2 Weeks
 	MAX_CHANNEL_LISTING_LIFETIME = (60*60*24)       // 1 Day
