@@ -350,7 +350,7 @@ async function loadConfig() {
     const YtDlpPathEl = document.getElementById("config-YtDlpPath")
     if (YtDlpPathEl) {
       YtDlpPathEl.placeholder = programConfig.YtDlp_Path
-      YtDlpPathEl.value        = programConfig.YtDlp_Path
+      YtDlpPathEl.value       = programConfig.YtDlp_Path
     }
     const YtArchivePathEl = document.getElementById("config-YtArchivePath")
     if (YtArchivePathEl) {
@@ -361,6 +361,22 @@ async function loadConfig() {
     if (FFmpegPathEl) {
       FFmpegPathEl.placeholder = programConfig.FFmpeg_Path
       FFmpegPathEl.value       = programConfig.FFmpeg_Path
+    }
+    
+    const DownloadDirEl = document.getElementById("config-DownloadDir")
+    if (DownloadDirEl) {
+      DownloadDirEl.placeholder = programConfig.Default_DownloadDir
+      DownloadDirEl.value       = programConfig.Default_DownloadDir
+    }
+    const OutputTemplateEl = document.getElementById("config-OutputTemplate")
+    if (OutputTemplateEl) {
+      OutputTemplateEl.placeholder = programConfig.Default_YtDlp_OutputTemplate
+      OutputTemplateEl.value       = programConfig.Default_YtDlp_OutputTemplate
+    }
+    const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive")
+    if (OutputTemplateLiveEl) {
+      OutputTemplateLiveEl.placeholder = programConfig.Default_YtDlp_OutputTemplate_Live
+      OutputTemplateLiveEl.value       = programConfig.Default_YtDlp_OutputTemplate_Live
     }
   } catch (err) {
     showToast(`Failed to load program config: ${err.message}`, 'error');
