@@ -11,7 +11,7 @@
   <div class="sidebar">
     <h1>Auto yt-dlp Manager</h1>
     <nav>
-      <a href="/channels" data-page="channels" class="active">
+      <a href="/channels" data-page="channels">
         <span>&#9776;</span> <span>Channels</span>
       </a>
       <a href="/videos" data-page="videos">
@@ -24,7 +24,7 @@
         <span>&#128172;</span> <span>Chat</span>
       </a>
       <hr>
-      <a href="/config" data-page="config" class="active">
+      <a href="/config" data-page="config">
         <span>&#9881;</span> <span>Config</span>
       </a>
     </nav>
@@ -35,13 +35,20 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- CHANNELS PAGE -->
-    <div class="page active" id="page-channels">
+    <div class="page" id="page-channels">
       <div class="page-header">
         <h2>Channels</h2>
         <button class="btn btn-primary" onclick="openAddChannelModal()">+ Add Channel</button>
       </div>
        
       <div class="stats-row" id="channelStats"></div>
+      <div class="form-group">
+        <label>Disable all channels:</label>
+        <label class="toggle">
+          <input type="checkbox" id="channels-config-AllChannelsDisabled" onchange="quickToggleDisableAllChannels(this)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
       
       <div id="channelsList">
         <div class="loading">Loading channels...</div>
@@ -303,7 +310,7 @@
               <option value="0">Videos Only</option>
               <option value="1">Live Streams</option>
               <!-- <option value="2">List only. Don't download</option> -->
-              <option value="3">Don't Download</option>
+              <option value="3">No Download</option>
             </select>
           </div>
           <div class="form-group">

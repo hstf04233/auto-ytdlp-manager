@@ -437,10 +437,7 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 
 // This must be called with a Video that has been passed through RequestVideoInfo()
 func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
-	DownloadDir := AChannel.DownloadDir
-	if DownloadDir == "" {
-		DownloadDir = DEFAULT_DOWNLOAD_DIR
-	}
+	DownloadDir := GetDownloadDir(AChannel)
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {

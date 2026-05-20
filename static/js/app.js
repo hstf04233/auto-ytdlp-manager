@@ -62,8 +62,9 @@ const isLocalhost = Boolean(
 // ========== State ==========
 
 // These are to stop spamming the api endpoints until the last call is finished!
-let areVideosLoading = false;
-let areTasksLoading  = false;
+let areChannelsLoading = false;
+let areVideosLoading   = false;
+let areTasksLoading    = false;
 
 let programConfig = {};
 let allChannels = [];
@@ -171,7 +172,7 @@ function statusBadge(type) {
     return '<span class="badge badge-type-videos">List only</span>';
   }
   if (type === 3) {
-    return '<span class="badge badge-type-videos">Don\'t Download</span>';
+    return '<span class="badge badge-type-videos">No Download</span>';
   }
   return '<span class="badge badge-type-videos">Videos?</span>';
 }
@@ -182,12 +183,22 @@ function qualityLabel(q) {
 }
 
 function intervalLabel(s) {
-  if (s <= 0) return 'Never';
-  // TODO: add more detail to dis...
-  if (s < 60) return `${s}s`;
-  if (s < 3600) return `${(s / 60).toFixed(2)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600 | 0).toFixed(2)}h`;
-  return `${Math.floor(s / 86400 | 0)}d`;
+  if (s <= 0) return '...';
+  
+  const seconds = Math.floor(s) % 60
+  if (s < 60) {
+    return `${seconds}s`;
+  }
+  const minutes = Math.floor(s / 60) % 60
+  if (s < 3600) {
+    return `${minutes}m ${seconds}s`;
+  }
+  const hours = Math.floor(s / 3600) % 24
+  if (s < 86400) {
+    return `${hours}h ${minutes}m`;
+  }
+  const days = Math.floor(s / 86400)
+  return `${days}d ${hours}h`;
 }
 
 function formatDate(ts) {
@@ -457,6 +468,7 @@ function renderConfig(config) {
   const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive")
   
   const AllChannelsDisabledEl = document.getElementById("config-AllChannelsDisabled")
+  const AllChannelsDisabledEl2 = document.getElementById("channels-config-AllChannelsDisabled")
   const TaskLogAutoDeleteEnabledEl = document.getElementById("config-TaskLogAutoDeleteEnabled")
   
   const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds")
@@ -494,6 +506,9 @@ function renderConfig(config) {
   if (AllChannelsDisabledEl) {
     AllChannelsDisabledEl.checked = programConfig.AllChannels_Disabled
   }
+  if (AllChannelsDisabledEl2) {
+    AllChannelsDisabledEl2.checked = programConfig.AllChannels_Disabled
+  }
   if (TaskLogAutoDeleteEnabledEl) {
     TaskLogAutoDeleteEnabledEl.checked = programConfig.TaskLog_AutoDelete_Enabled
   }
@@ -507,24 +522,49 @@ function renderConfig(config) {
 }
 
 // ========== Channels ==========
-async function loadChannels() {
+let lastChannelsCount = -1;
+async function loadChannels(softUpdateOnly) {
+  areChannelsLoading = true;
   try {
     const data = await API.get('/api/channels');
     allChannels = data.channels || data;
-    renderChannels();
-    updateChannelFilters();
+    if (!softUpdateOnly || allChannels.length !== lastChannelsCount) {
+      renderChannels();
+      updateChannelFilters();
+      lastChannelsCount = allChannels.length
+    } else {
+      // Soft update
+      softRenderChannels();
+    }
   } catch (err) {
     showToast(`Failed to load channels: ${err.message}`, 'error');
   }
+  areChannelsLoading = false;
 }
 
 function renderUpdateChannel(ch) {
-  channelEl = document.getElementById("channel-" + ch.id)
-  if (!channelEl) return
+  channelEl = document.getElementById("channel-" + ch.id);
+  if (!channelEl) return;
   
-  nextCheck = ch.getElementById("next-check")
-  if (nextCheck) {
-    nextCheck.textContent = "Will check in: " + ch.
+  nextCheckEl = channelEl.querySelector("#next-check");
+  if (nextCheckEl) {
+    let checkTime = new Date(ch._nextCheckMsec);
+    let now = new Date();
+    let delta = checkTime-now;
+    
+    const disabledText = "DISABLED!"
+    
+    if (ch.enabled && !programConfig.AllChannels_Disabled) {
+      nextCheckEl.textContent = "Will check in: " + intervalLabel(delta/1000);
+    } else if (nextCheckEl.textContent !== disabledText) {
+      nextCheckEl.textContent = disabledText;
+    }
+  }
+}
+
+function softRenderChannels() {
+  for (const ch of allChannels) {
+    renderUpdateChannel(ch);
   }
 }
 
@@ -1278,7 +1318,7 @@ function renderTasks() {
     if (t.basic_channel_info && t.basic_channel_info.name) {
       const chName = escHtml(t.basic_channel_info.name);
       const chId = t.basic_channel_info.id;
-      channelInfo = `<span class="task-channel" onclick="event.stopPropagation();navigateToChannel('${chId}')" title="Go to channel">${chName}</span>`;
+      channelInfo = `<a href="#" class="task-channel" target="_blank" onclick="event.preventDefault();event.stopPropagation();document.getElementById('taskChannelFilter').value='${chId}';taskPage=0;loadTasks();" title="Filter by this channel">${chName}</a>`;
     }
     let videoInfo = '';
     if (t.basic_video_info) {
@@ -1473,7 +1513,25 @@ async function init() {
   showPage(lastTab, true)
   
   updateChannelFilters();
-  // Auto-refresh videos every 10s
+  let nextSoftChannelsLoad = (new Date()).getTime() + 5000;
+  // Auto refresh channels
+  setInterval(() => {
+    if (document.hidden) {
+      return;
+    }
+    
+    const channelsPage = document.getElementById('page-channels');
+    if (channelsPage.classList.contains('active')) {
+      softRenderChannels();
+    }
+    
+    if (!areChannelsLoading && (new Date()).getTime() > nextSoftChannelsLoad) {
+      nextSoftChannelsLoad = (new Date()).getTime() + 5000
+      loadChannels(true);
+    }
+  }, 100);
+  
+  // Auto refresh videos every 10s
   setInterval(() => {
     if (areVideosLoading || document.hidden) {
       return;
@@ -1485,7 +1543,7 @@ async function init() {
     }
   }, 10_000);
   
-  // Auto-refresh tasks every 7.5s
+  // Auto refresh tasks every 7.5s
   setInterval(() => {
     if (areTasksLoading || document.hidden) {
       return;
@@ -1512,8 +1570,25 @@ async function init() {
   }, 300);
 }
 
+async function quickToggleDisableAllChannels(cb) {
+  try {
+    let isDisabled = cb.checked
+    await API.patch("/api/config", {
+        AllChannels_Disabled: isDisabled
+      }
+    );
+    
+    programConfig.AllChannels_Disabled = isDisabled;
+  } catch (err) {
+    showToast(`Failed to update AllChannels_Disabled: ${err.message}`, 'error');
+    loadConfig();
+  }
+}
+
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
+    softRenderChannels();
+    
     const videosPage = document.getElementById('page-videos');
     if (!areVideosLoading && videosPage.classList.contains('active')) {
       loadVideos();

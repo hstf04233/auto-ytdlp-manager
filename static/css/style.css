@@ -356,7 +356,9 @@ body {
   font-size: 1rem;
   color: var(--accent);
   text-decoration: none;
-  /* transition: color 0.2s; */
+}
+.video-title a:hover {
+  color: var(--accent-hover);
 }
 
 .status-badge {
@@ -680,6 +682,14 @@ form hr {
   padding: 8px 10px;
   cursor: pointer;
   transition: all 0.2s;
+}
+.task-item a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.task-item a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
 }
 
 .task-item:hover {
