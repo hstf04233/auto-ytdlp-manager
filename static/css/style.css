@@ -110,6 +110,11 @@ body {
   font-weight: 500;
 }
 
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .btn-primary {
   background: var(--accent);
   color: white;
@@ -192,21 +197,28 @@ body {
   width: 44px;
   height: 24px;
   display: inline-block;
+  cursor: pointer;
 }
 
 .toggle input {
+  position: absolute;
   opacity: 0;
-  width: 0;
-  height: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  z-index: 2;
 }
 
 .toggle-slider {
+  user-select: none;
+  pointer-events: none;
+
   position: absolute;
-  cursor: pointer;
-  top: 0; left: 0; right: 0; bottom: 0;
+  inset: 0;
   background: var(--bg-input);
   border-radius: 24px;
-  transition: 0.3s;
+  transition: 0.15s;
 }
 
 .toggle-slider:before {
@@ -218,7 +230,7 @@ body {
   bottom: 3px;
   background: white;
   border-radius: 50%;
-  transition: 0.3s;
+  transition: 0.15s;
 }
 
 .toggle input:checked + .toggle-slider {
@@ -317,7 +329,6 @@ body {
 .video-info p a {
   color: var(--accent);
   text-decoration: none;
-  /* transition: color 0.2s; */
 }
 
 .video-info p a:hover {
@@ -412,6 +423,7 @@ body {
 }
 
 .modal {
+  scrollbar-width: thin;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -448,7 +460,7 @@ form hr {
 .form-group input,
 .form-group select {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 8px;
   background: var(--bg-input);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -462,6 +474,11 @@ form hr {
   border-color: var(--accent);
 }
 
+.form-group a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
 .form-row {
   display: flex;
   gap: 15px;
@@ -469,6 +486,13 @@ form hr {
 
 .form-row .form-group {
   flex: 1;
+}
+
+.config-actions {
+  display: flex;
+  justify-content: left;
+  gap: 10px;
+  margin-bottom: 15px;
 }
 
 .modal-actions {
@@ -1107,8 +1131,6 @@ form hr {
 }
 
 .vd-preview img {
-  cursor: pointer;
-  
   width: 100%;
   height: 100%;
   object-fit: cover;

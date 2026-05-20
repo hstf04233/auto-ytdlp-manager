@@ -15,6 +15,7 @@ var WebStaticContent embed.FS
 
 // TODO: ! this could be set at build time but I'm lazy rn
 var ETag string
+var StartTime = time.Now().UTC()
 
 func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/")
@@ -49,12 +50,14 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	/*
 	FileContent, err := io.ReadAll(File)
 	if err != nil {
 		fmt.Printf("Could not read file? \"%s\", err: %v\n", path, err)
 		http.Error(w, "File could not be read?", http.StatusInternalServerError)
 		return
 	}
+	*/
 	
 	FileExt := filepath.Ext(path)
 	if FileExt == ".txt" {
@@ -79,7 +82,14 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/svg+xml")
 	}
 	
-	w.Write(FileContent)
+	FileSeeker, ok := File.(io.ReadSeeker)
+	if !ok {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	
+	http.ServeContent(w, r, filepath.Base(path), StartTime, FileSeeker)
+	//w.Write(FileContent)
 }
 
 func init() {

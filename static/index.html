@@ -187,7 +187,7 @@
         <h2>Config</h2>
       </div>
       
-      <form id="configForm" onsubmit="saveConfig(event)">
+      <form id="configForm" onsubmit="saveConfig(event)" autocomplete="off">
         <!-- <div class="form-row"> -->
           <div class="form-group" title="yt-dlp Filepath on the host">
             <label for="config-YtDlpPath">yt-dlp Path:</label>
@@ -209,6 +209,10 @@
           <label for="config-DownloadDir">Default download directory:</label>
           <input type="text" id="config-DownloadDir" placeholder="./downloads" maxlength="1024" required>
         </div>
+        <hr>
+        <div class="form-group">
+          <label>yt-dlp output format. See more at: <a href="https://github.com/yt-dlp/yt-dlp#output-template" target="_blank">yt-dlp#output-template</a></label>
+        </div>
         <div class="form-group" title="yt-dlp output template">
           <label for="config-OutputTemplate">Default output template:</label>
           <input type="text" id="config-OutputTemplate" placeholder="%(title)s %(id)s.%(ext)s" maxlength="1024" required>
@@ -221,11 +225,54 @@
         <hr>
         
         <div class="form-group">
-          <label for="config-AllChannelsDisabled">Disable all channels:</label>
+          <label>Disable all channels:</label>
           <label class="toggle">
-            <input type="checkbox" id="autoScrollToggle" checked>
+            <input type="checkbox" id="config-AllChannelsDisabled" checked>
             <span class="toggle-slider"></span>
           </label>
+        </div>
+        <div class="form-group">
+          <label>Auto Delete Task Logs:</label>
+          <label class="toggle">
+            <input type="checkbox" id="config-TaskLogAutoDeleteEnabled" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        
+        <div class="form-group" title="Interval in seconds, 0 = never.">
+          <label for="config-TaskLogAutoDeleteSeconds">Auto delete task logs after:</label>
+          <!-- <input type="number" id="config-TaskLogAutoDeleteSeconds" min="0"> -->
+          <select id="config-TaskLogAutoDeleteSeconds">
+            <option value="60">1 Minute</option>
+            <option value="3600">1 Hour</option>
+            <option value="86400">1 Day</option>
+            <option value="604800">1 Week</option>
+            <option value="1209600">2 Weeks</option>
+            <option value="2592000" selected>1 Month</option>
+            <option value="31536000">1 Year</option>
+            <option value="0">Never delete</option>
+          </select>
+        </div>
+        <div class="form-group" title="Interval in seconds, 0 = never.">
+          <label for="config-TaskLogListAutoDeleteSeconds">Auto delete channel task logs after:</label>
+          <!-- <input type="number" id="config-TaskLogListAutoDeleteSeconds" min="0"> -->
+          <select id="config-TaskLogListAutoDeleteSeconds">
+            <option value="60">1 Minute</option>
+            <option value="3600">1 Hour</option>
+            <option value="86400" selected>1 Day</option>
+            <option value="604800">1 Week</option>
+            <option value="1209600">2 Weeks</option>
+            <option value="2592000">1 Month</option>
+            <option value="31536000">1 Year</option>
+            <option value="0">Never delete</option>
+          </select>
+        </div>
+        
+        <hr>
+        
+        <div class="config-actions">
+          <button type="button" class="btn btn-secondary" id="configCancelBtn" onclick="cancelConfigChanges()" disabled>Undo Changes</button>
+          <button type="submit" class="btn btn-primary" id="configSubmitBtn">Save Changes</button>
         </div>
       </form>
     </div>
@@ -236,16 +283,16 @@
   <div class="modal-overlay" id="channelModal" onclick="if(event.target===this)closeChannelModal()">
     <div class="modal">
       <h2 id="channelModalTitle">Add Channel</h2>
-      <form id="channelForm" onsubmit="saveChannel(event)">
+      <form id="channelForm" onsubmit="saveChannel(event)" autocomplete="off">
         <input type="hidden" id="channelId">
 
         <div class="form-group">
-          <label for="channelName">Channel Name *</label>
+          <label for="channelName">Channel Name</label>
           <input type="text" id="channelName" placeholder="My Favorite Channel" maxlength="128" required>
         </div>
 
         <div class="form-group">
-          <label for="channelUrl">Channel / Playlist URL *</label>
+          <label for="channelUrl">Channel / Playlist URL</label>
           <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." maxlength="8192" required>
         </div>
 
@@ -255,8 +302,8 @@
             <select id="channelType" onchange="updateChannelModalPlaceholders()">
               <option value="0">Videos Only</option>
               <option value="1">Live Streams</option>
-              <option value="2">List only. Don't download</option>
-              <option value="3">List and ignore videos</option>
+              <!-- <option value="2">List only. Don't download</option> -->
+              <option value="3">Don't Download</option>
             </select>
           </div>
           <div class="form-group">
@@ -279,7 +326,11 @@
           <label for="channelDownloadDir">Download Directory</label>
           <input type="text" id="channelDownloadDir" placeholder="./downloads" maxlength="1024">
         </div>
-
+        
+        <hr>
+        <div class="form-group">
+          <label>yt-dlp output format. See more at: <a href="https://github.com/yt-dlp/yt-dlp#output-template" target="_blank">yt-dlp#output-template</a></label>
+        </div>
         <div class="form-group">
           <label for="channelOutputTemplate">Output Template</label>
           <input type="text" id="channelOutputTemplate" placeholder="%(title)s %(id)s.%(ext)s" maxlength="1024">

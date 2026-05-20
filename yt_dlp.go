@@ -29,7 +29,8 @@ type VideoInfo struct {
 	Thumbnail    string  `json:"thumbnail_url"`
 	
 	Filename           string  `json:"-"`
-	DownloadedFilename string  `json:"filename"`		// Where the video is stored on device
+	DownloadedFilename string  `json:"filename"`		// Where the video is stored on device (This is only the file name and not the file path...)
+	VideoFileExists    bool    `json:"videofile_exists"`
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`

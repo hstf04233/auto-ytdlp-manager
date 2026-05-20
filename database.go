@@ -15,7 +15,7 @@ const DATABASE_FILE_DEBUG = "autoytdlpmanager_DEBUG.db"
 
 const db_SQL_Header = `
 PRAGMA foreign_keys = ON;
-PRAGMA journal_mode = WAL;
+/* PRAGMA journal_mode = WAL; */
 PRAGMA secure_delete = ON;
 PRAGMA busy_timeout = 5000;
 PRAGMA synchronous = normal;
@@ -181,7 +181,7 @@ func DB_LoadChannels(WD *WatchingBundle) error {
 	defer WD.ChannelsLock.Unlock()
 	var i int64
 	for _, Channel := range(ChannelsList) {
-		Channel.NextFullChannelCheckMSEC = time.Now().UnixMilli() + (i*1000 * 60*2)
+		Channel.NextFullChannelCheckMSEC = time.Now().UTC().UnixMilli() + (i*1000 * 60*2)
 		
 		WD.Channels = append(WD.Channels, Channel)
 		

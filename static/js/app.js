@@ -171,7 +171,7 @@ function statusBadge(type) {
     return '<span class="badge badge-type-videos">List only</span>';
   }
   if (type === 3) {
-    return '<span class="badge badge-type-videos">List and ignore</span>';
+    return '<span class="badge badge-type-videos">Don\'t Download</span>';
   }
   return '<span class="badge badge-type-videos">Videos?</span>';
 }
@@ -345,41 +345,164 @@ function videoTypeBadge(vtype) {
 async function loadConfig() {
   try {
     const data = await API.get('/api/config');
-    programConfig = data.channels || data;
+    programConfig = data;
     
-    const YtDlpPathEl = document.getElementById("config-YtDlpPath")
-    if (YtDlpPathEl) {
-      YtDlpPathEl.placeholder = programConfig.YtDlp_Path
-      YtDlpPathEl.value       = programConfig.YtDlp_Path
-    }
-    const YtArchivePathEl = document.getElementById("config-YtArchivePath")
-    if (YtArchivePathEl) {
-      YtArchivePathEl.placeholder = programConfig.YtArchive_Path
-      YtArchivePathEl.value       = programConfig.YtArchive_Path
-    }
-    const FFmpegPathEl = document.getElementById("config-FFmpegPath")
-    if (FFmpegPathEl) {
-      FFmpegPathEl.placeholder = programConfig.FFmpeg_Path
-      FFmpegPathEl.value       = programConfig.FFmpeg_Path
-    }
-    
-    const DownloadDirEl = document.getElementById("config-DownloadDir")
-    if (DownloadDirEl) {
-      DownloadDirEl.placeholder = programConfig.Default_DownloadDir
-      DownloadDirEl.value       = programConfig.Default_DownloadDir
-    }
-    const OutputTemplateEl = document.getElementById("config-OutputTemplate")
-    if (OutputTemplateEl) {
-      OutputTemplateEl.placeholder = programConfig.Default_YtDlp_OutputTemplate
-      OutputTemplateEl.value       = programConfig.Default_YtDlp_OutputTemplate
-    }
-    const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive")
-    if (OutputTemplateLiveEl) {
-      OutputTemplateLiveEl.placeholder = programConfig.Default_YtDlp_OutputTemplate_Live
-      OutputTemplateLiveEl.value       = programConfig.Default_YtDlp_OutputTemplate_Live
-    }
+    renderConfig(programConfig);
   } catch (err) {
     showToast(`Failed to load program config: ${err.message}`, 'error');
+  }
+}
+
+function cancelConfigChanges() {
+  renderConfig(programConfig);
+}
+
+// Set .value and .placeholder to the same value.
+function setInputPV(el, value) {
+  el.placeholder = value
+  el.value       = value
+}
+
+function areThereConfigChanges() {
+  const YtDlpPathEl = document.getElementById("config-YtDlpPath")
+  if (YtDlpPathEl && YtDlpPathEl.value !== programConfig.YtDlp_Path) return true
+  const YtArchivePathEl = document.getElementById("config-YtArchivePath")
+  if (YtArchivePathEl && YtArchivePathEl.value !== programConfig.YtArchive_Path) return true
+  const FFmpegPathEl = document.getElementById("config-FFmpegPath")
+  if (FFmpegPathEl && FFmpegPathEl.value !== programConfig.FFmpeg_Path) return true
+  
+  const DownloadDirEl = document.getElementById("config-DownloadDir")
+  if (DownloadDirEl && DownloadDirEl.value !== programConfig.Default_DownloadDir) return true
+  const OutputTemplateEl = document.getElementById("config-OutputTemplate")
+  if (OutputTemplateEl && OutputTemplateEl.value !== programConfig.Default_YtDlp_OutputTemplate) return true
+  const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive")
+  if (OutputTemplateLiveEl && OutputTemplateLiveEl.value !== programConfig.Default_YtDlp_OutputTemplate_Live) return true
+  
+  const AllChannelsDisabledEl = document.getElementById("config-AllChannelsDisabled")
+  if (AllChannelsDisabledEl && AllChannelsDisabledEl.checked !== programConfig.AllChannels_Disabled) return true
+  const TaskLogAutoDeleteEnabledEl = document.getElementById("config-TaskLogAutoDeleteEnabled")
+  if (TaskLogAutoDeleteEnabledEl && TaskLogAutoDeleteEnabledEl.checked !== programConfig.TaskLog_AutoDelete_Enabled) return true
+  
+  const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds")
+  if (TaskLogAutoDeleteSecondsEl && TaskLogAutoDeleteSecondsEl.value != programConfig.TaskLog_AutoDelete_Seconds) return true
+  const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds")
+  if (TaskLogListAutoDeleteSecondsEl && TaskLogListAutoDeleteSecondsEl.value != programConfig.TaskLog_List_AutoDelete_Seconds) return true
+  
+  return false
+}
+
+async function saveConfig(e) {
+  e.preventDefault();
+  
+  const YtDlpPathEl = document.getElementById("config-YtDlpPath")
+  const YtArchivePathEl = document.getElementById("config-YtArchivePath")
+  const FFmpegPathEl = document.getElementById("config-FFmpegPath")
+  
+  const DownloadDirEl = document.getElementById("config-DownloadDir")
+  const OutputTemplateEl = document.getElementById("config-OutputTemplate")
+  const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive")
+  
+  const AllChannelsDisabledEl = document.getElementById("config-AllChannelsDisabled")
+  const TaskLogAutoDeleteEnabledEl = document.getElementById("config-TaskLogAutoDeleteEnabled")
+  
+  const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds")
+  const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds")
+  
+  const body = {
+    YtDlp_Path:     YtDlpPathEl.value.trim(),
+    YtArchive_Path: YtArchivePathEl.value.trim(),
+    FFmpeg_Path:    FFmpegPathEl.value.trim(),
+    
+    AllChannels_Disabled: AllChannelsDisabledEl.checked,
+    TaskLog_AutoDelete_Enabled: TaskLogAutoDeleteEnabledEl.checked,
+    
+    Default_DownloadDir:  DownloadDirEl.value.trim(),
+    Default_YtDlp_OutputTemplate: OutputTemplateEl.value,
+    Default_YtDlp_OutputTemplate_Live: OutputTemplateLiveEl.value,
+    
+    TaskLog_AutoDelete_Seconds: TaskLogAutoDeleteSecondsEl.value ? parseInt(TaskLogAutoDeleteSecondsEl.value) : programConfig.TaskLog_AutoDelete_Seconds,
+    TaskLog_List_AutoDelete_Seconds: TaskLogListAutoDeleteSecondsEl.value ? parseInt(TaskLogListAutoDeleteSecondsEl.value) : programConfig.TaskLog_List_AutoDelete_Seconds,
+  };
+  
+  try {
+    await API.patch("/api/config", body);
+    showToast('Config updated!', 'success');
+    
+    loadConfig();
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
+}
+
+document.getElementById("configForm").addEventListener('input', () => {
+  const configSubmitBtn = document.getElementById("configSubmitBtn")
+  const configCancelBtn = document.getElementById("configCancelBtn")
+  wereChangesMade = areThereConfigChanges();
+  
+  if (configSubmitBtn) {
+    configSubmitBtn.disabled = !wereChangesMade;
+  }
+  if (configCancelBtn) {
+    configCancelBtn.disabled = !wereChangesMade;
+  }
+});
+
+function renderConfig(config) {
+  const YtDlpPathEl = document.getElementById("config-YtDlpPath")
+  const YtArchivePathEl = document.getElementById("config-YtArchivePath")
+  const FFmpegPathEl = document.getElementById("config-FFmpegPath")
+  
+  const DownloadDirEl = document.getElementById("config-DownloadDir")
+  const OutputTemplateEl = document.getElementById("config-OutputTemplate")
+  const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive")
+  
+  const AllChannelsDisabledEl = document.getElementById("config-AllChannelsDisabled")
+  const TaskLogAutoDeleteEnabledEl = document.getElementById("config-TaskLogAutoDeleteEnabled")
+  
+  const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds")
+  const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds")
+  
+  const configSubmitBtn = document.getElementById("configSubmitBtn")
+  if (configSubmitBtn) {
+    configSubmitBtn.disabled = true
+  }
+  const configCancelBtn = document.getElementById("configCancelBtn")
+  if (configCancelBtn) {
+    configCancelBtn.disabled = true
+  }
+  
+  if (YtDlpPathEl) {
+    setInputPV(YtDlpPathEl, programConfig.YtDlp_Path)
+  }
+  if (YtArchivePathEl) {
+    setInputPV(YtArchivePathEl, programConfig.YtArchive_Path)
+  }
+  if (FFmpegPathEl) {
+    setInputPV(FFmpegPathEl, programConfig.FFmpeg_Path)
+  }
+  
+  if (DownloadDirEl) {
+    setInputPV(DownloadDirEl, programConfig.Default_DownloadDir)
+  }
+  if (OutputTemplateEl) {
+    setInputPV(OutputTemplateEl, programConfig.Default_YtDlp_OutputTemplate)
+  }
+  if (OutputTemplateLiveEl) {
+    setInputPV(OutputTemplateLiveEl, programConfig.Default_YtDlp_OutputTemplate_Live)
+  }
+  
+  if (AllChannelsDisabledEl) {
+    AllChannelsDisabledEl.checked = programConfig.AllChannels_Disabled
+  }
+  if (TaskLogAutoDeleteEnabledEl) {
+    TaskLogAutoDeleteEnabledEl.checked = programConfig.TaskLog_AutoDelete_Enabled
+  }
+  
+  if (TaskLogAutoDeleteSecondsEl) {
+    setInputPV(TaskLogAutoDeleteSecondsEl, programConfig.TaskLog_AutoDelete_Seconds)
+  }
+  if (TaskLogListAutoDeleteSecondsEl) {
+    setInputPV(TaskLogListAutoDeleteSecondsEl, programConfig.TaskLog_List_AutoDelete_Seconds)
   }
 }
 
@@ -392,6 +515,16 @@ async function loadChannels() {
     updateChannelFilters();
   } catch (err) {
     showToast(`Failed to load channels: ${err.message}`, 'error');
+  }
+}
+
+function renderUpdateChannel(ch) {
+  channelEl = document.getElementById("channel-" + ch.id)
+  if (!channelEl) return
+  
+  nextCheck = ch.getElementById("next-check")
+  if (nextCheck) {
+    nextCheck.textContent = "Will check in: " + ch.
   }
 }
 
@@ -413,37 +546,42 @@ function renderChannels() {
     container.innerHTML = '<div class="loading">No channels yet. Add one to get started!</div>';
     return;
   }
-
-  container.innerHTML = allChannels.map(ch => `
-    <div class="card channel-card">
-      <div class="channel-info">
-        <h3>${escHtml(ch.name)}</h3>
-        <p>${escHtml(ch.url)}</p>
-        <div class="channel-meta">
-          ${statusBadge(ch.type)}
-          <span>Quality: ${qualityLabel(ch.quality_select)}</span>
-          <span>Check: ${intervalLabel(ch.check_interval)}</span>
-          <span>FCheck: ${intervalLabel(ch.full_check_interval)}</span>
-          ${ch.download_dir ? `<span>Dir: "${escHtml(ch.download_dir)}"</span>` : ''}
+  
+  container.innerHTML = '';
+  
+  for (const ch of allChannels) {
+    channelHtml = `
+      <div class="card channel-card" id="channel-${ch.id}">
+        <div class="channel-info">
+          <h3>${escHtml(ch.name)}</h3>
+          <p>${escHtml(ch.url)}</p>
+          <div class="channel-meta">
+            ${statusBadge(ch.type)}
+            <span>Quality: ${qualityLabel(ch.quality_select)}</span>
+            <span id="next-check">Check: ${intervalLabel(ch.check_interval)}</span>
+          </div>
+        </div>
+        <div class="video-actions">
+          <label class="toggle">
+            <input type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="toggleChannel('${ch.id}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+          <button class="btn btn-secondary btn-sm" onclick="runChannelCheck('${ch.id}')">Run Check now</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditChannelModal('${ch.id}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}', '${ch.name}')">Delete</button>
         </div>
       </div>
-      <div class="video-actions">
-        <label class="toggle">
-          <input type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="toggleChannel('${ch.id}', this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-        <button class="btn btn-secondary btn-sm" onclick="runChannelCheck('${ch.id}')">Run Check now</button>
-        <button class="btn btn-secondary btn-sm" onclick="openEditChannelModal('${ch.id}')">Edit</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}', '${ch.name}')">Delete</button>
-      </div>
-    </div>
-  `).join('');
+    `;
+    container.insertAdjacentHTML("beforeend", channelHtml);
+    
+    renderUpdateChannel(ch);
+  }
 }
 
 async function toggleChannel(id, enabled) {
   try {
     await API.patch(`/api/channels/${id}`, { enabled });
-    showToast(`Channel ${enabled ? 'enabled' : 'disabled'}`, 'success');
+    //showToast(`Channel ${enabled ? 'enabled' : 'disabled'}`, 'success');
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
   }
@@ -516,7 +654,7 @@ function openVideoDetailsModal(videoId) {
     : '\u2014';
   
   let videoPreviewOnClick = "";
-  if (v.filename) {
+  if (v.videofile_exists) {
     videoPreviewOnClick = `event.preventDefault(); videoPreviewClick('${videoId}');`;
   }
   
@@ -524,8 +662,9 @@ function openVideoDetailsModal(videoId) {
   
   document.getElementById('videoDetailsContent').innerHTML = `
     <div class="vd-preview" id="modal-video-preview">
-      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
-        ${v.filename ? `<span>&#9654;</span>` : ''}
+      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}"
+     ${v.videofile_exists ? ` style="cursor: pointer;" title="Click to play video"` : ''} onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+        ${v.videofile_exists ? `<span>&#9654;</span>` : ''}
       </img>
       <div class="vd-preview-placeholder" style="display:none">No thumbnail</div>
     </div>
@@ -538,7 +677,7 @@ function openVideoDetailsModal(videoId) {
       <div class="vd-field"><span class="vd-field-label">Availability</span><span class="vd-field-value">${escHtml(v.availability)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Video Type</span><span class="vd-field-value">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : '\u2014'}</span></div>
       <div class="vd-field"><span class="vd-field-label">Status</span><span class="vd-field-value">${videoStatusBadge(v.id, v.status)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Filename</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Filename ${(v.videofile_exists || !v.filename) ? '' : '(DELETED?)'}</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
       <div class="vd-field"><span class="vd-field-label">Resolution</span><span class="vd-field-value">${resolutionText}</span></div>
       <div class="vd-field"><span class="vd-field-label">Release Date</span><span class="vd-field-value">${formatDateAndTime(v.release_date)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Added</span><span class="vd-field-value">${formatDateAndTime(v.added_at)}</span></div>
@@ -558,7 +697,7 @@ function openVideoDetailsModal(videoId) {
   document.getElementById('videoDetailsActions').innerHTML = `
     <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open original video link">Open Video</a>
     ${
-      v.filename ?
+      v.videofile_exists ?
     `<a href="/video-file/${escHtml(v.id)}?download=true" target="_blank" class="btn btn-secondary btn-sm" title="Download video file">Download Video</a>` :
     ''
     }
@@ -781,7 +920,7 @@ function renderVideos() {
           ${videoStatusBadge(v.id, v.status)}
           ${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}
           ${
-            v.filename ?
+            v.videofile_exists ?
             `<a href="/video-file/${escHtml(v.id)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video file">Video File</a>` :
             ''
           }
@@ -867,11 +1006,11 @@ function buildPaginationHTML(cfg) {
     return `<button${activeAttr}${disabledAttr}${onclick}>${labelText}</button>`;
   };
   
-  const singlePageMsg = `All ${label} shown (page 1 of 1)`;
+  //const singlePageMsg = `All ${label} shown (page 1 of 1)`;
   const countMsg = `Showing ${currentItems} ${label} out of ${totalCount}`;
   
   if (totalPages <= 1) {
-    return `<span class="single-page-msg">${singlePageMsg}</span>`;
+    return `<span class="single-page-msg">${countMsg}</span>`;
   }
   
   // Page numbers group

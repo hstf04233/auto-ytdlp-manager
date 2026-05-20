@@ -129,6 +129,13 @@ func DoesFileExist(FilePath string) bool {
 }
 
 func GetDownloadedVideoFilePath(Video *VideoInfo, AChannel *ArchiveChannel) (string, error) {
+	if AChannel == nil {
+		AChannel = GetArchiveChannelFromId(&WatchedDownloading, Video.FromChannel)
+		if AChannel == nil {
+			return "", fmt.Errorf("Channel for video could not be found.")
+		}
+	}
+	
 	var err error
 	DownloadDir := GetDownloadDir(AChannel)
 	DownloadDir, err = filepath.Abs(DownloadDir)
@@ -278,6 +285,13 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 	return true
 }
 
+func IsChannelEnabled(AChannel *ArchiveChannel) bool {
+	if G_Config.AllChannels_Disabled {
+		return false
+	}
+	return AChannel.Enabled
+}
+
 func CheckChannel(AChannel *ArchiveChannel) {
 	AChannel.Lock.Lock()
 	if AChannel.Url == "" {
@@ -292,7 +306,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	AChannel.IsBeingChecked = true
 	defer func() {AChannel.IsBeingChecked = false}()
 	
-	TimeNow := time.Now().UnixMilli()
+	TimeNow := time.Now().UTC().UnixMilli()
 	
 	AChannel.NextCheckMSEC = TimeNow + (AChannel.CheckInterval*1000)
 	
@@ -345,7 +359,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	
 	for _, Video := range(VideoList) {
 		if Task.Status != TASK_STATUS_RUNNING { return }
-		if !AChannel.Enabled { break }
+		if !IsChannelEnabled(AChannel) { break }
 		
 		Video.FromChannel = ChannelId
 		if CheckVideoAndDownload(AChannel, &Video, Task) {
@@ -366,7 +380,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	if len(QueuedVideosList) > 0 {
 		for _, Video := range(QueuedVideosList) {
 			if Task.Status != TASK_STATUS_RUNNING { return }
-			if !AChannel.Enabled { break }
+			if !IsChannelEnabled(AChannel) { break }
 			
 			Video.FromChannel = ChannelId
 			//CL_Logf(Task, "Checking old queued video: \"%s\" %s\n", Video.Title, Video.Url)
@@ -388,7 +402,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	if err == nil && len(RefreshableVideos) > 0 {
 		for _, Video := range(RefreshableVideos) {
 			if Task.Status != TASK_STATUS_RUNNING { return }
-			if !AChannel.Enabled { break }
+			if !IsChannelEnabled(AChannel) { break }
 			
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
@@ -397,7 +411,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	}
 	
 	AChannel.Lock.Lock()
-	AChannel.NextCheckMSEC = time.Now().UnixMilli() + (AChannel.CheckInterval*1000)
+	AChannel.NextCheckMSEC = time.Now().UTC().UnixMilli() + (AChannel.CheckInterval*1000)
 	AChannel.Lock.Unlock()
 	
 	CL_FinishTask(Task, TASK_STATUS_FINISHED)
@@ -452,10 +466,10 @@ func CheckChannels(WD *WatchingBundle) {
 		if AChannel.NeedsRefreshing {
 			go CheckChannelRefreshes(AChannel)
 		}
-		if !AChannel.Enabled {
+		if !IsChannelEnabled(AChannel) {
 			continue
 		}
-		if time.Now().UnixMilli() < AChannel.NextCheckMSEC || AChannel.CheckInterval <= 0 {
+		if time.Now().UTC().UnixMilli() < AChannel.NextCheckMSEC || AChannel.CheckInterval <= 0 {
 			continue
 		}
 		go CheckChannel(AChannel)

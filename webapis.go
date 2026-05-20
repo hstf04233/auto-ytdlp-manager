@@ -148,7 +148,7 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		if AChannel.CheckInterval < 0 {
 			AChannel.CheckInterval = 0
 		}
-		CheckTime := time.Now().UnixMilli()+(AChannel.CheckInterval*1000)
+		CheckTime := time.Now().UTC().UnixMilli()+(AChannel.CheckInterval*1000)
 		if AChannel.NextCheckMSEC > CheckTime {
 			AChannel.NextCheckMSEC = CheckTime
 		}
@@ -158,7 +158,7 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		if AChannel.FullCheckInterval < 0 {
 			AChannel.FullCheckInterval = 0
 		}
-		CheckTime := time.Now().UnixMilli()+(AChannel.FullCheckInterval*1000)
+		CheckTime := time.Now().UTC().UnixMilli()+(AChannel.FullCheckInterval*1000)
 		if AChannel.NextFullChannelCheckMSEC > CheckTime {
 			AChannel.NextFullChannelCheckMSEC = CheckTime
 		}
@@ -167,7 +167,7 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		LastEnabled := AChannel.Enabled
 		AChannel.Enabled = *Body.Enabled
 		if !LastEnabled && AChannel.Enabled {
-			AChannel.NextCheckMSEC = time.Now().UnixMilli() + (1000 * 4)
+			AChannel.NextCheckMSEC = time.Now().UTC().UnixMilli() + (1000 * 4)
 		}
 	}
 	err := DB_UpdateArchiveChannel(AChannel)
@@ -191,7 +191,7 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	AChannel.NextCheckMSEC = time.Now().UnixMilli()-1
+	AChannel.NextCheckMSEC = time.Now().UTC().UnixMilli()-1
 	
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("{\"Success\":true}"))
@@ -267,6 +267,19 @@ type TAPI_VideoListStats struct{
 var VideosListCache = NewCache(time.Second * 4)
 
 func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoInfo) {
+	if Video.DownloadedFilename != "" {
+		Filepath, err := GetDownloadedVideoFilePath(Video, nil)
+		if err == nil {
+			Video.VideoFileExists = false
+		}
+		if Filepath == "" {
+			// Video file was not found... Deleted?
+			Video.VideoFileExists = false
+		} else {
+			Video.VideoFileExists = true
+		}
+	}
+	
 	TasksList, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
 		FromVideoId: Video.Id,
 		Status: -1,
@@ -769,6 +782,25 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 		G_Config.FFmpeg_Path = Body.FFmpeg_Path
 	}
 	
+	// Actually set the config now...
+	
+	if Body.AllChannels_Disabled != nil {
+		G_Config.AllChannels_Disabled = *Body.AllChannels_Disabled
+	}
+	if Body.TaskLog_AutoDelete_Enabled != nil {
+		G_Config.TaskLog_AutoDelete_Enabled = *Body.TaskLog_AutoDelete_Enabled
+	}
+	
+	if Body.YtDlp_Path != "" {
+		G_Config.YtDlp_Path = Body.YtDlp_Path
+	}
+	if Body.YtArchive_Path != "" {
+		G_Config.YtArchive_Path = Body.YtArchive_Path
+	}
+	if Body.FFmpeg_Path != "" {
+		G_Config.FFmpeg_Path = Body.FFmpeg_Path
+	}
+	
 	if Body.Default_DownloadDir != "" {
 		G_Config.Default_DownloadDir = Body.Default_DownloadDir
 	}
@@ -777,6 +809,13 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if Body.Default_YtDlp_OutputTemplate_Live != "" {
 		G_Config.Default_YtDlp_OutputTemplate_Live = Body.Default_YtDlp_OutputTemplate_Live
+	}
+	
+	if Body.TaskLog_AutoDelete_Seconds != -1 {
+		G_Config.TaskLog_AutoDelete_Seconds = Body.TaskLog_AutoDelete_Seconds
+	}
+	if Body.TaskLog_List_AutoDelete_Seconds != -1 {
+		G_Config.TaskLog_List_AutoDelete_Seconds = Body.TaskLog_List_AutoDelete_Seconds
 	}
 	
 	err := UpdateConfig(G_Config)
@@ -885,14 +924,18 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Could not find video file '%s' The video must've been moved or deleted.", VideoInfo.DownloadedFilename), http.StatusNotFound)
 		return
 	}
+	Filename := filepath.Base(FilePath)
 	
 	if DownloadVal := r.URL.Query().Get("download"); DownloadVal != "" {
 		// User wants to download this video
 		DownloadVal = strings.ToLower(DownloadVal)
 		if DownloadVal == "true" || DownloadVal == "1" || DownloadVal == "yes" {
-			Filename := filepath.Base(FilePath)
 			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", Filename))
+		} else {
+			w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
 		}
+	} else {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
 	}
 	
 	http.ServeFile(w, r, FilePath)

@@ -550,8 +550,11 @@ func CleanUpTasksInDatabase() {
 		return
 	}
 	
-	DeleteTime         := time.Now().UTC().Add(time.Second * -time.Duration(G_Config.TaskLog_AutoDelete_Seconds))
-	Listing_DeleteTime := time.Now().UTC().Add(time.Second * -time.Duration(G_Config.TaskLog_List_AutoDelete_Seconds))
+	TaskLog_AutoDelete_Seconds      := G_Config.TaskLog_AutoDelete_Seconds
+	TaskLog_List_AutoDelete_Seconds := G_Config.TaskLog_List_AutoDelete_Seconds
+	
+	DeleteTime         := time.Now().UTC().Add(time.Second * -time.Duration(TaskLog_AutoDelete_Seconds))
+	Listing_DeleteTime := time.Now().UTC().Add(time.Second * -time.Duration(TaskLog_List_AutoDelete_Seconds))
 	
 	DeleteCount := 0
 	
@@ -562,11 +565,11 @@ func CleanUpTasksInDatabase() {
 		DeleteThis := false
 		
 		if Task.Type == TASK_TYPE_LISTING {
-			if Listing_DeleteTime.Unix() > Task.EndTime.Unix() {
+			if TaskLog_List_AutoDelete_Seconds > 0 && Listing_DeleteTime.Unix() > Task.EndTime.Unix() {
 				DeleteThis = true
 			}
 		} else {
-			if DeleteTime.Unix() > Task.EndTime.Unix() {
+			if TaskLog_AutoDelete_Seconds > 0 && DeleteTime.Unix() > Task.EndTime.Unix() {
 				DeleteThis = true
 			}
 		}

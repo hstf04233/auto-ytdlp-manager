@@ -24,12 +24,12 @@ const (
 	DEFAULT_YT_DLP_OUTPUT_TEMPLATE      = "%(title)s %(id)s.%(ext)s"
 	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(release_date>%Y-%m-%d,upload_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
 	
-	MAX_TASK_LOG_LIFETIME        = (60*60*24 * 7*2) // 2 Weeks
-	MAX_CHANNEL_LISTING_LIFETIME = (60*60*24)       // 1 Day
+	MAX_TASK_LOG_LIFETIME        = (60*60*24 * 30) // 1 Month
+	MAX_CHANNEL_LISTING_LIFETIME = (60*60*24)      // 1 Day
 )
 
 type ProgramConfig struct {
-	Mutex *sync.RWMutex
+	Mutex *sync.RWMutex `json:"-"`
 	ConfigFile *os.File `json:"-"`
 	
 	ServerPort uint16
@@ -97,11 +97,20 @@ func UpdateConfig(Config *ProgramConfig) error {
 }
 
 func SaveConfig(Config *ProgramConfig, File *os.File) error {
+	err := File.Truncate(0)
+	if err != nil {
+		return fmt.Errorf("Could not write config json, error %v\n", err)
+	}
+	_, err = File.Seek(0, 0)
+	if err != nil {
+		return fmt.Errorf("Could not write config json, error %v\n", err)
+	}
+	
 	JsonEncoder := json.NewEncoder(File)
 	JsonEncoder.SetEscapeHTML(false)  // DIE! (I disable this setting because it messes with the YtDlp_OutputTemplate)
 	JsonEncoder.SetIndent("", "\t")
 	
-	err := JsonEncoder.Encode(G_Config)
+	err = JsonEncoder.Encode(G_Config)
 	if err != nil {
 		return fmt.Errorf("Could not write config json, error %v\n", err)
 	}
@@ -113,10 +122,10 @@ func OpenConfig(ConfigPath string) error {
 		G_Config.ServerPort = DEFAULT_SERVER_PORT_DEBUG
 	}
 	
-	ConfigFile, err := os.Open(ConfigPath)
+	ConfigFile, err := os.OpenFile(ConfigPath, os.O_RDWR, 0644)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		// The config doesn't exist! Write the default config.
-		NewConfigFile, err := os.OpenFile(ConfigPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		NewConfigFile, err := os.OpenFile(ConfigPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
 		if err != nil {
 			return fmt.Errorf("Could not create default config file '%s' %v\n", ConfigPath, err)
 		}
