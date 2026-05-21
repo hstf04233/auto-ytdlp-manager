@@ -3,8 +3,7 @@
 call build_debug.bat
 
 if %ERRORLEVEL% NEQ 0 (
-	pause
-	exit
+	rem Nothing...
+) else (
+	autoytdlpmanager-debug.exe
 )
-
-autoytdlpmanager-debug.exe
