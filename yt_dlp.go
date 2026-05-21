@@ -412,7 +412,10 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 		"-o", fmt.Sprintf("%s.%%(ext)s", FilenameWithoutExt),
 	}
 	FFmpegPath := Get_FFmpegPath(G_Config)
-	if filepath.Base(FFmpegPath) != FFmpegPath {
+	if filepath.IsAbs(FFmpegPath) {
+		// '--ffmpeg-location' doesn't handle system environment paths.
+		// Only add the ffmpeg location if it's absolute!
+		
 		Args = append(Args, "--ffmpeg-location", Get_FFmpegPath(G_Config))
 	}
 	if AChannel.QualitySelect > 0 {
