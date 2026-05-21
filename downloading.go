@@ -343,6 +343,8 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	}
 	DB_UpdateCommandTaskInfo(Task)
 	
+	CL_Logf(Task, "Found %d videos !\n", len(VideoList))
+	
 	// Add the videos to the queued list.
 	for i := len(VideoList)-1; i >= 0; i-- {
 		if Task.Status != TASK_STATUS_RUNNING { return }

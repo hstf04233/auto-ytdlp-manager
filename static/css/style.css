@@ -809,6 +809,7 @@ form hr {
   position: sticky;
   top: 0;
   height: fit-content;
+  min-width: 300px;
   min-height: 400px;
   max-height: calc(100vh - 240px);
 }

@@ -547,15 +547,28 @@ function renderUpdateChannel(ch) {
   if (!channelEl) return;
   
   nextCheckEl = channelEl.querySelector("#next-check");
+  channelCheckBtnEl = channelEl.querySelector("#channel-check-btn");
   if (nextCheckEl) {
     let checkTime = new Date(ch._nextCheckMsec);
     let now = new Date();
     let delta = checkTime-now;
     
+    let isEnabled = (ch.enabled && !programConfig.AllChannels_Disabled);
+    
+    if (delta <= 1 || !isEnabled) {
+      channelCheckBtnEl.disabled = true;
+    } else {
+      channelCheckBtnEl.disabled = false;
+    }
+    
     const disabledText = "DISABLED!"
     
-    if (ch.enabled && !programConfig.AllChannels_Disabled) {
-      nextCheckEl.textContent = "Will check in: " + intervalLabel(delta/1000);
+    if (isEnabled) {
+      if (delta > 0) {
+        nextCheckEl.textContent = "Will check in: " + intervalLabel(delta/1000);
+      } else {
+        nextCheckEl.textContent = "Checking channel now...";
+      }
     } else if (nextCheckEl.textContent !== disabledText) {
       nextCheckEl.textContent = disabledText;
     }
@@ -622,7 +635,7 @@ function renderChannels() {
             <input type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="toggleChannel('${ch.id}', this.checked)">
             <span class="toggle-slider"></span>
           </label>
-          <button class="btn btn-secondary btn-sm" onclick="runChannelCheck('${ch.id}')">Run Check now</button>
+          <button class="btn btn-secondary btn-sm" onclick="runChannelCheck('${ch.id}')" id="channel-check-btn">Check videos now</button>
           <button class="btn btn-secondary btn-sm" onclick="openEditChannelModal('${ch.id}')">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}', '${ch.name}')">Delete</button>
         </div>
