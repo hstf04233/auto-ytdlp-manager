@@ -1264,6 +1264,7 @@ function gotoTasksPageAndFilterVideo(videoId) {
   
   showPage("tasks");
   loadTasks();
+  renderTaskPagination();
 }
 function gotoTasksPageAndFilterChannel(channelId) {
   clearTaskFilters(true);
@@ -1273,6 +1274,7 @@ function gotoTasksPageAndFilterChannel(channelId) {
   
   showPage("tasks");
   loadTasks();
+  renderTaskPagination();
   
   const channel = allChannels.find(c => c.id === channelId);
   if (channel) {
