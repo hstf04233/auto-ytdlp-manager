@@ -114,7 +114,7 @@ func main() {
 	if Exit {
 		L_Printf("\nThe program will exit now due to unavailable dependencies...\n")
 		L_Printf("If you already have these dependencies, edit the paths in ./config.json to the correct location\n")
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 10)
 		return
 	}
 	
