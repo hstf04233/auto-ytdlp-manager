@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 )
 
 var (
@@ -14,6 +15,7 @@ var (
 )
 
 func L_Printf(format string, a ... any) {
+	TimeNow := time.Now().Local().Format("2006-01-02 15-04-05")
 	Msg := fmt.Sprintf(format, a ...)
 	
 	fmt.Print(Msg)
@@ -22,7 +24,8 @@ func L_Printf(format string, a ... any) {
 	}
 	go func() {
 		logSync.Lock()
-		logFile.Write([]byte(Msg))
+		MsgWithTime := fmt.Sprintf("[%s]: %s", TimeNow, Msg)
+		logFile.Write([]byte(MsgWithTime))
 		logSync.Unlock()
 	}()
 }
