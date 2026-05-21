@@ -1611,13 +1611,13 @@ async function init() {
     const channelsPage = document.getElementById('page-channels');
     if (channelsPage.classList.contains('active')) {
       softRenderChannels();
+      
+      if (!areChannelsLoading && (new Date()).getTime() > nextSoftChannelsLoad) {
+        nextSoftChannelsLoad = (new Date()).getTime() + 5000
+        loadChannels(true);
+      }
     }
-    
-    if (!areChannelsLoading && (new Date()).getTime() > nextSoftChannelsLoad) {
-      nextSoftChannelsLoad = (new Date()).getTime() + 5000
-      loadChannels(true);
-    }
-  }, 100);
+  }, 200);
   
   // Auto refresh videos every 10s
   setInterval(() => {
