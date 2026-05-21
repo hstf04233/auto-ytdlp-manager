@@ -915,6 +915,22 @@ async function loadVideos() {
   areVideosLoading = false;
 }
 
+function filterVideosTabByChannel(channelId) {
+  const videoChannelFilterEl = document.getElementById('videoChannelFilter');
+  
+  const optionExists = Array.from(videoChannelFilterEl.options).some(opt => opt.value === channelId);
+  
+  if (!optionExists) {
+    const newOption = new Option(channelId, channelId);
+    newOption.hidden = true;
+    videoChannelFilterEl.add(newOption);
+  }
+  
+  videoChannelFilterEl.value = channelId;
+  videoPage=0;
+  loadVideos();
+}
+
 function renderVideos() {
   const container = document.getElementById('videosList');
 
@@ -963,7 +979,7 @@ function renderVideos() {
             <span title="${escHtml(v.title)}">${escHtml(v.title)}</span>
             <a href="${escHtml(v.url)}" target="_blank">[VideoLink]</a>
           </h3>
-          <p title="Filter by this channel">From: <a href="#" onclick="event.preventDefault();document.getElementById('videoChannelFilter').value='${v.from_channel}';videoPage=0;loadVideos();">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
+          <p title="Filter by this channel">From: <a href="#" onclick="event.preventDefault();filterVideosTabByChannel('${v.from_channel}');">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
           <p>Released: ${formatDateAndTime(v.release_date)}</p>
           <p>${escHtml(v.availability)}</p>
           <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
@@ -1223,22 +1239,29 @@ function taskTypeBadge(type) {
 }
 
 function gotoTasksPageAndFilterVideo(videoId) {
-  clearTaskFilters(true)
+  clearTaskFilters(true);
   
-  taskPage = 0
+  taskPage = 0;
   document.getElementById('taskVideoFilter').value = videoId;
   
-  showPage("tasks")
+  showPage("tasks");
   loadTasks();
 }
 function gotoTasksPageAndFilterChannel(channelId) {
-  clearTaskFilters(true)
+  clearTaskFilters(true);
   
-  taskPage = 0
+  taskPage = 0;
   document.getElementById('taskChannelFilter').value = channelId;
   
-  showPage("tasks")
+  showPage("tasks");
   loadTasks();
+  
+  const channel = allChannels.find(c => c.id === channelId);
+  if (channel) {
+    if (channel.active_task) {
+      selectTask(channel.active_task);
+    }
+  }
 }
 
 function onTaskFilterChange() {
