@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
 const (
 	CONFIG_PATH = "config.json"
 	CONFIG_PATH_DEBUG = "config_DEBUG.json"
+	
+	YT_DLP_CONFIG_FILENAME = "ytdlp_config.txt"
 	
 	DEFAULT_SERVER_PORT = 8867
 	DEFAULT_SERVER_PORT_DEBUG = 6788
@@ -26,6 +29,10 @@ const (
 	
 	MAX_TASK_LOG_LIFETIME        = (60*60*24 * 30) // 1 Month
 	MAX_CHANNEL_LISTING_LIFETIME = (60*60*24)      // 1 Day
+)
+
+var (
+	GLOBAL_YT_DLP_CONFIG_PATH = ""
 )
 
 type ProgramConfig struct {
@@ -127,6 +134,28 @@ func SaveConfig(Config *ProgramConfig, File *os.File) error {
 func OpenConfig(ConfigPath string) error {
 	if APPLICATION_VERSION == "debug" {
 		G_Config.ServerPort = DEFAULT_SERVER_PORT_DEBUG
+	}
+	
+	YtDlpConfigPath := filepath.Join(CURRENT_WORKING_DIRECTORY, YT_DLP_CONFIG_FILENAME)
+	GLOBAL_YT_DLP_CONFIG_PATH = YtDlpConfigPath
+	
+	fmt.Printf("GLOBAL_YT_DLP_CONFIG_PATH: %s\n", GLOBAL_YT_DLP_CONFIG_PATH)
+	
+	YtDlpConfigFile, err := os.OpenFile(YtDlpConfigPath, os.O_RDWR, 0644)
+	if err != nil && errors.Is(err, os.ErrNotExist) {
+		YtDlpConfigFile, err = os.OpenFile(YtDlpConfigPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
+		if err == nil {
+			YtDlpConfigFile.Write([]byte(`# Add yt-dlp commands here!
+# See https://github.com/yt-dlp/yt-dlp#configuration on how to use yt-dlp configs.
+
+# Add cookies to yt-dlp with:
+#--cookies "path/to/cookies.txt"
+
+`))
+			defer YtDlpConfigFile.Close()
+		}
+	} else if err == nil {
+		defer YtDlpConfigFile.Close()
 	}
 	
 	ConfigFile, err := os.OpenFile(ConfigPath, os.O_RDWR, 0644)

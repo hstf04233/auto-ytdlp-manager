@@ -211,6 +211,7 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 	Args := []string{
 		VideoUrl,
 		"--ignore-config",
+		"--config-locations", GLOBAL_YT_DLP_CONFIG_PATH,
 		"--dump-json",
 		"--skip-download",
 		//"--restrict-filenames",
@@ -300,6 +301,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 	Args := []string{
 		ChannelUrl,
 		"--ignore-config",
+		"--config-locations", GLOBAL_YT_DLP_CONFIG_PATH,
 		"--flat-playlist",
 		"--dump-json",
 		"--skip-download",
@@ -407,6 +409,7 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	Args := []string{
 		Video.Url,
 		"--ignore-config",
+		"--config-locations", GLOBAL_YT_DLP_CONFIG_PATH,
 		"--embed-metadata",
 		"--external-downloader-args", "ffmpeg: -loglevel warning -stats",
 		"-o", fmt.Sprintf("%s.%%(ext)s", FilenameWithoutExt),
@@ -485,6 +488,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 	Args := []string{
 		"--ffmpeg-path", Get_FFmpegPath(G_Config),
 		"--ytdlp-path",  Get_YtDlpPath(G_Config),
+		"--ytdlp-opts", fmt.Sprintf("--config-locations \"%s\"", GLOBAL_YT_DLP_CONFIG_PATH),
 		"--no-wait",
 		"--add-metadata",
 		"--save-state",
