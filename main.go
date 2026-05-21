@@ -58,8 +58,10 @@ func StartServer(ServerPort int) {
 	Mux.HandleFunc("/video-file/", ServeVideoDownload)
 	
 	fmt.Printf("Starting server at http://localhost:%d\n", ServerPort)
+	fmt.Printf("!!! DO NOT HOST THIS PROGRAM TO THE INTERNET! THIS PROGRAM IS IN TESTING PHASE AND IS UNSAFE OUTSIDE OF THE LOCAL NETWORK...\n")
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", ServerPort), Mux); err != nil {
 		fmt.Printf("Cannot start server because: %v\n", err)
+		fmt.Printf("The server port might be currently occupied... Edit the server port in config.json if you need to change the server port!\n")
 		panic(err)
 	}
 }
@@ -101,7 +103,7 @@ func main() {
 	}
 	
 	if Exit {
-		fmt.Printf("The program will exit now due to unavailable programs... Read the readme.txt for more information.\n")
+		fmt.Printf("The program will exit now due to unavailable programs...\n")
 		time.Sleep(time.Second * 5)
 		return
 	}

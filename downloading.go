@@ -241,7 +241,6 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 	
 	err := RequestVideoInfo(AChannel, Video.Url, Video)
 	if err != nil {
-		fmt.Printf("Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		CL_Logf(Task, "Failed to grab video info for \"%s\"... Error: %v\n", Video.Title, err)
 		return false
