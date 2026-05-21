@@ -439,7 +439,7 @@ a:hover {
   border-radius: 12px;
   padding: 30px;
   width: 90%;
-  max-width: 650px;
+  max-width: 850px;
   max-height: 90vh;
   overflow-y: auto;
 }
@@ -487,6 +487,11 @@ form hr {
 .form-group a {
   color: var(--accent);
   text-decoration: none;
+}
+
+.form-group li {
+  white-space: break-spaces;
+  font-size: 0.85rem;
 }
 
 .form-row {

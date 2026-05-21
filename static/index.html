@@ -294,12 +294,25 @@
       <h2 id="channelModalTitle">Add Channel</h2>
       <form id="channelForm" onsubmit="saveChannel(event)" autocomplete="off">
         <input type="hidden" id="channelId">
-
+        
         <div class="form-group">
           <label for="channelName">Channel Name</label>
           <input type="text" id="channelName" placeholder="My Favorite Channel" maxlength="128" required>
         </div>
-
+        <hr>
+        
+        <div class="form-group">
+          <label>Make sure you have the correct url!</label>
+        </div>
+        <div class="form-group">
+          <ul>
+            <li><i>https://www.youtube.com/@ExampleChannel/videos</i> Will only download from the videos tab (This will not download shorts.)</li>
+            <li><i>https://www.youtube.com/@ExampleChannel/shorts</i> Will only download from the shorts tab (This will not download videos.)</li>
+            <li><i>https://www.youtube.com/@ExampleChannel/streams</i> Will only download live streams (Pair this with Type: 'Live Streams')</li>
+            <li><i>https://www.youtube.com/@ExampleChannel</i> Will download everything relating to the channel (videos, shorts, live streams, etc...)</li>
+          </ul>
+        </div>
+        
         <div class="form-group">
           <label for="channelUrl">Channel / Playlist URL</label>
           <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." maxlength="8192" required>
