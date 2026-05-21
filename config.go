@@ -37,6 +37,9 @@ type ProgramConfig struct {
 	YtDlp_Path     string
 	YtArchive_Path string
 	FFmpeg_Path    string
+	YtDlp_Path_Real     string `json:"-"`
+	YtArchive_Path_Real string `json:"-"`
+	FFmpeg_Path_Real    string `json:"-"`
 	
 	AllChannels_Disabled bool
 	
@@ -71,17 +74,17 @@ var G_Config = &ProgramConfig{
 func Get_YtDlpPath(Config *ProgramConfig) string {
 	Config.Mutex.RLock()
 	defer Config.Mutex.RUnlock()
-	return Config.YtDlp_Path
+	return Config.YtDlp_Path_Real
 }
 func Get_YtArchivePath(Config *ProgramConfig) string {
 	Config.Mutex.RLock()
 	defer Config.Mutex.RUnlock()
-	return Config.YtArchive_Path
+	return Config.YtArchive_Path_Real
 }
 func Get_FFmpegPath(Config *ProgramConfig) string {
 	Config.Mutex.RLock()
 	defer Config.Mutex.RUnlock()
-	return Config.FFmpeg_Path
+	return Config.FFmpeg_Path_Real
 }
 
 func UpdateConfig(Config *ProgramConfig) error {
@@ -92,6 +95,10 @@ func UpdateConfig(Config *ProgramConfig) error {
 	if err != nil {
 		return err
 	}
+	
+	Config.YtDlp_Path_Real     = FindCommand(Config.YtDlp_Path)
+	Config.YtArchive_Path_Real = FindCommand(Config.YtArchive_Path)
+	Config.FFmpeg_Path_Real    = FindCommand(Config.FFmpeg_Path)
 	
 	return nil
 }

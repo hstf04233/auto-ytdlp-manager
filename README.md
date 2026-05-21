@@ -1,6 +1,7 @@
 # auto-ytdlp-manager
 
 Very simple web ui program written in go that is a wrapper for yt-dlp and ytarchive!
+
 I really only built this for myself because I needed something that supports yt-dlp and ytarchive at the same time.
 
 **This is currently a windows only program!!**
@@ -16,7 +17,7 @@ A command prompt should open and tell you where the server is being hosted, by d
 config.json is created after you run autoytdlpmanager.exe the first time.
 Editing config.json while the program is running does not reload the config, please just edit the config in the web ui config tab or just restart the program for changes to apply.
 
-If the program closes after a few seconds, you might have missing dependencies...
+If the program closes after a few seconds (or it closes instantly) then you might have missing dependencies. Read log_current.log to confirm. 
 
 # Dependencies
 

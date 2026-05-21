@@ -223,7 +223,7 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 		Args = append(Args, "--live-from-start")
 	}
 	
-	Cmd := exec.Command(CMD_YT_DLP, Args...)
+	Cmd := exec.Command(Get_YtDlpPath(G_Config), Args...)
 	Cmd.Dir = DownloadDir
 	
 	stderr, err := Cmd.StderrPipe()
@@ -310,7 +310,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 		Args = append(Args, "--playlist-end", fmt.Sprintf("%d", PlaylistEnd))
 	}
 	
-	Cmd := exec.Command(CMD_YT_DLP, Args...)
+	Cmd := exec.Command(Get_YtDlpPath(G_Config), Args...)
 	if Task != nil {
 		CL_Logf(Task, fmt.Sprintf(">%s\n\n", GetRealArgs(Cmd.Args)))
 	}
@@ -416,7 +416,7 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
 	}
 	
-	Cmd := exec.Command(CMD_YT_DLP, Args...)
+	Cmd := exec.Command(Get_YtDlpPath(G_Config), Args...)
 	Cmd.Dir = DownloadDir
 	CL_RunDownloadTask(Cmd, Video, AChannel.Id)
 	
@@ -477,8 +477,8 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 	DB_UpdateVideoFilename(Video, Filename)
 	
 	Args := []string{
-		"--ffmpeg-path", CMD_FFMPEG,
-		"--ytdlp-path",  CMD_YT_DLP,
+		"--ffmpeg-path", Get_FFmpegPath(G_Config),
+		"--ytdlp-path",  Get_YtDlpPath(G_Config),
 		"--no-wait",
 		"--add-metadata",
 		"--save-state",
@@ -493,7 +493,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 	Args = append(Args, Video.Url, QualityString)
 	
 	Cmd := exec.Command(
-		CMD_YT_ARCHIVE,
+		Get_YtArchivePath(G_Config),
 		Args ...,
 	)
 	Cmd.Dir = DownloadDir

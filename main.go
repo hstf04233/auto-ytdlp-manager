@@ -17,11 +17,14 @@ var (
 	APPLICATION_VERSION = "release"
 	CURRENT_WORKING_DIRECTORY = ""
 )
+
+/*
 var (
 	CMD_YT_DLP = C_CMD_YT_DLP
 	CMD_YT_ARCHIVE = C_CMD_YT_ARCHIVE
 	CMD_FFMPEG = C_CMD_FFMPEG
 )
+*/
 
 func CommandExists(cmd string) bool {
 	_, err := exec.LookPath(cmd)
@@ -70,6 +73,7 @@ func StartServer(ServerPort int) {
 }
 
 func main() {
+	fmt.Printf("------- auto yt-dlp manager -------\n\n")
 	InitLogPrint()
 	
 	var err error
@@ -88,27 +92,28 @@ func main() {
 		panic(err)
 	}
 	
-	CMD_YT_DLP     = FindCommand(C_CMD_YT_DLP)
-	CMD_YT_ARCHIVE = FindCommand(C_CMD_YT_ARCHIVE)
-	CMD_FFMPEG     = FindCommand(C_CMD_FFMPEG)
+	G_Config.YtDlp_Path_Real     = FindCommand(G_Config.YtDlp_Path)
+	G_Config.YtArchive_Path_Real = FindCommand(G_Config.YtArchive_Path)
+	G_Config.FFmpeg_Path_Real    = FindCommand(G_Config.FFmpeg_Path)
 	
 	Exit := false
 	
-	if !CommandExists(CMD_YT_DLP) {
+	if !CommandExists(G_Config.YtDlp_Path_Real) {
 		Exit = true
-		L_Printf("You need '%s' to run this program! https://github.com/yt-dlp/yt-dlp \n", C_CMD_YT_DLP)
+		L_Printf("Could not find program '%s' Get the dependency here: https://github.com/yt-dlp/yt-dlp \n", G_Config.YtDlp_Path)
 	}
-	if !CommandExists(CMD_FFMPEG) {
+	if !CommandExists(G_Config.YtArchive_Path_Real) {
 		Exit = true
-		L_Printf("You need '%s' (and possibly 'ffprobe') to run this program! Get both from https://www.ffmpeg.org/ \n", C_CMD_FFMPEG)
+		L_Printf("Could not find program '%s' Get the dependency here: https://github.com/dreammu/ytarchive\n", G_Config.YtArchive_Path)
 	}
-	if !CommandExists(CMD_YT_ARCHIVE) {
+	if !CommandExists(G_Config.FFmpeg_Path_Real) {
 		Exit = true
-		L_Printf("You need '%s' to run this program! https://github.com/dreammu/ytarchive\n", C_CMD_YT_ARCHIVE)
+		L_Printf("Could not find program '%s' Get the dependency here: https://www.ffmpeg.org/ \n", G_Config.FFmpeg_Path)
 	}
 	
 	if Exit {
-		L_Printf("The program will exit now due to unavailable programs...\n")
+		L_Printf("\nThe program will exit now due to unavailable dependencies...\n")
+		L_Printf("If you already have these dependencies, edit the paths in ./config.json to the correct location\n")
 		time.Sleep(time.Second * 5)
 		return
 	}
