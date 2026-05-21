@@ -50,6 +50,9 @@ type ArchiveChannel struct {
 	
 	NextCheckMSEC            int64 `json:"_nextCheckMsec"`
 	NextFullChannelCheckMSEC int64 `json:"_nextFullChannelCheckMsec"`
+	
+	FORAPI_TasksCount   int `json:"tasks_count"`
+	FORAPI_ActiveTaskId string `json:"active_task"`
 }
 
 type WatchingBundle struct {

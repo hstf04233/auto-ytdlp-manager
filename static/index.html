@@ -287,8 +287,8 @@
   </div>
 
   <!-- ADD/EDIT CHANNEL MODAL -->
-  <div class="modal-overlay" id="channelModal" onclick="if(event.target===this)closeChannelModal()">
-    <div class="modal">
+  <div class="modal-overlay" id="channelModal">
+    <div class="modal" onclick="event.stopPropagation();">
       <h2 id="channelModalTitle">Add Channel</h2>
       <form id="channelForm" onsubmit="saveChannel(event)" autocomplete="off">
         <input type="hidden" id="channelId">
@@ -367,7 +367,7 @@
   </div>
 
   <!-- VIDEO DETAILS MODAL -->
-  <div class="modal-overlay" id="videoDetailsModal" onclick="if(event.target===this)closeVideoDetailsModal()">
+  <div class="modal-overlay" id="videoDetailsModal">
     <div class="modal modal-video-details">
       <div class="modal-header">
         <h2>Video Details</h2>

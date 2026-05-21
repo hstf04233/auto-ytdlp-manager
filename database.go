@@ -618,7 +618,7 @@ type ListCommandTasksQuery struct {
 
 func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery, Statement *string, Args *[]interface{}) {
 	WhereAdded := false
-	if Query.Status == -2 && Query.Type == -1 && Query.FromVideoId == "" {
+	if Query.Status == -2 && Query.Type == -1 && Query.FromVideoId == "" && Query.FromChannelId == "" {
 		if !WhereAdded {
 			WhereAdded = true
 			*Statement += " WHERE "

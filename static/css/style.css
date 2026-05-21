@@ -25,6 +25,11 @@ body {
   min-height: 100vh;
 }
 
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
 /* Sidebar */
 .sidebar {
   width: var(--sidebar-width);

@@ -560,6 +560,19 @@ function renderUpdateChannel(ch) {
       nextCheckEl.textContent = disabledText;
     }
   }
+  
+  channelTaskBtnEl = channelEl.querySelector("#channel-task-btn");
+  
+  if (channelTaskBtnEl) {
+    let tasksButtonText = `View Tasks[${ch.tasks_count}]`;
+    if (ch.active_task) {
+      tasksButtonText = `View Active Task + [${ch.tasks_count}]`;
+    }
+    
+    if (channelTaskBtnEl.textContent != tasksButtonText) {
+      channelTaskBtnEl.textContent = tasksButtonText;
+    }
+  }
 }
 
 function softRenderChannels() {
@@ -600,6 +613,7 @@ function renderChannels() {
             <span>Quality: ${qualityLabel(ch.quality_select)}</span>
             <span id="next-check">Check: ${intervalLabel(ch.check_interval)}</span>
           </div>
+          <p><a id="channel-task-btn" href="#" onclick="event.preventDefault();gotoTasksPageAndFilterChannel('${ch.id}');">...</a></p>
         </div>
         <div class="video-actions">
           <label class="toggle">
@@ -1217,6 +1231,15 @@ function gotoTasksPageAndFilterVideo(videoId) {
   showPage("tasks")
   loadTasks();
 }
+function gotoTasksPageAndFilterChannel(channelId) {
+  clearTaskFilters(true)
+  
+  taskPage = 0
+  document.getElementById('taskChannelFilter').value = channelId;
+  
+  showPage("tasks")
+  loadTasks();
+}
 
 function onTaskFilterChange() {
   taskPage = 0;
@@ -1492,6 +1515,28 @@ function escHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+function setupModalClickExit(modalId, callback) {
+  let backdropMouseDown = false;
+  const overlay = document.getElementById(modalId)
+  if (!overlay) {
+    console.log("Could not fine modal overlay '" + modalId + "'")
+    return
+  }
+  overlay.addEventListener('mousedown', (event) => {
+    backdropMouseDown = event.target === overlay;
+  });
+  
+  overlay.addEventListener('click', (event) => {
+    if (backdropMouseDown && event.target === overlay) {
+      callback();
+    }
+  
+    backdropMouseDown = false;
+  });
+}
+setupModalClickExit("channelModal", closeChannelModal)
+setupModalClickExit("videoDetailsModal", closeVideoDetailsModal)
 
 window.addEventListener('popstate', function (e) {
   const tab = window.location.pathname.replace(/^\//, '') || '';

@@ -218,6 +218,24 @@ func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("{\"Success\":true}"))
 }
 
+func API_SpiceUpChannelInfo(w http.ResponseWriter, r *http.Request, AChannel *ArchiveChannel) {
+	TasksList, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
+		FromChannelId: AChannel.Id,
+		Status: -1,
+		Type: -1,
+		OrderDirection: 1,
+	})
+	if err == nil && TasksList != nil {
+		AChannel.FORAPI_TasksCount = len(TasksList)
+		for _, Task := range(TasksList) {
+			if Task.Status == TASK_STATUS_RUNNING {
+				AChannel.FORAPI_ActiveTaskId = Task.Id
+				break
+			}
+		}
+	}
+}
+
 func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if strings.HasPrefix(r.URL.Path, "channels/") && RequestId != "" {
@@ -233,24 +251,35 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		
+		SendChannel := &ArchiveChannel{}
+		*SendChannel = *AChannel
+		
+		API_SpiceUpChannelInfo(w, r, SendChannel)
+		
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(AChannel)
+		json.NewEncoder(w).Encode(SendChannel)
 		return
 	}
 	
 	WatchedDownloading.ChannelsLock.RLock()
 	
-	Channels := WatchedDownloading.Channels
-	if len(Channels) <= 0 {
-		// This fixes an issue where an empty list might be null instead of {}
-		Channels = []*ArchiveChannel{}
-	}
+	SendChannels := []*ArchiveChannel{}
 	
-	defer WatchedDownloading.ChannelsLock.RUnlock()
+	Channels := WatchedDownloading.Channels
+	for _, AChannel := range(Channels) {
+		NewChannel := &ArchiveChannel{}
+		*NewChannel = *AChannel
+		
+		API_SpiceUpChannelInfo(w, r, NewChannel)
+		
+		SendChannels = append(SendChannels, NewChannel)
+	}
+	WatchedDownloading.ChannelsLock.RUnlock()
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"count": len(WatchedDownloading.Channels),
-		"channels": Channels,
+		"count": len(SendChannels),
+		"channels": SendChannels,
 	})
 }
 
@@ -285,10 +314,7 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 		Status: -1,
 		Type: -1,
 	})
-	if err != nil {
-		return
-	}
-	if TasksList != nil {
+	if err == nil && TasksList != nil {
 		Video.TasksCount = len(TasksList)
 		for _, Task := range(TasksList) {
 			if Task.Status == TASK_STATUS_RUNNING {
