@@ -51,6 +51,8 @@ type ArchiveChannel struct {
 	NextCheckMSEC            int64 `json:"_nextCheckMsec"`
 	NextFullChannelCheckMSEC int64 `json:"_nextFullChannelCheckMsec"`
 	
+	PlaylistEnd int `json:"playlist_end"`
+	
 	FORAPI_TasksCount   int `json:"tasks_count"`
 	FORAPI_ActiveTaskId string `json:"active_task"`
 }
@@ -342,7 +344,11 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 	Url := AChannel.Url
 	ChannelId := AChannel.Id
 	
-	PlaylistEnd := 20
+	PlaylistEnd := AChannel.PlaylistEnd
+	if PlaylistEnd <= -1 {
+		// Can check all videos!
+		PlaylistEnd = 50
+	}
 	if CheckSettings.CheckAllVideos {
 		PlaylistEnd = -1
 		L_Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
@@ -500,7 +506,10 @@ func CheckChannels(WD *WatchingBundle) {
 		
 		CheckAll := false
 		
-		if AChannel.FullCheckInterval > 0 && TimeNow > AChannel.NextFullChannelCheckMSEC {
+		if AChannel.PlaylistEnd <= -1 && TimeNow > AChannel.NextFullChannelCheckMSEC {
+			if AChannel.FullCheckInterval <= 0 {
+				AChannel.FullCheckInterval = 86400
+			}
 			AChannel.NextFullChannelCheckMSEC = TimeNow + (AChannel.FullCheckInterval * 1000)
 			CheckAll = true
 		}

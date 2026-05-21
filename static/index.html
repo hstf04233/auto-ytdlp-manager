@@ -297,7 +297,7 @@
         
         <div class="form-group">
           <label for="channelName">Channel Name</label>
-          <input type="text" id="channelName" placeholder="My Favorite Channel" maxlength="128" required>
+          <input type="text" id="channelName" placeholder="Example - videos" maxlength="128" required>
         </div>
         <hr>
         
@@ -345,7 +345,7 @@
         </div>
 
         <div class="form-group">
-          <label for="channelDownloadDir">Download Directory</label>
+          <label for="channelDownloadDir">Download Directory (Optional)</label>
           <input type="text" id="channelDownloadDir" placeholder="./downloads" maxlength="1024">
         </div>
         
@@ -354,7 +354,7 @@
           <label>yt-dlp output format. See more at: <a href="https://github.com/yt-dlp/yt-dlp#output-template" target="_blank">yt-dlp#output-template</a></label>
         </div>
         <div class="form-group">
-          <label for="channelOutputTemplate">Output Template</label>
+          <label for="channelOutputTemplate">Output Template (Optional)</label>
           <input type="text" id="channelOutputTemplate" placeholder="%(title)s %(id)s.%(ext)s" maxlength="1024">
         </div>
         
@@ -365,9 +365,19 @@
             <label for="channelCheckInterval">Check Interval<br> 0 = never.</label>
             <input type="number" id="channelCheckInterval" placeholder="1800" min="0">
           </div>
-          <div class="form-group" title="Interval in seconds">
-            <label for="channelFullCheckInterval">Full Check Interval<br>0 = never.</label>
-            <input type="number" id="channelFullCheckInterval" placeholder="172800" min="0">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="channelPlaylistEnd">Max videos to check/download</label>
+            <select id="channelPlaylistEnd">
+              <option value="1">1 Video</option>
+              <option value="5">5 Videos</option>
+              <option value="10">10 Videos</option>
+              <option value="20" selected>20 Videos</option>
+              <option value="50">50 Videos</option>
+              <option value="100">100 Videos</option>
+              <option value="-1">All Videos</option>
+            </select>
           </div>
         </div>
         
@@ -389,11 +399,11 @@
       </div>
       
       <div class="modal-actions-list" id="channelStartActions">
-        <button type="button" class="btn btn-secondary" title="This will download the first ~20 videos from the channel" onclick="checkCurrentChannel(-2, false)">Download videos first</button>
+        <button type="button" class="btn btn-secondary" title="This will download videos from the channel" onclick="checkCurrentChannel(-2, false)">Download videos first</button>
         <button type="button" class="btn btn-secondary" title="This will download the all videos from the channel" onclick="checkCurrentChannel(-2, true)">Download all videos first</button>
         <hr>
-        <button type="button" class="btn btn-secondary" title="This will only scrape the first ~20 videos from the channel and will not download anything." onclick="checkCurrentChannel(3, false)">Don't download, just grab videos and their metadata</button>
-        <button type="button" class="btn btn-secondary" title="This will scrape all the videos from the channel and will not download anything." onclick="checkCurrentChannel(3, true)">Don't download, just grab all videos and their metadata</button>
+        <button type="button" class="btn btn-secondary" title="This will only scrape videos from the channel and will not download anything." onclick="checkCurrentChannel(3, false)">Don't download anything, just grab videos and their metadata</button>
+        <button type="button" class="btn btn-secondary" title="This will scrape all the videos from the channel and will not download anything." onclick="checkCurrentChannel(3, true)">Don't download anything, just grab all videos and their metadata</button>
         <hr>
         
         <button type="button" class="btn btn-secondary" onclick="closeChannelStartModal()">Do nothing.</button>

@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 	QualitySelect     INTEGER NOT NULL,
 	CheckInterval     INTEGER NOT NULL,
 	FullCheckInterval INTEGER NOT NULL default 172800,
+	PlaylistEnd       INTEGER NOT NULL default 20,
 	
 	Type    INTEGER NOT NULL,
 	Enabled BOOLEAN,
@@ -104,8 +105,8 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	defer AChannel.Lock.RUnlock()
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval, Type, Enabled, UpdatedAt, CreatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
 	Url=excluded.Url,
@@ -115,9 +116,10 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	CheckInterval=excluded.CheckInterval,
 	FullCheckInterval=excluded.FullCheckInterval,
 	Type=excluded.Type,
+	PlaylistEnd=excluded.PlaylistEnd,
 	Enabled=excluded.Enabled,
 	UpdatedAt=excluded.UpdatedAt
-	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.Enabled, TimeNow, TimeNow)
+	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.PlaylistEnd, AChannel.Type, AChannel.Enabled, TimeNow, TimeNow)
 	
 	if err != nil {
 		L_Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
@@ -148,7 +150,7 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 	Name,
 	Url,
 	DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval,
-	Type,
+	Type, PlaylistEnd,
 	Enabled FROM ArchiveChannels %s`, Condition))
 	if err != nil {
 		return nil, err
@@ -162,6 +164,7 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 			&Channel.Url,
 			&Channel.DownloadDir, &Channel.OutputTemplate, &Channel.QualitySelect, &Channel.CheckInterval, &Channel.FullCheckInterval,
 			&Channel.Type,
+			&Channel.PlaylistEnd,
 			&Channel.Enabled)
 		if err != nil {
 			return nil, err
@@ -838,6 +841,7 @@ func OpenDB() error {
 		"ALTER TABLE Videos ADD COLUMN Description TEXT DEFAULT ''",
 		
 		"ALTER TABLE Videos ADD COLUMN QueuedAction INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE ArchiveChannels ADD COLUMN PlaylistEnd  INTEGER NOT NULL default 20",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

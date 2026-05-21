@@ -306,11 +306,11 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
   dropdown.style.left = rect.left + 'px';
   
   const statuses = [
-    [0, 'Queued'],
-    [1, 'Downloading'],
-    [2, 'Downloaded'],
-    [3, 'Failed'],
-    [4, 'Ignored'],
+    [0, "Set to 'Queued' (Download if channel allows for downloads.)"],
+    //[1, 'Downloading'],
+    //[2, 'Downloaded'],
+    //[3, 'Failed'],
+    [4, "Set to 'Ignored' (Don't download)"],
   ];
   dropdown.innerHTML = statuses.map(([val, label]) =>
     `<div class="status-option ${val === currentStatus ? 'active' : ''}" data-video-id="${videoId}" data-new-status="${val}">${label}${val === currentStatus ? ' ✓' : ''}</div>`
@@ -818,7 +818,7 @@ function openAddChannelModal() {
   document.getElementById('channelDownloadDir').value = '';
   document.getElementById('channelOutputTemplate').value = '';
   document.getElementById('channelCheckInterval').value = '';
-  document.getElementById('channelFullCheckInterval').value = '';
+  document.getElementById('channelPlaylistEnd').value = '20';
   document.getElementById('channelSubmitBtn').textContent = 'Add Channel';
   document.getElementById('channelModal').classList.add('active');
   
@@ -838,7 +838,7 @@ function openEditChannelModal(id) {
   document.getElementById('channelDownloadDir').value = ch.download_dir || '';
   document.getElementById('channelOutputTemplate').value = ch.output_template || '';
   document.getElementById('channelCheckInterval').value = ch.check_interval || '';
-  document.getElementById('channelFullCheckInterval').value = ch.full_check_interval !== -1 ? ch.full_check_interval : '';
+  document.getElementById('channelPlaylistEnd').value = ch.playlist_end;
   document.getElementById('channelSubmitBtn').textContent = 'Save Changes';
   document.getElementById('channelModal').classList.add('active');
   
@@ -893,7 +893,7 @@ async function saveChannel(e) {
   const downloadDir = document.getElementById('channelDownloadDir').value.trim();
   const outputTemplate = document.getElementById('channelOutputTemplate').value.trim();
   const checkInterval  = document.getElementById('channelCheckInterval').value ? parseInt(document.getElementById('channelCheckInterval').value) : 1800;
-  const fullCheckInterval = document.getElementById('channelFullCheckInterval').value ? parseInt(document.getElementById('channelFullCheckInterval').value) : 172800;
+  const playlistEnd = parseInt(document.getElementById('channelPlaylistEnd').value);
 
   const body = {
     name,
@@ -903,7 +903,7 @@ async function saveChannel(e) {
     download_dir: downloadDir,
     output_template: outputTemplate,
     check_interval: checkInterval,
-    full_check_interval: fullCheckInterval,
+    plalist_end: playlistEnd,
   };
 
   try {
@@ -918,7 +918,7 @@ async function saveChannel(e) {
       patch.quality_select = quality;
       patch.type = type;
       patch.check_interval = checkInterval;
-      patch.full_check_interval = fullCheckInterval;
+      patch.playlist_end = playlistEnd;
       newChannelData = await API.patch(`/api/channels/${id}`, patch);
       showToast('Channel updated!', 'success');
     } else {

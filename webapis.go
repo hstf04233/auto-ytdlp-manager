@@ -24,6 +24,7 @@ type API_RequestChannelBody struct{
 	Type           int32  `json:"type"`
 	CheckInterval  int64  `json:"check_interval"`
 	FullCheckInterval int64 `json:"full_check_interval"`
+	PlaylistEnd       int   `json:"playlist_end"`
 	
 	Enabled *bool `json:"enabled"`
 }
@@ -47,6 +48,7 @@ func Verify_API_RequestChannelBody(body API_RequestChannelBody) (bool, string) {
 
 func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 	var Body API_RequestChannelBody
+	Body.FullCheckInterval = -1
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -63,6 +65,9 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 	if Body.QualitySelect < 0 {
 		Body.QualitySelect = 0
 	}
+	if Body.FullCheckInterval == -1 {
+		Body.FullCheckInterval = 86400
+	}
 	
 	NewChannel := &ArchiveChannel{
 		Name: Body.Name,
@@ -75,6 +80,7 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 		
 		CheckInterval: Body.CheckInterval,
 		FullCheckInterval: Body.FullCheckInterval,
+		PlaylistEnd: Body.PlaylistEnd,
 	}
 	if NewChannel.CheckInterval < 0 {
 		NewChannel.CheckInterval = 0
@@ -97,6 +103,7 @@ func Set_API_RequestChannelBodyDefaults(Body *API_RequestChannelBody) {
 	Body.Type = -1
 	Body.CheckInterval = -1
 	Body.FullCheckInterval = -1
+	Body.PlaylistEnd = -2
 	Body.Enabled = nil
 }
 func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
@@ -165,6 +172,9 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 			AChannel.NextFullChannelCheckMSEC = CheckTime
 		}
 	}
+	if Body.PlaylistEnd != -2 {		// -1 is reserved for all videos.
+		AChannel.PlaylistEnd = Body.PlaylistEnd
+	}
 	if Body.Enabled != nil {
 		LastEnabled := AChannel.Enabled
 		AChannel.Enabled = *Body.Enabled
@@ -228,6 +238,7 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	AChannel.NextCheckMSEC = time.Now().UTC().UnixMilli()-1
+	AChannel.NextFullChannelCheckMSEC = time.Now().UTC().UnixMilli()-1
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("{\"Success\":true}"))
 }
