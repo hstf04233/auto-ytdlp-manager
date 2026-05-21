@@ -583,17 +583,19 @@ function softRenderChannels() {
 
 function renderChannels() {
   const container = document.getElementById('channelsList');
-  const statsContainer = document.getElementById('channelStats');
-
+  
   const total = allChannels.length;
   const enabled = allChannels.filter(c => c.enabled).length;
   const disabled = total - enabled;
-
+  
+  /*
+  const statsContainer = document.getElementById('channelStats');
   statsContainer.innerHTML = `
     <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--success)">${enabled}</div><div class="stat-label">Enabled</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--text-secondary)">${disabled}</div><div class="stat-label">Disabled</div></div>
   `;
+  */
 
   if (allChannels.length === 0) {
     container.innerHTML = '<div class="loading">No channels yet. Add one to get started!</div>';
