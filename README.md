@@ -4,6 +4,8 @@ Very simple web ui program written in go that is a wrapper for yt-dlp and ytarch
 
 I really only built this for myself because I needed something that supports yt-dlp and ytarchive at the same time.
 
+Even though this is a web ui, you shouldn't host this program outside of your local network. I plan on adding a simple password authentication system to remove this problem.
+
 **This is currently a windows only program!!**
 _(You might be able to build from source on other platforms, although I haven't tested if this program works on platforms other than windows. (swoon))_
 
