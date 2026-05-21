@@ -29,6 +29,9 @@ a {
   color: var(--accent);
   text-decoration: none;
 }
+a:hover {
+  color: var(--accent-hover);
+}
 
 /* Sidebar */
 .sidebar {

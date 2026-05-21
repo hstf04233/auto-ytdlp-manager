@@ -343,7 +343,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	}
 	DB_UpdateCommandTaskInfo(Task)
 	
-	CL_Logf(Task, "Found %d videos !\n", len(VideoList))
+	CL_Logf(Task, "Found %d videos\n", len(VideoList))
 	
 	// Add the videos to the queued list.
 	for i := len(VideoList)-1; i >= 0; i-- {
