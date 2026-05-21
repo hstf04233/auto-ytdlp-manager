@@ -406,11 +406,14 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	
 	Args := []string{
 		Video.Url,
-		//"--ffmpeg-location", CMD_FFMPEG,
 		"--ignore-config",
 		"--embed-metadata",
 		"--external-downloader-args", "ffmpeg: -loglevel warning -stats",
 		"-o", fmt.Sprintf("%s.%%(ext)s", FilenameWithoutExt),
+	}
+	FFmpegPath := Get_FFmpegPath(G_Config)
+	if filepath.Base(FFmpegPath) != FFmpegPath {
+		Args = append(Args, "--ffmpeg-location", Get_FFmpegPath(G_Config))
 	}
 	if AChannel.QualitySelect > 0 {
 		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
