@@ -113,7 +113,7 @@ func main() {
 	
 	//CleanUpTasksInDatabase()
 	
-	go StartDownloading()
+	go InitDownloading()
 	
 	fmt.Printf("APPLICATION_VERSION: %s\n", APPLICATION_VERSION)
 	

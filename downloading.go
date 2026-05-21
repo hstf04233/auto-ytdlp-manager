@@ -89,12 +89,12 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
 	NewChannels := make([]*ArchiveChannel, 0, len(WD.Channels))
 	
 	for _, AChannel := range(WD.Channels) {
-		if AChannel.Id == Id { continue }
-		
-		AChannel.Enabled = false
+		if AChannel.Id == Id {
+			AChannel.Enabled = false
+			continue
+		}
 		
 		NewChannels = append(NewChannels, AChannel)
-		DB_RemoveChannel(Id)
 	}
 	
 	WD.Channels = NewChannels
@@ -481,7 +481,7 @@ func CheckChannels(WD *WatchingBundle) {
 	WD.ChannelsLock.RUnlock()
 }
 
-func StartDownloading() {
+func InitDownloading() {
 	err := DB_LoadChannels(&WatchedDownloading)
 	if err != nil {
 		panic(err)
