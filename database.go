@@ -501,6 +501,52 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	return VideosList, nil
 }
 
+type DB_VideoListStats struct{
+	Total int `json:"total"`
+	
+	TotalQueued      int `json:"total_queued"`
+	TotalDownloading int `json:"total_downloading"`
+	TotalDownloaded  int `json:"total_downloaded"`
+	TotalFailed      int `json:"total_failed"`
+	TotalIgnored     int `json:"total_ignored"`
+}
+
+var DB_VideoStatsCache = NewCache(time.Second * 4)
+
+
+func DB_GetVideoStatsFromQuery(Query ListVideosQuery) (*DB_VideoListStats, error) {
+	CacheKey := fmt.Sprintf("%s %s %d", Query.FromChannelId, Query.SearchQuery, Query.Status)
+	
+	DB_VideoStatsCache.CleanUp()
+	Stats := &DB_VideoListStats{}
+	StatsC, CacheExists := DB_VideoStatsCache.Get(CacheKey)
+	if CacheExists {
+		Stats = StatsC.(*DB_VideoListStats)
+	} else {
+		VideosListStats, err := DB_ListVideos(-1, 0, Query)
+		if err != nil {
+			L_Printf("Failed to get videos list for stats... Err: %v\n", err)
+		}
+		
+		Stats = &DB_VideoListStats{
+			Total: len(VideosListStats),
+		}
+		for _, Video := range(VideosListStats) {
+			switch Video.Status {
+				case VIDEO_STATUS_QUEUED:      Stats.TotalQueued++
+				case VIDEO_STATUS_DOWNLOADING: Stats.TotalDownloading++
+				case VIDEO_STATUS_DOWNLOADED:  Stats.TotalDownloaded++
+				case VIDEO_STATUS_FAILED:      Stats.TotalFailed++
+				case VIDEO_STATUS_IGNORED:     Stats.TotalIgnored++
+			}
+		}
+		
+		DB_VideoStatsCache.Set(CacheKey, Stats)
+	}
+	
+	return Stats, nil
+}
+
 func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	Task.Lock.Lock()
 	defer Task.Lock.Unlock()

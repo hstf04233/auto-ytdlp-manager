@@ -635,7 +635,7 @@ function renderChannels() {
         </div>
         <div class="video-actions">
           <label class="toggle">
-            <input type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="toggleChannel('${ch.id}', this.checked)">
+            <input type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="enableChannel('${ch.id}', this.checked)">
             <span class="toggle-slider"></span>
           </label>
           <button class="btn btn-secondary btn-sm" onclick="runChannelCheck('${ch.id}')" id="channel-check-btn">Check videos now</button>
@@ -650,9 +650,11 @@ function renderChannels() {
   }
 }
 
-async function toggleChannel(id, enabled) {
+async function enableChannel(id, enabled) {
   try {
-    await API.patch(`/api/channels/${id}`, { enabled });
+    await API.patch(`/api/channels/${id}`, {
+      enabled: enabled
+    });
     //showToast(`Channel ${enabled ? 'enabled' : 'disabled'}`, 'success');
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
@@ -847,6 +849,40 @@ function closeChannelModal() {
   document.getElementById('channelModal').classList.remove('active');
 }
 
+let currentChannel;
+
+function openChannelStartModal() {
+  document.getElementById('channelStartModal').classList.add('active');
+}
+function closeChannelStartModal() {
+  document.getElementById('channelStartModal').classList.remove('active');
+  
+  if (currentChannel) {
+    enableChannel(currentChannel.id, true);
+  }
+}
+
+async function checkCurrentChannel(overrideType, allVideos) {
+  if (!currentChannel) {
+    console.log("checkCurrentChannel called without a currentChannel ?")
+    return
+  }
+  
+  try {
+    await API.post(`/api/check-channel-now/${currentChannel.id}`, {
+      instant_check: true,
+      
+      check_all_videos: allVideos,
+      override_channel_type: overrideType,
+    });
+    loadChannels();
+  } catch (err) {
+    showToast(`Failed to check channel: ${err.message}`, 'error');
+  }
+  
+  closeChannelStartModal();
+}
+
 async function saveChannel(e) {
   e.preventDefault();
   const id   = document.getElementById('channelId').value;
@@ -871,6 +907,7 @@ async function saveChannel(e) {
   };
 
   try {
+    let newChannelData = null;
     if (id) {
       // Edit
       const patch = {};
@@ -882,11 +919,14 @@ async function saveChannel(e) {
       patch.type = type;
       patch.check_interval = checkInterval;
       patch.full_check_interval = fullCheckInterval;
-      await API.patch(`/api/channels/${id}`, patch);
+      newChannelData = await API.patch(`/api/channels/${id}`, patch);
       showToast('Channel updated!', 'success');
     } else {
-      await API.post('/api/channels', body);
+      newChannelData = await API.post('/api/channels', body);
       showToast('Channel added!', 'success');
+      
+      currentChannel = newChannelData;
+      openChannelStartModal();
     }
     closeChannelModal();
     loadChannels();

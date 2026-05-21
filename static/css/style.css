@@ -505,6 +505,15 @@ form hr {
   margin-bottom: 15px;
 }
 
+.modal-actions-list {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 15px;
+  margin-bottom: 15px;
+}
+
 .modal-actions {
   display: flex;
   justify-content: center;

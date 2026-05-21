@@ -125,6 +125,8 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	AChannel.Lock.Lock()
+	
 	if Body.Name != "" {
 		AChannel.Name = Body.Name
 	}
@@ -170,6 +172,8 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 			AChannel.NextCheckMSEC = time.Now().UTC().UnixMilli() + (1000 * 4)
 		}
 	}
+	AChannel.Lock.Unlock()
+	
 	err := DB_UpdateArchiveChannel(AChannel)
 	if err != nil {
 		// Just log this error and move on...
@@ -191,8 +195,39 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	AChannel.NextCheckMSEC = time.Now().UTC().UnixMilli()-1
+	var Body struct {
+		InstantCheck bool `json:"instant_check"`
+		
+		CheckAll    bool `json:"check_all_videos"`
+		ChannelType int `json:"override_channel_type"`
+	}
+	Body.ChannelType = -1
 	
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&Body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	if Body.ChannelType == -2 {
+		// Download
+		if AChannel.Type == ACHANNEL_TYPE_LIVE {
+			Body.ChannelType = ACHANNEL_TYPE_LIVE
+		} else {
+			Body.ChannelType = ACHANNEL_TYPE_VIDEOS
+		}
+	}
+	
+	if Body.InstantCheck {
+		go CheckChannel(AChannel, ChannelCheckSettings{
+			ForceEnable: true,
+			
+			CheckAllVideos: Body.CheckAll,
+			OverrideChannelType: Body.ChannelType,
+		})
+	}
+	
+	AChannel.NextCheckMSEC = time.Now().UTC().UnixMilli()-1
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("{\"Success\":true}"))
 }
@@ -282,19 +317,6 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 		"channels": SendChannels,
 	})
 }
-
-type TAPI_VideoListStats struct{
-	Total int `json:"total"`
-	
-	TotalQueued      int `json:"total_queued"`
-	TotalDownloading int `json:"total_downloading"`
-	TotalDownloaded  int `json:"total_downloaded"`
-	TotalFailed      int `json:"total_failed"`
-	TotalIgnored     int `json:"total_ignored"`
-}
-
-var VideosListCache = NewCache(time.Second * 4)
-
 func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoInfo) {
 	if Video.DownloadedFilename != "" {
 		Filepath, err := GetDownloadedVideoFilePath(Video, nil)
@@ -418,42 +440,7 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	CacheKey := fmt.Sprintf("%s %s %d", FromChannelId, SearchQuery, Status)
-	
-	VideosListCache.CleanUp()
-	
-	Stats := &TAPI_VideoListStats{}
-	StatsC, CacheExists := VideosListCache.Get(CacheKey)
-	if CacheExists {
-		Stats = StatsC.(*TAPI_VideoListStats)
-	} else {
-		VideosListStats := VideosList
-		if (len(VideosList) >= Limit || Offset > 0) {
-			// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every video...
-			// (Or maybe cache the results aswell...)
-			VideosListAll, err := DB_ListVideos(-1, 0, Query)
-			if err == nil {
-				VideosListStats = VideosListAll
-			} else if err != nil {
-				L_Printf("Failed to get videos list for stats... Err: %v\n", VideosListAll)
-			}
-		}
-		
-		Stats = &TAPI_VideoListStats{
-			Total: len(VideosListStats),
-		}
-		for _, Video := range(VideosListStats) {
-			switch Video.Status {
-				case VIDEO_STATUS_QUEUED:      Stats.TotalQueued++
-				case VIDEO_STATUS_DOWNLOADING: Stats.TotalDownloading++
-				case VIDEO_STATUS_DOWNLOADED:  Stats.TotalDownloaded++
-				case VIDEO_STATUS_FAILED:      Stats.TotalFailed++
-				case VIDEO_STATUS_IGNORED:     Stats.TotalIgnored++
-			}
-		}
-		
-		VideosListCache.Set(CacheKey, Stats)
-	}
+	Stats, err := DB_GetVideoStatsFromQuery(Query)
 	
 	for _, Video := range(VideosList) {
 		API_SpiceUpVideoInfo(w, r, Video)

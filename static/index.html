@@ -248,7 +248,7 @@
           </label>
         </div>
         
-        <div class="form-group" title="Interval in seconds, 0 = never.">
+        <div class="form-group">
           <label for="config-TaskLogAutoDeleteSeconds">Auto delete task logs after:</label>
           <!-- <input type="number" id="config-TaskLogAutoDeleteSeconds" min="0"> -->
           <select id="config-TaskLogAutoDeleteSeconds">
@@ -262,7 +262,7 @@
             <option value="0">Never delete</option>
           </select>
         </div>
-        <div class="form-group" title="Interval in seconds, 0 = never.">
+        <div class="form-group">
           <label for="config-TaskLogListAutoDeleteSeconds">Auto delete channel task logs after:</label>
           <!-- <input type="number" id="config-TaskLogListAutoDeleteSeconds" min="0"> -->
           <select id="config-TaskLogListAutoDeleteSeconds">
@@ -309,7 +309,7 @@
           <div class="form-group">
             <label for="channelType">Type</label>
             <select id="channelType" onchange="updateChannelModalPlaceholders()">
-              <option value="0">Videos Only</option>
+              <option value="0">Videos</option>
               <option value="1">Live Streams</option>
               <!-- <option value="2">List only. Don't download</option> -->
               <option value="3">No Download</option>
@@ -367,6 +367,26 @@
       </form>
     </div>
   </div>
+  
+  <div class="modal-overlay" id="channelStartModal">
+    <div class="modal" onclick="event.stopPropagation();">
+      <div class="modal-header">
+        <h2>What should this channel do first?</h2>
+        <button class="modal-close" onclick="closeChannelStartModal()">&times;</button>
+      </div>
+      
+      <div class="modal-actions-list" id="channelStartActions">
+        <button type="button" class="btn btn-secondary" title="This will download the first ~20 videos from the channel" onclick="checkCurrentChannel(-2, false)">Download videos first</button>
+        <button type="button" class="btn btn-secondary" title="This will download the all videos from the channel" onclick="checkCurrentChannel(-2, true)">Download all videos first</button>
+        <hr>
+        <button type="button" class="btn btn-secondary" title="This will only scrape the first ~20 videos from the channel and will not download anything." onclick="checkCurrentChannel(3, false)">Don't download, just grab videos and their metadata</button>
+        <button type="button" class="btn btn-secondary" title="This will scrape all the videos from the channel and will not download anything." onclick="checkCurrentChannel(3, true)">Don't download, just grab all videos and their metadata</button>
+        <hr>
+        
+        <button type="button" class="btn btn-secondary" onclick="closeChannelStartModal()">Do nothing.</button>
+      </div>
+    </div>
+  </div>
 
   <!-- VIDEO DETAILS MODAL -->
   <div class="modal-overlay" id="videoDetailsModal">
@@ -388,5 +408,16 @@
 
   <script src="/static/js/app.js"></script>
   <script src="/static/js/chat.js"></script>
+  
+  <noscript>
+    <div class="modal-overlay active">
+      <div class="modal modal-video-details">
+        <h2>
+          This app requires JavaScript to be enabled!
+          Please enable JavaScript to use this app.
+        </h2>>
+      </div>
+    </div>
+  </noscript>
 </body>
 </html>
