@@ -223,7 +223,7 @@ func API_SpiceUpChannelInfo(w http.ResponseWriter, r *http.Request, AChannel *Ar
 		FromChannelId: AChannel.Id,
 		Status: -1,
 		Type: -1,
-		OrderDirection: 1,
+		OrderDirection: -1,
 	})
 	if err == nil && TasksList != nil {
 		AChannel.FORAPI_TasksCount = len(TasksList)
