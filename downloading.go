@@ -69,7 +69,7 @@ func AddArchiveChannel(WD *WatchingBundle, AChannel *ArchiveChannel) error {
 	
 	err := DB_UpdateArchiveChannel(AChannel)
 	if err != nil {
-		fmt.Printf("!!! COULD NOT ADD CHANNEL: \"%s\" TO DATABASE ERR: %v !!!\n", AChannel.Url, err)
+		L_Printf("!!! COULD NOT ADD CHANNEL: \"%s\" TO DATABASE ERR: %v !!!\n", AChannel.Url, err)
 		return err
 	}
 	
@@ -82,7 +82,7 @@ func AddArchiveChannel(WD *WatchingBundle, AChannel *ArchiveChannel) error {
 func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
 	err := DB_RemoveChannel(Id)
 	if err != nil {
-		fmt.Printf("Could not remove channel from database err: %v\n", err)
+		L_Printf("Could not remove channel from database err: %v\n", err)
 		return err
 	}
 	WD.ChannelsLock.Lock()
@@ -116,7 +116,7 @@ func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
 }
 
 func DoesFileExist(FilePath string) bool {
-	//fmt.Printf("DoesFileExist: '%s'\n", FilePath) // TODO: Temp debug print statement
+	//L_Printf("DoesFileExist: '%s'\n", FilePath) // TODO: Temp debug print statement
 	
 	_, err := os.Stat(FilePath)
 	if err == nil {
@@ -127,7 +127,7 @@ func DoesFileExist(FilePath string) bool {
 	if errors.Is(err, os.ErrNotExist) {
 		return false
 	}
-	fmt.Printf("DoesFileExist error %v\n", err)
+	L_Printf("DoesFileExist error %v\n", err)
 	return false
 }
 
@@ -173,7 +173,7 @@ func GetDownloadedVideoFilePath(Video *VideoInfo, AChannel *ArchiveChannel) (str
 func CheckIsVideoDownloaded(Video *VideoInfo) bool {
 	DB_VideoInfo, err := DB_GetVideo(Video.Id)
 	if err != nil {
-		fmt.Printf("CheckIsVideoDownloaded err: %v\n", err)
+		L_Printf("CheckIsVideoDownloaded err: %v\n", err)
 		return false
 	}
 	if DB_VideoInfo != nil {
@@ -204,7 +204,7 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 
 func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) error {
 	if AChannel.Type == ACHANNEL_TYPE_LIST_NO_DOWNLOAD || AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
-		fmt.Printf("DownloadVideo tried to download from a channel that doesn't allow downloads? Name: \"%s\"\n", AChannel.Name)
+		L_Printf("DownloadVideo tried to download from a channel that doesn't allow downloads? Name: \"%s\"\n", AChannel.Name)
 		return nil
 	}
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
@@ -330,7 +330,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	if AChannel.FullCheckInterval > 0 && TimeNow > AChannel.NextFullChannelCheckMSEC {
 		PlaylistEnd = -1
 		AChannel.NextFullChannelCheckMSEC = TimeNow + (AChannel.FullCheckInterval * 1000)
-		fmt.Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
+		L_Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
 		CL_Logf(Task, "Checking every video for \"%s\" ! \n", AChannel.Name)
 	}
 	AChannel.Lock.Unlock()
@@ -374,11 +374,12 @@ func CheckChannel(AChannel *ArchiveChannel) {
 	
 	QueuedVideosList, err := DB_ListVideos(-1, 0, ListVideosQuery{
 		RefreshState: -1,
+		QueuedAction: -1,
 		Status: 0,
 		FromChannelId: ChannelId,
 	})
 	if err != nil {
-		fmt.Printf("DB_ListVideos err: %v\n", err)
+		L_Printf("DB_ListVideos err: %v\n", err)
 		CL_Logf(Task, "DB_ListVideos error grabbing queued videos: %v \n", err)
 	}
 	if len(QueuedVideosList) > 0 {
@@ -399,6 +400,7 @@ func CheckChannel(AChannel *ArchiveChannel) {
 		RefreshState: 1,
 		FromChannelId: ChannelId,
 		Status: -1,
+		QueuedAction: -1,
 	})
 	if err != nil {
 		CL_Logf(Task, "Failed to grab refreshable videos from DB_ListVideos, error: %v\n", err)
@@ -444,6 +446,7 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 		RefreshState: 1,
 		FromChannelId: AChannel.Id,
 		Status: -1,
+		QueuedAction: -1,
 	})
 	if err != nil {
 		CL_Logf(Task, "Failed to grab refreshable videos from DB_ListVideos, error: %v\n", err)

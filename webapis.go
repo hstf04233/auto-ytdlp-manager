@@ -173,7 +173,7 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	err := DB_UpdateArchiveChannel(AChannel)
 	if err != nil {
 		// Just log this error and move on...
-		fmt.Printf("Error when updating archive channel in database: %v\n", err)
+		L_Printf("Error when updating archive channel in database: %v\n", err)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(AChannel)
@@ -401,15 +401,18 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		Limit = 100
 	}
 	
-	VideosList, err := DB_ListVideos(Limit, Offset, ListVideosQuery{
+	Query := ListVideosQuery{
 		RefreshState: -1,
+		QueuedAction: -1,
 		Status: Status,
 		FromChannelId: FromChannelId,
 		SearchQuery:   SearchQuery,
 		
 		OrderBy: OrderBy,
 		OrderDirection: OrderDirection,
-	})
+	}
+	
+	VideosList, err := DB_ListVideos(Limit, Offset, Query)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -428,19 +431,11 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		if (len(VideosList) >= Limit || Offset > 0) {
 			// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every video...
 			// (Or maybe cache the results aswell...)
-			VideosListAll, err := DB_ListVideos(-1, 0, ListVideosQuery{
-				RefreshState: -1,
-				Status: Status,
-				FromChannelId: FromChannelId,
-				SearchQuery:   SearchQuery,
-				
-				OrderBy: OrderBy,
-				OrderDirection: OrderDirection,
-			})
+			VideosListAll, err := DB_ListVideos(-1, 0, Query)
 			if err == nil {
 				VideosListStats = VideosListAll
 			} else if err != nil {
-				fmt.Printf("Failed to get videos list for stats... Err: %v\n", VideosListAll)
+				L_Printf("Failed to get videos list for stats... Err: %v\n", VideosListAll)
 			}
 		}
 		
@@ -669,7 +664,7 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			TasksListStats = TasksListAll
 		} else if err != nil {
-			fmt.Printf("Failed to get tasks list for stats... Err: %v\n", TasksListAll)
+			L_Printf("Failed to get tasks list for stats... Err: %v\n", TasksListAll)
 		}
 	}
 	

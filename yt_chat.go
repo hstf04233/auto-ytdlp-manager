@@ -39,14 +39,14 @@ type YTChatContext struct {
 func BasicWriteFile(FilePath string, FileContent string) error {
 	file, err := os.Create(FilePath)
 	if err != nil {
-		fmt.Printf("Failed to create '%s': %v\n", FilePath, err)
+		L_Printf("Failed to create '%s': %v\n", FilePath, err)
 		return err
 	}
 	defer file.Close()
 	
 	_, err = io.WriteString(file, FileContent)
 	if err != nil {
-		fmt.Printf("Failed to write file: %v\n", err)
+		L_Printf("Failed to write file: %v\n", err)
 		return err
 	}
 	
@@ -91,7 +91,7 @@ func DownloadChatSegment(Continuation string, ThisChatContext *YTChatContext) (s
 		}
 	}
 	jsonData, _ := json.Marshal(payload)
-	//fmt.Printf("%s\n", jsonData)
+	//L_Printf("%s\n", jsonData)
 	
 	if ThisChatContext.ContinuationType == 0 {
 		ThisChatContext.LastPublishUsec = time.Now().UnixMicro()
@@ -140,26 +140,26 @@ func RetrieveLiveChatModeContinuation(SegmentJson map[string]interface{}) string
 		"continuationContents", "liveChatContinuation", "header", "liveChatHeaderRenderer", "viewSelector", "sortFilterSubMenuRenderer",
 	})
 	if !ok {
-		fmt.Printf("[Live chat mode] Couldn't find 'sortFilterSubMenuRenderer'\n")
+		L_Printf("[Live chat mode] Couldn't find 'sortFilterSubMenuRenderer'\n")
 		return ""
 	}
 	
 	subMenuItems, ok := sortFilterSubMenuRenderer["subMenuItems"].([]interface{})
 	if !ok || len(subMenuItems) <= 1 {
-		fmt.Printf("[Live chat mode] Couldn't find 'subMenuItems' or empty.\n")
+		L_Printf("[Live chat mode] Couldn't find 'subMenuItems' or empty.\n")
 		return ""
 	}
 	
 	// Live chat mode is usually the 2nd sub item.
 	liveChatSub, ok := subMenuItems[1].(map[string]interface{})
 	if !ok {
-		fmt.Printf("[Live chat mode] Couldn't find live chat item in 'subMenuItems'\n")
+		L_Printf("[Live chat mode] Couldn't find live chat item in 'subMenuItems'\n")
 		return ""
 	}
 	
 	reloadContinuationData, ok := RecursiveGetJson(liveChatSub, []string{"continuation", "reloadContinuationData"})
 	if !ok {
-		fmt.Printf("[Live chat mode] Couldn't find 'reloadContinuationData'\n")
+		L_Printf("[Live chat mode] Couldn't find 'reloadContinuationData'\n")
 		return ""
 	}
 	
@@ -265,14 +265,14 @@ func WriteActions(Actions []interface{}, ChatFile *os.File) error {
 func YTC_DownloadYTWebpage(VideoUrl string, VideoId string) (*YTChatContext, error) {
 	responsePage, err := http.Get(fmt.Sprintf("https://youtube.com/watch?v=%s", VideoId))
 	if err != nil {
-		//fmt.Printf("Failed to download page: %v\n", err)
+		//L_Printf("Failed to download page: %v\n", err)
 		return nil, err
 	}
 	defer responsePage.Body.Close()
 	
 	body, err := io.ReadAll(responsePage.Body)
 	if err != nil {
-		//fmt.Printf("An error occured when reading page: %v\n", err)
+		//L_Printf("An error occured when reading page: %v\n", err)
 		return nil, err
 	}
 	
@@ -281,28 +281,28 @@ func YTC_DownloadYTWebpage(VideoUrl string, VideoId string) (*YTChatContext, err
 	if YT_CHAT_DEBUG_HTML == true {
 		dfile, err := os.Create("output.html")
 		if err != nil {
-			//fmt.Printf("Failed to create output.html: %v\n", err)
+			//L_Printf("Failed to create output.html: %v\n", err)
 			return nil, err
 		}
 		defer dfile.Close()
 		
 		_, err = io.WriteString(dfile, bodyStr)
 		if err != nil {
-			//fmt.Printf("Failed to write file: %v\n", err)
+			//L_Printf("Failed to write file: %v\n", err)
 			return nil, err
 		}
 	}
 	
 	reloadContinuation := GetStartReloadContinuation(bodyStr)
 	if len(reloadContinuation) <= 0 {
-		//fmt.Printf("reload continuation id not found...\n")
+		//L_Printf("reload continuation id not found...\n")
 		return nil, errors.New("Reload continuation id not found")
 	}
 	
 	itcReg := regexp.MustCompile(`"INNERTUBE_CONTEXT":(.*?),"INNERTUBE_CONTEXT_CLIENT_NAME"`)
 	contextMatches := itcReg.FindStringSubmatch(bodyStr)
 	if len(contextMatches) <= 0 {
-		//fmt.Printf("Could not find INNERTUBE_CONTEXT data...\n")
+		//L_Printf("Could not find INNERTUBE_CONTEXT data...\n")
 		return nil, errors.New("Could not find INNERTUBE_CONTEXT data...")
 	}
 	INNERTUBE_CONTEXT := contextMatches[1]
@@ -310,7 +310,7 @@ func YTC_DownloadYTWebpage(VideoUrl string, VideoId string) (*YTChatContext, err
 	itkReg := regexp.MustCompile(`"INNERTUBE_API_KEY":"([^"]+)"`)
 	apiKeyMatches := itkReg.FindStringSubmatch(bodyStr)
 	if len(apiKeyMatches) <= 0 {
-		fmt.Printf("Could not find INNERTUBE_API_KEY...\n")
+		L_Printf("Could not find INNERTUBE_API_KEY...\n")
 		return nil, errors.New("Could not find INNERTUBE_API_KEY...")
 	}
 	INNERTUBE_API_KEY := apiKeyMatches[1]
@@ -376,7 +376,7 @@ func yt_chat_Run(VideoUrl string, OutputPath string, Task *CommandTask) {
 		// TODO: Add support for replay chats
 		segmentBody, err := DownloadChatSegment(nextContinuation, ThisChatContext)
 		if err != nil {
-			//fmt.Printf("An error occured when downloading segment %d: %v\n", ThisChatContext.SegmentId, err)
+			//L_Printf("An error occured when downloading segment %d: %v\n", ThisChatContext.SegmentId, err)
 			CL_Logf(Task, "An error occured when downloading segment %d: %v\n", ThisChatContext.SegmentId, err)
 			break
 		}
@@ -384,7 +384,7 @@ func yt_chat_Run(VideoUrl string, OutputPath string, Task *CommandTask) {
 		segmentJson := map[string]interface{}{}
 		err = json.Unmarshal([]byte(segmentBody), &segmentJson)
 		if err != nil {
-			//fmt.Printf("Segment returned malformed json text, err: %v\n", err)
+			//L_Printf("Segment returned malformed json text, err: %v\n", err)
 			CL_Logf(Task, "Segment returned malformed json text, err: %v\n", err)
 			break
 		}

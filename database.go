@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS Videos (
 	
 	RefreshState INTEGER NOT NULL DEFAULT 0,
 	Status       INTEGER NOT NULL DEFAULT 0,
+	QueuedAction INTEGER NOT NULL DEFAULT 0,
 	VideoType    INTEGER NOT NULL DEFAULT 0,
 	
 	ReleaseDate BIGINT NOT NULL,
@@ -119,7 +120,7 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.Enabled, TimeNow, TimeNow)
 	
 	if err != nil {
-		fmt.Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
+		L_Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
 		return err
 	}
 	
@@ -131,7 +132,7 @@ func DB_RemoveChannel(ChannelId string) error {
 	DELETE FROM ArchiveChannels WHERE Id = ?
 	`, ChannelId)
 	if err != nil {
-		fmt.Printf("DB_RemoveChannel ERR: %v\n", err)
+		L_Printf("DB_RemoveChannel ERR: %v\n", err)
 		return err
 	}
 	
@@ -214,7 +215,7 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	`, Video.Id, Video.FromChannel, Video.Title, Video.Description, Video.Url, Video.Availability, Video.Resolution, Video.Thumbnail, Video.ReleaseDate, Video.Duration, Video.VideoType, TimeNow, TimeNow)
 	
 	if err != nil {
-		fmt.Printf("DB_UpdateVideoInfo ERR: %v\n", err)
+		L_Printf("DB_UpdateVideoInfo ERR: %v\n", err)
 		return err
 	}
 	
@@ -233,6 +234,20 @@ func DB_UpdateVideoStatus(Video *VideoInfo, NewStatus int) error {
 	_, err := GDB.Exec(`
 	UPDATE Videos SET Status = ?, UpdatedAt = ? WHERE Id = ?
 	`, NewStatus, time.Now().UTC(), Video.Id)
+	return err
+}
+
+func DB_UpdateVideoQueuedAction(Video *VideoInfo, NewQueuedAction int) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
+	if Video.QueuedAction == NewQueuedAction {
+		return nil
+	}
+	
+	Video.Status = NewQueuedAction
+	_, err := GDB.Exec(`
+	UPDATE Videos SET QueuedAction = ?, UpdatedAt = ? WHERE Id = ?
+	`, NewQueuedAction, time.Now().UTC(), Video.Id)
 	return err
 }
 
@@ -264,7 +279,7 @@ func DB_UpdateVideoRefreshState(Video *VideoInfo, RefreshState int) error {
 	UPDATE Videos SET RefreshState = ? WHERE Id = ?
 	`, RefreshState, Video.Id)
 	if err != nil {
-		fmt.Printf("DB_UpdateVideoRefreshState err: %v\n", err)
+		L_Printf("DB_UpdateVideoRefreshState err: %v\n", err)
 	}
 	return err
 }
@@ -283,7 +298,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, ReleaseDate, Duration, VideoType,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, QueuedAction, ReleaseDate, Duration, VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
 	`, VideoId)
 	err := VideoRow.Scan(
@@ -298,6 +313,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		&VideoInfo.DownloadedFilename,
 		
 		&VideoInfo.Status,
+		&VideoInfo.QueuedAction,
 		&VideoInfo.ReleaseDate,
 		&VideoInfo.Duration,
 		&VideoInfo.VideoType,
@@ -327,13 +343,14 @@ type ListVideosQuery struct {
 	FromChannelId string
 	SearchQuery string
 	RefreshState int
+	QueuedAction int
 	
 	OrderBy int
 	OrderDirection int
 }
 
 func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, Statement *string, Args *[]interface{}) {
-	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 {
+	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 || Query.QueuedAction != -1 {
 		*Statement += " WHERE "
 		AddAnd := false
 		if Query.Status != -1 {
@@ -355,6 +372,14 @@ func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, 
 			}
 			*Statement += " RefreshState = ?"
 			*Args = append(*Args, Query.RefreshState)
+			AddAnd = true
+		}
+		if Query.QueuedAction != -1 {
+			if AddAnd {
+				*Statement += " AND "
+			}
+			*Statement += " QueuedAction = ?"
+			*Args = append(*Args, Query.QueuedAction)
 			AddAnd = true
 		}
 	}
@@ -383,7 +408,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	Args := []interface{}{}
 	
 	Statement := `
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, ReleaseDate, Duration, VideoType,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, QueuedAction, ReleaseDate, Duration, VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos`
 	
 	QLimit := Limit
@@ -426,6 +451,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			&VideoInfo.DownloadedFilename,
 			
 			&VideoInfo.Status,
+			&VideoInfo.QueuedAction,
 			&VideoInfo.ReleaseDate,
 			&VideoInfo.Duration,
 			&VideoInfo.VideoType,
@@ -511,7 +537,7 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	`, Task.Id, Task.Title, Task.Type, Status, Task.FromChannelId, Task.FromVideoId, Task.RunArgs, Output, Task.StartTime, Task.EndTime, time.Now().UTC())
 	
 	if err != nil {
-		fmt.Printf("DB_UpdateCommandTaskInfo ERR: %v\n", err)
+		L_Printf("DB_UpdateCommandTaskInfo ERR: %v\n", err)
 		return err
 	}
 	
@@ -684,7 +710,7 @@ func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommand
 	
 	*Statement += fmt.Sprintf(" ORDER BY %s %s LIMIT ? OFFSET ?", OrderBy, OrderDirection)
 	*Args = append(*Args, Limit, Offset)
-	//fmt.Printf("Statement: %s\n Args: %+v\n", *Statement, *Args)
+	//L_Printf("Statement: %s\n Args: %+v\n", *Statement, *Args)
 }
 
 func DB_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]*CommandTask, error) {
@@ -764,6 +790,8 @@ func OpenDB() error {
 		"ALTER TABLE CommandTasks ADD COLUMN UpdatedAt DATETIME NOT NULL DEFAULT 0",
 		
 		"ALTER TABLE Videos ADD COLUMN Description TEXT DEFAULT ''",
+		
+		"ALTER TABLE Videos ADD COLUMN QueuedAction INTEGER NOT NULL DEFAULT 0",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)
@@ -774,7 +802,7 @@ func OpenDB() error {
 	for i, Upgrade := range(DatabaseUpgrades) {
 		_, err = db.Exec(Upgrade)
 		if err != nil && APPLICATION_VERSION == "debug" {
-			fmt.Printf("Upgrade[%d] failed, error: %v\n", i, err)
+			L_Printf("Upgrade[%d] failed, error: %v\n", i, err)
 		}
 	}
 	

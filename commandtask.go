@@ -108,7 +108,7 @@ func watchStd(std io.ReadCloser, buf *[]byte, nout *int, Mutex *sync.RWMutex) {
 			ErrorCount++
 			if ErrorCount > 1000 {
 				// This pipe must be broken then?
-				fmt.Printf("Pipe error wat | err: %v\n", err)
+				L_Printf("Pipe error wat | err: %v\n", err)
 				break
 			}
 			time.Sleep(16 * time.Millisecond)
@@ -117,7 +117,7 @@ func watchStd(std io.ReadCloser, buf *[]byte, nout *int, Mutex *sync.RWMutex) {
 			ErrorCount = 0
 		}
 	}
-	//fmt.Printf("This pipe closed!\n")
+	//L_Printf("This pipe closed!\n")
 }
 
 func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCloser) {
@@ -143,11 +143,9 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 	
 	for {
 		n := 0
-		//fmt.Printf("TICK_! %d \n", State)
 		Mutex.Lock()
 		_c_out := c_out
 		_c_err := c_err
-		//fmt.Printf("TICK! %d \n", State)
 		if State == 0 {
 			// Read stdout
 			buf = &bufout
@@ -269,7 +267,7 @@ func CL_BasicWatchStdPipe(StdPipe io.ReadCloser) *Task_StdOut {
 			if errors.Is(err, io.EOF) || errors.Is(err, os.ErrClosed) || errors.Is(err, io.ErrClosedPipe) || errors.Is(err, io.ErrUnexpectedEOF) {
 				break
 			} else if err != nil {
-				fmt.Printf("Unknown error? : %v\n", err)
+				L_Printf("Unknown pipe error? : %v\n", err)
 				break
 			}
 		}
@@ -337,7 +335,7 @@ func CL_CommandTaskRun(Task *CommandTask, stdout io.ReadCloser, stderr io.ReadCl
 		Task.Lock.Lock()
 		if Task.Status != TASK_STATUS_RUNNING {
 			Task.Lock.Unlock()
-			fmt.Printf("This task isn't running? Id: %s\n", Task.Id)
+			L_Printf("This task isn't running? Id: %s\n", Task.Id)
 			break
 		}
 		Task.Lock.Unlock()
@@ -387,7 +385,7 @@ func CL_CancelTask(Task *CommandTask) error {
 	
 	err := Task.Cmd.Process.Kill()
 	if err != nil {
-		fmt.Printf("Cannot kill process | err: %v\n", err)
+		L_Printf("Cannot kill process | err: %v\n", err)
 		return err
 	}
 	if CanCancel {
@@ -413,7 +411,7 @@ func CL_RunDownloadTask(Cmd *exec.Cmd, Video *VideoInfo, ChannelId string) (*Com
 	if err != nil {
 		ErrMsg := fmt.Sprintf("Error creating StdoutPipe: %s\n", err)
 		Task.Output = ErrMsg
-		fmt.Printf("%s", ErrMsg)
+		L_Printf("%s", ErrMsg)
 		
 		CL_FinishTask(Task, TASK_STATUS_FAILED)
 		return nil, err
@@ -422,7 +420,7 @@ func CL_RunDownloadTask(Cmd *exec.Cmd, Video *VideoInfo, ChannelId string) (*Com
 	if err != nil {
 		ErrMsg := fmt.Sprintf("Error creating StderrPipe: %s\n", err)
 		Task.Output = ErrMsg
-		fmt.Printf("%s", ErrMsg)
+		L_Printf("%s", ErrMsg)
 		
 		CL_FinishTask(Task, TASK_STATUS_FAILED)
 		return nil, err
@@ -510,7 +508,7 @@ func CL_GetCommandTask(TaskId string) (*CommandTask, error) {
 		var err error
 		Task, err = DB_GetCommandTask(TaskId)
 		if err != nil {
-			fmt.Printf("DB_GetCommandTask error: %v !\n", err)
+			L_Printf("DB_GetCommandTask error: %v !\n", err)
 			return nil, err
 		}
 	}
@@ -520,7 +518,7 @@ func CL_GetCommandTask(TaskId string) (*CommandTask, error) {
 
 func CL_Logf(Task *CommandTask, format string, a ... any) {
 	if Task == nil {
-		fmt.Printf(format, a ...)
+		L_Printf(format, a ...)
 		return
 	}
 	
@@ -546,7 +544,7 @@ func CleanUpTasksInDatabase() {
 		Status: -1,
 	})
 	if err != nil {
-		fmt.Printf("CleanUpListingTasksInDatabase error: %v\n", err)
+		L_Printf("CleanUpListingTasksInDatabase error: %v\n", err)
 		return
 	}
 	
@@ -576,13 +574,13 @@ func CleanUpTasksInDatabase() {
 		if DeleteThis {
 			err := DB_DeleteCommandTask(Task.Id)
 			if err != nil {
-				fmt.Printf("Could not delete task '%s', error: %v\n", err)
+				L_Printf("Could not delete task '%s', error: %v\n", err)
 				continue
 			}
 			DeleteCount += 1
 		}
 	}
-	fmt.Printf("Auto deleted %d tasks for being outdated.\n", DeleteCount)
+	L_Printf("Auto deleted %d tasks for being outdated.\n", DeleteCount)
 }
 
 func init() {

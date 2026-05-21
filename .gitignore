@@ -25,6 +25,6 @@ output.html
 yt-stream-manager.exe
 
 
-config_DEBUG _.json
 config.json
 config_DEBUG.json
+log_current.log

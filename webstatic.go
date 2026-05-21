@@ -19,7 +19,6 @@ var StartTime = time.Now().UTC()
 
 func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/")
-	//fmt.Printf("Serving \"%s\"\n", path)
 	if path == "favicon.ico" {
 		path = "favicon.png"
 		if APPLICATION_VERSION == "debug" {
@@ -37,27 +36,16 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	
 	File, err := WebStaticContent.Open(fmt.Sprintf("static/%s", path))
 	if err != nil {
-		fmt.Printf("Cannot find file: %s\n", path)
+		L_Printf("Cannot find file: %s\n", path)
 		http.Error(w, "Page not found.", http.StatusNotFound)
 		return
 	}
 	defer File.Close()
 	
-	//w.Header().Set("Cache-Control", "public, max-age=86400")	// Cache for 24 hours.
-	//w.Header().Set("ETag", ETag)
 	if r.Header.Get("If-None-Match") == ETag {
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	
-	/*
-	FileContent, err := io.ReadAll(File)
-	if err != nil {
-		fmt.Printf("Could not read file? \"%s\", err: %v\n", path, err)
-		http.Error(w, "File could not be read?", http.StatusInternalServerError)
-		return
-	}
-	*/
 	
 	FileExt := filepath.Ext(path)
 	if FileExt == ".txt" {

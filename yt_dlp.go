@@ -29,12 +29,13 @@ type VideoInfo struct {
 	Thumbnail    string  `json:"thumbnail_url"`
 	
 	Filename           string  `json:"-"`
-	DownloadedFilename string  `json:"filename"`		// Where the video is stored on device (This is only the file name and not the file path...)
+	DownloadedFilename string  `json:"filename"`		// Where the video is stored on device (This is only the file name, not the file path...)
 	VideoFileExists    bool    `json:"videofile_exists"`
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
 	Status       int     `json:"status"`
+	QueuedAction int     `json:"queued_action"`
 	
 	TasksCount   int `json:"tasks_count"`
 	ActiveTaskId string `json:"active_task"`
@@ -204,7 +205,7 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
-		fmt.Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
+		L_Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
 	}
 	
 	Args := []string{
@@ -227,7 +228,7 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 	
 	stderr, err := Cmd.StderrPipe()
 	if err != nil {
-		fmt.Printf("Error when creating StderrPipe: %v\n", err)
+		L_Printf("Error when creating StderrPipe: %v\n", err)
 		return err
 	}
 	ErrOut := CL_BasicWatchStdPipe(stderr)
@@ -242,11 +243,11 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 			Video.VideoType = VIDEO_TYPE_WASLIVE
 		}
 		
-		FilePath, err := GetDownloadedVideoFilePath(Video, AChannel)
-		if err == nil && FilePath != "" {
+		FilePath, fpErr := GetDownloadedVideoFilePath(Video, AChannel)
+		if fpErr == nil && FilePath != "" {
 			VFileInfo, err := GetVideoFileInfo(FilePath)
 			if err != nil {
-				fmt.Printf("Could not get video file info because: %v\n", err)
+				L_Printf("Could not get video file info because: %v\n", err)
 			}
 			if Video.Duration <= 1 {
 				Video.Duration = VFileInfo.Duration
@@ -266,14 +267,14 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 			return fmt.Errorf("%s", ErrOutput)
 		}
 		
-		fmt.Printf("%s\n", ErrOutput)
-		fmt.Printf("Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
+		L_Printf("%s\n", ErrOutput)
+		L_Printf("Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
 		return fmt.Errorf("%s", ErrOutput)
 	}
 	var OutVideo YT_DLP_OUTVIDEO
 	err = json.Unmarshal(Out, &OutVideo)
 	if err != nil {
-		fmt.Printf("json.Unmarshal err: %v\n", err)
+		L_Printf("json.Unmarshal err: %v\n", err)
 		return err
 	}
 	
@@ -346,7 +347,6 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 		}
 		
 		ErrorMsg := fmt.Sprintf("Failed to list videos from channel: %s, Error: %v\n", ChannelUrl, err)
-		//fmt.Print(ErrorMsg)
 		if Task != nil {
 			CL_Logf(Task, "%s", ErrorMsg)
 			DB_UpdateCommandTaskInfo(Task)
@@ -395,7 +395,7 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
-		fmt.Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
+		L_Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
 	}
 	
 	Filename := Video.Filename
@@ -422,15 +422,15 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	
 	err = Cmd.Start()
 	if err != nil {
-		fmt.Printf("Failed to start download video from url: %s, Error: %v\n", Video.Url, err)
+		L_Printf("Failed to start download video from url: %s, Error: %v\n", Video.Url, err)
 		return err
 	}
 	err = Cmd.Wait()
 	if err != nil {
-		fmt.Printf("Failed to download video from url: %s, Error: %v\n", Video.Url, err)
+		L_Printf("Failed to download video from url: %s, Error: %v\n", Video.Url, err)
 		return err
 	}
-	//fmt.Printf("Output: %s\n", Out)
+	//L_Printf("Output: %s\n", Out)
 	
 	return nil
 }
@@ -441,7 +441,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
-		fmt.Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
+		L_Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
 	}
 	
 	//144p, 240p, 360p, 480p, 720p, 720p60, 1080p, 1080p60, 1440p, 1440p60, 2160p, 2160p60, best
@@ -501,15 +501,15 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 	
 	err = Cmd.Start()
 	if err != nil {
-		fmt.Printf("Failed to start live download from url: %s, Error: %v\n", Video.Url, err)
+		L_Printf("Failed to start live download from url: %s, Error: %v\n", Video.Url, err)
 		return err
 	}
 	err = Cmd.Wait()
 	if err != nil {
-		fmt.Printf("Failed to live download from url: %s, Error: %v\n", Video.Url, err)
+		L_Printf("Failed to live download from url: %s, Error: %v\n", Video.Url, err)
 		return err
 	}
-	//fmt.Printf("Output: %s\n", Out)
+	//L_Printf("Output: %s\n", Out)
 	
 	return nil
 }

@@ -57,16 +57,21 @@ func StartServer(ServerPort int) {
 	Mux.HandleFunc("/api/", ServeApi)
 	Mux.HandleFunc("/video-file/", ServeVideoDownload)
 	
-	fmt.Printf("Starting server at http://localhost:%d\n", ServerPort)
-	fmt.Printf("!!! DO NOT HOST THIS PROGRAM TO THE INTERNET! THIS PROGRAM IS IN TESTING PHASE AND IS UNSAFE OUTSIDE OF THE LOCAL NETWORK...\n")
+	L_Printf("Starting server at http://localhost:%d\n", ServerPort)
+	
+	// TODO: I'm planning on adding an auth system.
+	L_Printf("!!! DO NOT HOST THIS PROGRAM TO THE INTERNET! THIS PROGRAM IS IN TESTING PHASE AND IS UNSAFE OUTSIDE OF THE LOCAL NETWORK...\n")
+	
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", ServerPort), Mux); err != nil {
-		fmt.Printf("Cannot start server because: %v\n", err)
-		fmt.Printf("The server port might be currently occupied... Edit the server port in config.json if you need to change the server port!\n")
+		L_Printf("Cannot start server because: %v\n", err)
+		L_Printf("The server port might be currently occupied... Edit the server port in config.json if you need to change the server port!\n")
 		panic(err)
 	}
 }
 
 func main() {
+	InitLogPrint()
+	
 	var err error
 	CURRENT_WORKING_DIRECTORY, err = os.Getwd()
 	if err != nil {
@@ -91,19 +96,19 @@ func main() {
 	
 	if !CommandExists(CMD_YT_DLP) {
 		Exit = true
-		fmt.Printf("You need '%s' to run this program! https://github.com/yt-dlp/yt-dlp \n", C_CMD_YT_DLP)
+		L_Printf("You need '%s' to run this program! https://github.com/yt-dlp/yt-dlp \n", C_CMD_YT_DLP)
 	}
 	if !CommandExists(CMD_FFMPEG) {
 		Exit = true
-		fmt.Printf("You need '%s' (and possibly 'ffprobe') to run this program! Get both from https://www.ffmpeg.org/ \n", C_CMD_FFMPEG)
+		L_Printf("You need '%s' (and possibly 'ffprobe') to run this program! Get both from https://www.ffmpeg.org/ \n", C_CMD_FFMPEG)
 	}
 	if !CommandExists(CMD_YT_ARCHIVE) {
 		Exit = true
-		fmt.Printf("You need '%s' to run this program! https://github.com/dreammu/ytarchive\n", C_CMD_YT_ARCHIVE)
+		L_Printf("You need '%s' to run this program! https://github.com/dreammu/ytarchive\n", C_CMD_YT_ARCHIVE)
 	}
 	
 	if Exit {
-		fmt.Printf("The program will exit now due to unavailable programs...\n")
+		L_Printf("The program will exit now due to unavailable programs...\n")
 		time.Sleep(time.Second * 5)
 		return
 	}
@@ -117,7 +122,7 @@ func main() {
 	
 	go InitDownloading()
 	
-	fmt.Printf("APPLICATION_VERSION: %s\n", APPLICATION_VERSION)
+	L_Printf("APPLICATION_VERSION: %s\n", APPLICATION_VERSION)
 	
 	// TODO: THIS IS TEMP! go yt_chat_Run("https://www.youtube.com/watch?v=G5oz2dQLi00", "./test-chat-output.json", nil)
 	
