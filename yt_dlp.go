@@ -488,7 +488,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 	Args := []string{
 		"--ffmpeg-path", Get_FFmpegPath(G_Config),
 		"--ytdlp-path",  Get_YtDlpPath(G_Config),
-		"--ytdlp-opts", fmt.Sprintf("--config-locations \"%s\"", GLOBAL_YT_DLP_CONFIG_PATH),
+		//"--ytdlp-opts", fmt.Sprintf("--config-locations \"%s\"", GLOBAL_YT_DLP_CONFIG_PATH),
 		"--no-wait",
 		"--add-metadata",
 		"--save-state",
