@@ -420,7 +420,7 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 	
 	CS := &CheckStatus{}
 	
-	go ManuallyAddVideos(AChannel, Body.DownloadUrl, Body.Type, CS)
+	go ManuallyAddVideos(AChannel, Body.DownloadUrl, Body.Type, Body.QualitySelect, CS)
 	
 	Status := 0
 	QuitTime := time.Now().UTC().Add(time.Duration(time.Minute * 1))

@@ -209,7 +209,7 @@ func GetVideoFileInfo(filePath string) (*VideoFileInfo, error) {
 	return &Info, nil
 }
 
-func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInfo) (error) {
+func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect int, Video *VideoInfo) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
 	OutputTemplate := GetOutputTemplate(AChannel)
 	
@@ -227,8 +227,13 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, Video *VideoInf
 		//"--restrict-filenames",
 		"-o", OutputTemplate,
 	}
-	if AChannel.QualitySelect > 0 {
-		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
+	
+	if QualitySelect == -1 {
+		QualitySelect = AChannel.QualitySelect
+	}
+	
+	if QualitySelect > 0 {
+		Args = append(Args, "-S", fmt.Sprintf("res:%d", QualitySelect))
 	}
 	if ShouldLiveFromStart(AChannel, VideoUrl) {
 		Args = append(Args, "--live-from-start")
@@ -447,7 +452,7 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySel
 		Args = append(Args, "--ffmpeg-location", Get_FFmpegPath(G_Config))
 	}
 	if QualitySelect > 0 {
-		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
+		Args = append(Args, "-S", fmt.Sprintf("res:%d", QualitySelect))
 	}
 	
 	Cmd := exec.Command(Get_YtDlpPath(G_Config), Args...)

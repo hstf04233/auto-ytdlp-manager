@@ -221,7 +221,7 @@ func CheckIsVideoDownloaded(Video *VideoInfo) bool {
 }
 
 func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
-	err := RequestVideoInfo(AChannel, Video.Url, Video)
+	err := RequestVideoInfo(AChannel, Video.Url, -1, Video)
 	if err != nil {
 		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoInfo(Video)
@@ -285,7 +285,12 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
 	}
 	
-	err := RequestVideoInfo(AChannel, Video.Url, Video)
+	QualitySelect := AChannel.QualitySelect
+	if CheckSettings.QualitySelect >= 0 {
+		QualitySelect = CheckSettings.QualitySelect
+	}
+	
+	err := RequestVideoInfo(AChannel, Video.Url, QualitySelect, Video)
 	if err != nil {
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		DB_UpdateVideoAvalibility(Video, Video.Availability)
@@ -307,11 +312,6 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		}
 		
 		return false
-	}
-	
-	QualitySelect := AChannel.QualitySelect
-	if CheckSettings.QualitySelect >= 0 {
-		QualitySelect = CheckSettings.QualitySelect
 	}
 	
 	switch Video.VideoType {
@@ -384,7 +384,7 @@ func SetCheckStatus(CS *CheckStatus, NewStatus int) {
 	CS.Mutex.Unlock()
 }
 
-func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, CS *CheckStatus) {
+func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, QualitySelect int, CS *CheckStatus) {
 	Task := CL_NewGenericTask()
 	defer func() {
 		if Task.Status == TASK_STATUS_RUNNING {
@@ -432,9 +432,13 @@ func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, CS *Check
 		// This must just be a video url...
 	}
 	
+	if QualitySelect == -1 {
+		QualitySelect = AChannel.QualitySelect
+	}
+	
 	CheckSettings := ChannelCheckSettings{
 		OverrideChannelType: Type,
-		QualitySelect: AChannel.QualitySelect,
+		QualitySelect: QualitySelect,
 	}
 	
 	SetCheckStatus(CS, CHECK_STATUS_CHECKING_VIDEOS)
@@ -646,6 +650,10 @@ func CheckChannels(WD *WatchingBundle) {
 			continue
 		}
 		if time.Now().UTC().UnixMilli() < AChannel.NextCheckMSEC || AChannel.CheckInterval <= 0 {
+			continue
+		}
+		if AChannel.Id == MANUAL_CHANNEL_ID {
+			// Don't auto download stuff from the manual channel.
 			continue
 		}
 		

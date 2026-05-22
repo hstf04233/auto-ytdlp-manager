@@ -937,9 +937,11 @@ function closeAddVideosModal() {
 
 async function sendAddVideosForm(type) {
   const url = document.getElementById('avm-ChannelUrl').value.trim();
+  const quality = parseInt(document.getElementById('avm-Quality').value);
   
   const body = {
     download_url: url,
+    quality_select: quality,
     type: type,
   };
   
