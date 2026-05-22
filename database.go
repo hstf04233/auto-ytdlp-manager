@@ -108,7 +108,7 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	defer AChannel.Lock.RUnlock()
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT OR REPLACE INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
+	INSERT INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
@@ -254,7 +254,7 @@ func DB_UpdateVideoQueuedAction(Video *VideoInfo, NewQueuedAction int) error {
 		return nil
 	}
 	
-	Video.Status = NewQueuedAction
+	Video.QueuedAction = NewQueuedAction
 	_, err := GDB.Exec(`
 	UPDATE Videos SET QueuedAction = ?, UpdatedAt = ? WHERE Id = ?
 	`, NewQueuedAction, time.Now().UTC(), Video.Id)
@@ -716,7 +716,7 @@ func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommand
 			WhereAdded = true
 			*Statement += " WHERE "
 		}
-		*Statement += " ((Status = 0 OR Status == 1 OR Status == 3) OR Type == 2) "
+		*Statement += " ((Status = 0 OR Status = 1 OR Status = 3) OR Type = 2) "
 	}
 	
 	if Query.Status >= 0 || Query.Type != -1 || Query.FromChannelId != "" || Query.FromVideoId != "" {
@@ -827,8 +827,6 @@ func DB_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]
 }
 
 func DB_DeleteCommandTask(TaskId string) error {
-	VideoDBLock.Lock()
-	defer VideoDBLock.Unlock()
 	_, err := GDB.Exec(`
 	DELETE FROM CommandTasks WHERE Id = ?
 	`, TaskId)
@@ -864,7 +862,7 @@ func OpenDB() error {
 	
 	for i, Upgrade := range(DatabaseUpgrades) {
 		_, err = db.Exec(Upgrade)
-		if err != nil && APPLICATION_VERSION == "debug" {
+		if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
 			L_Printf("Upgrade[%d] failed, error: %v\n", i, err)
 		}
 	}
