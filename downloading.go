@@ -232,10 +232,13 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 }
 
 func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int, Task *CommandTask) error {
+	/*
 	if AChannel.Type == ACHANNEL_TYPE__UNUSED || AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
 		L_Printf("DownloadVideo tried to download from a channel that doesn't allow downloads? Name: \"%s\"\n", AChannel.Name)
+		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		return nil
 	}
+	*/
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
 	err := yt_dlp_DownloadVideo(AChannel, Video, QualitySelect)
 	if err != nil {
