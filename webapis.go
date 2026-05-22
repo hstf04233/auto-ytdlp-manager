@@ -387,7 +387,7 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid target channel id.", http.StatusBadRequest)
 			return
 		}
-		AChannel = GetManualArchiveChannel(&WatchedDownloading)
+		AChannel = GetArchiveChannelFromId(&WatchedDownloading, Body.TargetChannel)
 	}
 	if AChannel == nil {
 		http.Error(w, "Could not find target channel.", http.StatusNotFound)
