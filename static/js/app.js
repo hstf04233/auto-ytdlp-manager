@@ -543,11 +543,11 @@ async function loadChannels(softUpdateOnly) {
 }
 
 function renderUpdateChannel(ch) {
-  channelEl = document.getElementById("channel-" + ch.id);
+  const channelEl = document.getElementById("channel-" + ch.id);
   if (!channelEl) return;
   
-  nextCheckEl = channelEl.querySelector("#next-check");
-  channelCheckBtnEl = channelEl.querySelector("#channel-check-btn");
+  const nextCheckEl = channelEl.querySelector("#next-check");
+  const channelCheckBtnEl = channelEl.querySelector("#channel-check-btn");
   if (nextCheckEl) {
     let checkTime = new Date(ch._nextCheckMsec);
     let now = new Date();
@@ -577,7 +577,7 @@ function renderUpdateChannel(ch) {
     }
   }
   
-  channelTaskBtnEl = channelEl.querySelector("#channel-task-btn");
+  const channelTaskBtnEl = channelEl.querySelector("#channel-task-btn");
   
   if (channelTaskBtnEl) {
     let tasksButtonText = `View Tasks[${ch.tasks_count}]`;
@@ -588,6 +588,11 @@ function renderUpdateChannel(ch) {
     if (channelTaskBtnEl.textContent != tasksButtonText) {
       channelTaskBtnEl.textContent = tasksButtonText;
     }
+  }
+  
+  const channelEnabledCheckboxEl = channelEl.querySelector("#channel-enabled-checkbox");
+  if (channelEnabledCheckboxEl) {
+    channelEnabledCheckboxEl.checked = ch.enabled;
   }
 }
 
@@ -635,7 +640,7 @@ function renderChannels() {
         </div>
         <div class="video-actions">
           <label class="toggle">
-            <input type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="enableChannel('${ch.id}', this.checked)">
+            <input id="channel-enabled-checkbox" title="Channel enabled checkbox" type="checkbox" ${ch.enabled ? 'checked' : ''} onchange="enableChannel('${ch.id}', this.checked)">
             <span class="toggle-slider"></span>
           </label>
           <button class="btn btn-secondary btn-sm" onclick="runChannelCheck('${ch.id}')" id="channel-check-btn">Check videos now</button>
@@ -655,6 +660,10 @@ async function enableChannel(id, enabled) {
     await API.patch(`/api/channels/${id}`, {
       enabled: enabled
     });
+    const channel = getChannelFromId(id);
+    if (channel) {
+      channel.enabled = enabled;
+    }
     //showToast(`Channel ${enabled ? 'enabled' : 'disabled'}`, 'success');
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
@@ -714,7 +723,7 @@ function openVideoDetailsModal(videoId) {
   const v = allVideos.find(x => x.id === videoId);
   if (!v) return;
 
-  const channel = allChannels.find(c => c.id === v.from_channel);
+  const channel = getChannelFromId(v.from_channel);
   const channelName = channel ? escHtml(channel.name) : 'Unknown Channel';
   const channelUrl = channel ? escHtml(channel.url) : '';
 
@@ -825,8 +834,13 @@ function openAddChannelModal() {
   updateChannelModalPlaceholders();
 }
 
-function openEditChannelModal(id) {
+function getChannelFromId(id) {
   const ch = allChannels.find(c => c.id === id);
+  return ch;
+}
+
+function openEditChannelModal(id) {
+  const ch = getChannelFromId(id);
   if (!ch) return;
 
   document.getElementById('channelModalTitle').textContent = 'Edit Channel';
@@ -1004,7 +1018,7 @@ function renderVideos() {
       durationText = "LIVE"
     }
     
-    const channel = allChannels.find(c => c.id === v.from_channel);
+    const channel = getChannelFromId(v.from_channel);
     const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
     const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
     
@@ -1316,7 +1330,7 @@ function gotoTasksPageAndFilterChannel(channelId) {
   loadTasks();
   renderTaskPagination();
   
-  const channel = allChannels.find(c => c.id === channelId);
+  const channel = getChannelFromId(channelId);
   if (channel) {
     if (channel.active_task) {
       selectTask(channel.active_task);
