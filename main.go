@@ -19,14 +19,6 @@ var (
 	CURRENT_WORKING_DIRECTORY = ""
 )
 
-/*
-var (
-	CMD_YT_DLP = C_CMD_YT_DLP
-	CMD_YT_ARCHIVE = C_CMD_YT_ARCHIVE
-	CMD_FFMPEG = C_CMD_FFMPEG
-)
-*/
-
 func CommandExists(cmd string) bool {
 	_, err := exec.LookPath(cmd)
 	return err == nil
@@ -80,8 +72,9 @@ func StartServer(ServerPort int) {
 }
 
 func main() {
-	fmt.Printf("------- auto yt-dlp manager -------\n\n")
+	fmt.Printf("------- auto yt-dlp manager -------\n")
 	InitLogPrint()
+	L_Printf("APPLICATION_VERSION: %s\n\n", APPLICATION_VERSION)
 	
 	var err error
 	CURRENT_WORKING_DIRECTORY, err = os.Getwd()
@@ -102,24 +95,30 @@ func main() {
 	G_Config.YtDlp_Path_Real     = FindCommand(G_Config.YtDlp_Path)
 	G_Config.YtArchive_Path_Real = FindCommand(G_Config.YtArchive_Path)
 	G_Config.FFmpeg_Path_Real    = FindCommand(G_Config.FFmpeg_Path)
+	G_Config.Deno_Path_Real      = FindCommand(G_Config.Deno_Path)
 	
 	Exit := false
 	
 	if !CommandExists(G_Config.YtDlp_Path_Real) {
 		Exit = true
-		L_Printf("Could not find program '%s' Get the dependency here: https://github.com/yt-dlp/yt-dlp \n", G_Config.YtDlp_Path)
+		L_Printf("Could not find program '%s' Get the dependency here: https://github.com/yt-dlp/yt-dlp \n\n", G_Config.YtDlp_Path)
 	}
 	if !CommandExists(G_Config.YtArchive_Path_Real) {
 		Exit = true
-		L_Printf("Could not find program '%s' Get the dependency here: https://github.com/dreammu/ytarchive\n", G_Config.YtArchive_Path)
+		L_Printf("Could not find program '%s' Get the dependency here: https://github.com/dreammu/ytarchive\n\n", G_Config.YtArchive_Path)
 	}
 	if !CommandExists(G_Config.FFmpeg_Path_Real) {
 		Exit = true
-		L_Printf("Could not find program '%s' Get the dependency here: https://www.ffmpeg.org/ \n", G_Config.FFmpeg_Path)
+		L_Printf("Could not find program '%s' Get the dependency here: https://www.ffmpeg.org/ \n\n", G_Config.FFmpeg_Path)
+	}
+	
+	if !CommandExists(G_Config.Deno_Path_Real) {
+		L_Printf("Could not find optional dependency 'deno' (Used by yt-dlp) It's recommended that you get this for yt-dlp to fully work properly.\n")
+		L_Printf("If you experience long wait times for yt-dlp or missing formats, then getting deno *might* fix the issue...: https://github.com/denoland/deno/releases\n\n")
 	}
 	
 	if Exit {
-		L_Printf("\nThe program will exit now due to unavailable dependencies...\n")
+		L_Printf("The program will exit now due to unavailable dependencies...\n")
 		L_Printf("If you already have these dependencies, edit the paths in ./config.json to the correct location\n")
 		time.Sleep(time.Second * 10)
 		return
@@ -134,8 +133,6 @@ func main() {
 	//CleanUpTasksInDatabase()
 	
 	go InitDownloading()
-	
-	L_Printf("APPLICATION_VERSION: %s\n", APPLICATION_VERSION)
 	
 	// TODO: THIS IS TEMP! go yt_chat_Run("https://www.youtube.com/watch?v=G5oz2dQLi00", "./test-chat-output.json", nil)
 	

@@ -449,8 +449,13 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySel
 		// '--ffmpeg-location' doesn't handle system environment paths.
 		// Only add the ffmpeg location if it's absolute!
 		
-		Args = append(Args, "--ffmpeg-location", Get_FFmpegPath(G_Config))
+		Args = append(Args, "--ffmpeg-location", FFmpegPath)
 	}
+	DenoPath := Get_DenoPath(G_Config)
+	if filepath.IsAbs(DenoPath) {
+		Args = append(Args, "--js-runtimes", fmt.Sprintf("deno:%s", DenoPath))
+	}
+	
 	if QualitySelect > 0 {
 		Args = append(Args, "-S", fmt.Sprintf("res:%d", QualitySelect))
 	}

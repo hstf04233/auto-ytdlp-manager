@@ -19,10 +19,6 @@ const (
 	DEFAULT_SERVER_PORT = 8867
 	DEFAULT_SERVER_PORT_DEBUG = 6788
 	
-	C_CMD_YT_DLP = "yt-dlp"
-	C_CMD_YT_ARCHIVE = "ytarchive"
-	C_CMD_FFMPEG = "ffmpeg"
-	
 	DEFAULT_DOWNLOAD_DIR = "./downloads"
 	DEFAULT_YT_DLP_OUTPUT_TEMPLATE      = "%(title)s %(id)s.%(ext)s"
 	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(release_date>%Y-%m-%d,upload_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
@@ -44,9 +40,11 @@ type ProgramConfig struct {
 	YtDlp_Path     string
 	YtArchive_Path string
 	FFmpeg_Path    string
+	Deno_Path      string `json:"-"`
 	YtDlp_Path_Real     string `json:"-"`
 	YtArchive_Path_Real string `json:"-"`
 	FFmpeg_Path_Real    string `json:"-"`
+	Deno_Path_Real      string `json:"-"`
 	
 	AllChannels_Disabled bool
 	
@@ -66,6 +64,7 @@ var G_Config = &ProgramConfig{
 	YtDlp_Path:     "yt-dlp",
 	YtArchive_Path: "ytarchive",
 	FFmpeg_Path:    "ffmpeg",
+	Deno_Path:      "deno",
 	
 	AllChannels_Disabled: false,
 	
@@ -92,6 +91,11 @@ func Get_FFmpegPath(Config *ProgramConfig) string {
 	Config.Mutex.RLock()
 	defer Config.Mutex.RUnlock()
 	return Config.FFmpeg_Path_Real
+}
+func Get_DenoPath(Config *ProgramConfig) string {
+	Config.Mutex.RLock()
+	defer Config.Mutex.RUnlock()
+	return Config.Deno_Path_Real
 }
 
 func UpdateConfig(Config *ProgramConfig) error {
