@@ -139,8 +139,6 @@ func OpenConfig(ConfigPath string) error {
 	YtDlpConfigPath := filepath.Join(CURRENT_WORKING_DIRECTORY, YT_DLP_CONFIG_FILENAME)
 	GLOBAL_YT_DLP_CONFIG_PATH = YtDlpConfigPath
 	
-	fmt.Printf("GLOBAL_YT_DLP_CONFIG_PATH: %s\n", GLOBAL_YT_DLP_CONFIG_PATH)
-	
 	YtDlpConfigFile, err := os.OpenFile(YtDlpConfigPath, os.O_RDWR, 0644)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		YtDlpConfigFile, err = os.OpenFile(YtDlpConfigPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
