@@ -1,5 +1,6 @@
 
 Abillity to add multiple channel urls for a single channel
+Select multiple videos and do bulk actions such as (delete, refresh, etc...)
 
 Automatically update yt-dlp binary (if possible)
 
