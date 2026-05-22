@@ -17,7 +17,7 @@ _(You might be able to build from source on other platforms, although I haven't 
 # Installation
 
 Extract the contents of autoytdlpmanager-windows.zip into a new folder then run autoytdlpmanager.exe
-The program should open and tell you where the server is being hosted, by default it's https://localhost:8867 (The server port can be changed in config.json)
+The program should open and tell you where the server is being hosted, by default it's localhost:8867 (The server port can be changed in config.json)
 
 config.json is created after you run autoytdlpmanager.exe the first time.
 Editing config.json while the program is running does not reload the config. Please just edit the config in the web ui config tab or restart the program for changes to apply.
@@ -27,9 +27,9 @@ If the program closes after a few seconds (or it closes instantly) then you migh
 # Dependencies
 
 This program depends on:
-- yt-dlp
+- yt-dlp ([github.com/yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp))
 - ytarchive ([This forked version by dreammu specificly](https://github.com/dreammu/ytarchive))
-- ffmpeg
+- ffmpeg ([ffmpeg.org/download.html](https://ffmpeg.org/download.html), I recommend the builds from [gyan.dev/ffmpeg/builds/](https://www.gyan.dev/ffmpeg/builds/))
 
 Although it's supported to just put these dependencies straight into the program's directory,
 it's recommended that you add these to your system path environment!
