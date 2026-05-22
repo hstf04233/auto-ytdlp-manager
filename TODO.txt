@@ -2,3 +2,5 @@
 Abillity to add multiple channel urls for a single channel
 
 Download live stream chat in real time
+
+Download the video thumbnails into a database instead
