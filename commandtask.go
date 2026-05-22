@@ -383,13 +383,18 @@ func CL_CancelTask(Task *CommandTask) error {
 		CanCancel = true
 	}
 	
-	err := Task.Cmd.Process.Kill()
-	if err != nil {
-		L_Printf("Cannot kill process | err: %v\n", err)
-		return err
+	if Task.Cmd != nil {
+		err := Task.Cmd.Process.Kill()
+		if err != nil {
+			L_Printf("Cannot kill process | err: %v\n", err)
+			return err
+		}
 	}
 	if CanCancel {
 		CL_FinishTask(Task, TASK_STATUS_CANCELED)
+		
+		CL_Logf(Task, "\nThis task was canceled manually.\n")
+		DB_UpdateCommandTaskInfo(Task)
 	}
 	
 	return nil

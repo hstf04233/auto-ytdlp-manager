@@ -1343,6 +1343,15 @@ function clearTaskFilters(dontLoadTasks) {
   }
 }
 
+async function cancelTask(id) {
+  try {
+    await API.post(`/api/cancel-task/${id}`, {});
+    loadTasks();
+  } catch (err) {
+    showToast(`Failed to cancel task: ${err.message}`, 'error');
+  }
+}
+
 async function loadTasks() {
   areTasksLoading = true;
   try {
@@ -1426,6 +1435,10 @@ function renderTasks() {
       const chId = t.basic_channel_info.id;
       channelInfo = `<a href="#" class="task-channel" target="_blank" onclick="event.preventDefault();event.stopPropagation();document.getElementById('taskChannelFilter').value='${chId}';taskPage=0;loadTasks();" title="Filter by this channel">${chName}</a>`;
     }
+    let cancelTaskHtml = '';
+    if (t.status == 0) {
+      cancelTaskHtml = `<a href="#" class="task-channel" target="_blank" onclick="event.preventDefault();cancelTask('${t.id}');">Cancel Task</a>`;
+    }
     let videoInfo = '';
     if (t.basic_video_info) {
       const vTitle = escHtml(t.basic_video_info.title || "");
@@ -1448,6 +1461,7 @@ function renderTasks() {
         ${taskStatusBadge(t.status)}
         ${taskTypeBadge(t.type)}
       </div>
+      ${cancelTaskHtml || "<br>"}
       ${channelInfo ? `<div class="task-item-channel">${channelInfo}</div>` : ''}
       ${videoInfo ? `<div class="task-item-video">${videoInfo}</div>` : ''}
     </div>

@@ -258,6 +258,12 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		return false
 	}
 	
+	if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
+		// This task was canceled!! don't do anything.
+		return false
+	}
+	
+	
 	DB_UpdateVideoInfo(Video)
 	
 	if ChannelType == ACHANNEL_TYPE__UNUSED || ChannelType == ACHANNEL_TYPE_LIST_AND_IGNORE {
@@ -475,6 +481,7 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 	}
 	if err == nil && len(RefreshableVideos) > 0 {
 		for _, Video := range(RefreshableVideos) {
+			if Task.Status != TASK_STATUS_RUNNING { return }
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
 			RefreshVideoInfo(AChannel, Video, Task)

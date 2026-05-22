@@ -1,2 +1,4 @@
 
-Abillity to add multiple channel urls for a single channel!
+Abillity to add multiple channel urls for a single channel
+
+Download live stream chat in real time

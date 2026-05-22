@@ -572,6 +572,37 @@ func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("{\"Success\":true}"))
 }
 
+func API_CancelTask(w http.ResponseWriter, r *http.Request) {
+	RequestId := path.Base(r.URL.Path)
+	if strings.HasPrefix(r.URL.Path, "cancel-task/") && RequestId != "" {
+		if len(RequestId) > API_MAX_REQUEST_ID {
+			http.Error(w, "Invalid task id.", http.StatusBadRequest)
+			return
+		}
+		Task, err := CL_GetCommandTask(RequestId)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error when getting task: %v !", err), http.StatusInternalServerError)
+			return
+		}
+		if Task == nil {
+			http.Error(w, "Task not found.", http.StatusNotFound)
+			return
+		}
+		
+		err = CL_CancelTask(Task)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error when canceling task: %v !", err), http.StatusInternalServerError)
+			return
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("{\"Success\":true}"))
+		return
+	}
+	
+	http.Error(w, "Task id required.", http.StatusBadRequest)
+	return
+}
 func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if strings.HasPrefix(r.URL.Path, "tasks/") && RequestId != "" {
@@ -894,6 +925,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		  api/tasks/{video_id} will give you a specific task.
 		*/
 		API_GetTasks(w, r)
+	} else if (strings.HasPrefix(Path, "cancel-task/")) && Method == "POST" {
+		API_CancelTask(w, r)
 	} else if strings.HasPrefix(Path, "get-realtime-task-output/") && Method == "GET" {
 		API_GetTaskOutput(w, r)
 	} else if strings.HasPrefix(Path, "config") && Method == "GET" {
