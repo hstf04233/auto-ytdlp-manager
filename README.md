@@ -14,9 +14,8 @@ _(You might be able to build from source on other platforms, although I haven't 
 
 # Installation
 
-Create a new folder and put "autoytdlpmanager.exe" in it.
-Then run autoytdlpmanager.exe
-A command prompt should open and tell you where the server is being hosted, by default it's localhost:8867 (The port can be changed in config.json)
+Extract the contents of autoytdlpmanager-windows.zip into a new folder then run autoytdlpmanager.exe
+The program should open and tell you where the server is being hosted, by default it's https://localhost:8867 (The server port can be changed in config.json)
 
 config.json is created after you run autoytdlpmanager.exe the first time.
 Editing config.json while the program is running does not reload the config. Please just edit the config in the web ui config tab or restart the program for changes to apply.
