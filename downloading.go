@@ -590,7 +590,6 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 }
 
 func CheckChannelRefreshes(AChannel *ArchiveChannel) {
-	if AChannel.Url == "" { return }
 	if AChannel.IsBeingChecked { return }
 	AChannel.NeedsRefreshing = false
 	

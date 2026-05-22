@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS Videos (
 	Thumbnail    TEXT DEFAULT '',
 	Duration     FLOAT DEFAULT 0,
 	
+	UploaderName TEXT DEFAULT '',
+	UploaderUrl  TEXT DEFAULT '',
+	
 	RefreshState INTEGER NOT NULL DEFAULT 0,
 	Status       INTEGER NOT NULL DEFAULT 0,
 	QueuedAction INTEGER NOT NULL DEFAULT 0,
@@ -200,8 +203,8 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	defer VideoDBLock.Unlock()
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT INTO Videos(Id, FromChannel, Title, Description, Url, Availability, Resolution, Thumbnail, ReleaseDate, Duration, VideoType, UpdatedAt, AddedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO Videos(Id, FromChannel, Title, Description, Url, Availability, Resolution, Thumbnail, ReleaseDate, Duration, UploaderName, UploaderUrl, VideoType, UpdatedAt, AddedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	FromChannel=excluded.FromChannel,
 	Title=excluded.Title,
@@ -213,9 +216,13 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	
 	ReleaseDate=excluded.ReleaseDate,
 	Duration=excluded.Duration,
+	
+	UploaderName=excluded.UploaderName,
+	UploaderUrl=excluded.UploaderUrl,
+	
 	VideoType=excluded.VideoType,
 	UpdatedAt=excluded.UpdatedAt
-	`, Video.Id, Video.FromChannel, Video.Title, Video.Description, Video.Url, Video.Availability, Video.Resolution, Video.Thumbnail, Video.ReleaseDate, Video.Duration, Video.VideoType, TimeNow, TimeNow)
+	`, Video.Id, Video.FromChannel, Video.Title, Video.Description, Video.Url, Video.Availability, Video.Resolution, Video.Thumbnail, Video.ReleaseDate, Video.Duration, Video.UploaderName, Video.UploaderUrl, Video.VideoType, TimeNow, TimeNow)
 	
 	if err != nil {
 		L_Printf("DB_UpdateVideoInfo ERR: %v\n", err)
@@ -301,7 +308,9 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, QueuedAction, ReleaseDate, Duration, VideoType,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, QueuedAction, ReleaseDate, Duration,
+	UploaderName, UploaderUrl,
+	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
 	`, VideoId)
 	err := VideoRow.Scan(
@@ -319,6 +328,10 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		&VideoInfo.QueuedAction,
 		&VideoInfo.ReleaseDate,
 		&VideoInfo.Duration,
+		
+		&VideoInfo.UploaderName,
+		&VideoInfo.UploaderUrl,
+		
 		&VideoInfo.VideoType,
 		
 		&VideoInfo.AddedAt,
@@ -411,7 +424,9 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	Args := []interface{}{}
 	
 	Statement := `
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, QueuedAction, ReleaseDate, Duration, VideoType,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, QueuedAction, ReleaseDate, Duration,
+	UploaderName, UploaderUrl,
+	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos`
 	
 	QLimit := Limit
@@ -457,6 +472,10 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			&VideoInfo.QueuedAction,
 			&VideoInfo.ReleaseDate,
 			&VideoInfo.Duration,
+			
+			&VideoInfo.UploaderName,
+			&VideoInfo.UploaderUrl,
+			
 			&VideoInfo.VideoType,
 			
 			&VideoInfo.AddedAt,
@@ -515,7 +534,6 @@ type DB_VideoListStats struct{
 }
 
 var DB_VideoStatsCache = NewCache(time.Second * 4)
-
 
 func DB_GetVideoStatsFromQuery(Query ListVideosQuery) (*DB_VideoListStats, error) {
 	CacheKey := fmt.Sprintf("%s %s %d", Query.FromChannelId, Query.SearchQuery, Query.Status)
@@ -829,19 +847,14 @@ func OpenDB() error {
 	}
 	
 	DatabaseUpgrades := []string{
-		"ALTER TABLE Videos ADD COLUMN VideoType INTEGER DEFAULT 0",
-		"ALTER TABLE Videos ADD COLUMN RefreshState INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE Videos ADD COLUMN Availability TEXT NOT NULL DEFAULT ''",
-		"ALTER TABLE Videos ADD COLUMN Resolution TEXT DEFAULT ''",
-		"ALTER TABLE Videos ADD COLUMN Filename TEXT DEFAULT ''",
-		"ALTER TABLE Videos ADD COLUMN Thumbnail TEXT DEFAULT ''",
-		"ALTER TABLE CommandTasks ADD COLUMN Title TEXT DEFAULT ''",
-		"ALTER TABLE CommandTasks ADD COLUMN UpdatedAt DATETIME NOT NULL DEFAULT 0",
-		
-		"ALTER TABLE Videos ADD COLUMN Description TEXT DEFAULT ''",
-		
 		"ALTER TABLE Videos ADD COLUMN QueuedAction INTEGER NOT NULL DEFAULT 0",
 		"ALTER TABLE ArchiveChannels ADD COLUMN PlaylistEnd  INTEGER NOT NULL default 20",
+		
+		"ALTER TABLE Videos ADD COLUMN PlaylistEnd INTEGER NOT NULL default 20",
+		
+		// v0.12
+		"ALTER TABLE Videos ADD COLUMN UploaderName TEXT DEFAULT ''",
+		"ALTER TABLE Videos ADD COLUMN UploaderUrl  TEXT DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

@@ -19,18 +19,21 @@ const (
 )
 
 type VideoInfo struct {
-	FromChannel  string  `json:"from_channel"`	// Channel id
-	Title        string  `json:"title"`
-	Description  string  `json:"description"`
-	Url          string  `json:"url"`
-	Id           string  `json:"id"`
-	Availability string  `json:"availability"`  // public, unlisted, private etc...
-	Resolution   string  `json:"resolution"`
-	Thumbnail    string  `json:"thumbnail_url"`
+	FromChannel  string `json:"from_channel"`	// Channel id
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Url          string `json:"url"`
+	Id           string `json:"id"`
+	Availability string `json:"availability"`  // public, unlisted, private etc...
+	Resolution   string `json:"resolution"`
+	Thumbnail    string `json:"thumbnail_url"`
 	
-	Filename           string  `json:"-"`
-	DownloadedFilename string  `json:"filename"`		// Where the video is stored on device (This is only the file name, not the file path...)
-	VideoFileExists    bool    `json:"videofile_exists"`
+	UploaderUrl  string `json:"uploader_url"`
+	UploaderName string `json:"uploader"`
+	
+	Filename           string `json:"-"`
+	DownloadedFilename string `json:"filename"`		// Where the video is stored on device (This is only the file name, not the file path...)
+	VideoFileExists    bool   `json:"videofile_exists"`
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
@@ -49,17 +52,20 @@ type VideoInfo struct {
 }
 
 type YT_DLP_OUTVIDEO struct {
-	Title        string  `json:"title"`
-	FullTitle    string  `json:"fulltitle"`
-	Description  string  `json:"description"`
-	Url          string  `json:"webpage_url"`
-	Id           string  `json:"id"`
-	Availability string  `json:"availability"`
-	Resolution   string  `json:"resolution"`
-	Thumbnail    string  `json:"thumbnail"`
-	Filename     string  `json:"filename"`
+	Title        string `json:"title"`
+	FullTitle    string `json:"fulltitle"`
+	Description  string `json:"description"`
+	Url          string `json:"webpage_url"`
+	Id           string `json:"id"`
+	Availability string `json:"availability"`
+	Resolution   string `json:"resolution"`
+	Thumbnail    string `json:"thumbnail"`
+	Filename     string `json:"filename"`
 	
-	Duration     float64  `json:"duration"`
+	UploaderUrl  string `json:"channel_url"`
+	UploaderName string `json:"uploader"`
+	
+	Duration     float64 `json:"duration"`
 	
 	Timestamp        int64 `json:"timestamp"`
 	ReleaseTimestamp int64 `json:"release_timestamp"`
@@ -100,9 +106,13 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	if OutVideo.Thumbnail != "" {
 		VideoInfo.Thumbnail = OutVideo.Thumbnail
 	}
-	//if OutVideo.Filename != "" && VideoInfo.Filename == "" {
-		VideoInfo.Filename = OutVideo.Filename
-	//}
+	if OutVideo.UploaderName != "" {
+		VideoInfo.UploaderName = OutVideo.UploaderName
+	}
+	if OutVideo.UploaderUrl != "" {
+		VideoInfo.UploaderUrl = OutVideo.UploaderUrl
+	}
+	VideoInfo.Filename = OutVideo.Filename
 	
 	if OutVideo.ReleaseTimestamp != 0 {
 		VideoInfo.ReleaseDate = OutVideo.ReleaseTimestamp
