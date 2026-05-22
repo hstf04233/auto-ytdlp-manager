@@ -61,7 +61,7 @@
     <div class="page" id="page-videos">
       <div class="page-header">
         <h2>Videos</h2>
-        <button class="btn btn-primary" onclick="openAddVideosModal()">+ Download Or Add Videos</button>
+        <button class="btn btn-primary" onclick="openAddVideosModal()">Download Or Add Videos</button>
       </div>
 
       <div class="stats-row" id="videoStats"></div>
@@ -404,11 +404,11 @@
         <button type="button" class="btn btn-secondary" title="This will download videos from the channel" onclick="checkCurrentChannel(-2, false)">Download videos first</button>
         <button type="button" class="btn btn-secondary" title="This will download the all videos from the channel" onclick="checkCurrentChannel(-2, true)">Download all videos from this channel first</button>
         <hr>
-        <button type="button" class="btn btn-secondary" title="This will only scrape videos from the channel and will not download anything." onclick="checkCurrentChannel(3, false)">Don't download anything, just grab videos and their metadata</button>
-        <button type="button" class="btn btn-secondary" title="This will scrape all the videos from the channel and will not download anything." onclick="checkCurrentChannel(3, true)">Don't download anything, just grab all videos and their metadata</button>
+        <button type="button" class="btn btn-secondary" title="This will only scrape videos from the channel and will not download anything." onclick="checkCurrentChannel(3, false)">Grab metadata first. Don't download anything yet</button>
+        <button type="button" class="btn btn-secondary" title="This will scrape all the videos from the channel and will not download anything." onclick="checkCurrentChannel(3, true)">Grab metadata for all videos under this channel first. Don't download anything yet</button>
         <hr>
         
-        <button type="button" class="btn btn-secondary" onclick="closeChannelStartModal()">Do nothing.</button>
+        <button type="button" class="btn btn-secondary" onclick="closeChannelStartModal()">Do nothing</button>
       </div>
     </div>
   </div>
@@ -444,9 +444,13 @@
         
         <hr>
         
+        <div class="form-group">
+          <label id = "avm-DownloadDir"></label>
+        </div>
+        
         <div class="modal-actions-list">
           <button type="button" class="btn btn-primary" onclick="sendAddVideosForm(0);">Download</button>
-          <button type="button" class="btn btn-primary" onclick="sendAddVideosForm(3);">Don't download, just grab metadata</button>
+          <button type="button" class="btn btn-secondary" onclick="sendAddVideosForm(3);">Grab metadata (Don't download)</button>
         </div>
       </form>
     </div>
