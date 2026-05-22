@@ -308,11 +308,11 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
   dropdown.style.left = rect.left + 'px';
   
   let statuses = [
-    [0, "Set to 'Queued'"],
+    [0, "Set to 'Queued' (Cancel download, if downloading.)"],
     //[1, 'Downloading'],
     //[2, 'Downloaded'],
     //[3, 'Failed'],
-    [4, "Set to 'Ignored' (Don't download)"],
+    [4, "Set to 'Ignored' (Cancel download, if downloading.)"],
     //[-100, "Download this video"],
   ];
   
@@ -1516,7 +1516,13 @@ function renderTasks() {
     }
     let cancelTaskHtml = '';
     if (t.status == 0) {
-      cancelTaskHtml = `<a href="#" class="task-channel" target="_blank" onclick="event.preventDefault();cancelTask('${t.id}');">Cancel Task</a>`;
+      // This task is running
+      let cancelText = "Cancel Task";
+      if (t.type == 2) {
+        // This is a download task
+        cancelText = "Cancel Download";
+      }
+      cancelTaskHtml = `<a href="#" class="task-channel" target="_blank" onclick="event.preventDefault();cancelTask('${t.id}');">${cancelText}</a>`;
     }
     let videoInfo = '';
     if (t.basic_video_info) {

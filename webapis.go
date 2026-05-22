@@ -620,6 +620,23 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 	
 	if Body.Status != nil && *Body.Status >= 0 && *Body.Status <= 10 {
 		DB_UpdateVideoStatus(VideoInfo, *Body.Status)
+		if VideoInfo.Status == VIDEO_STATUS_IGNORED || VideoInfo.Status == VIDEO_STATUS_QUEUED {
+			L_Printf("Canceling active downloading tasks!\n") // TODO: TEMP
+			// Cancel all download tasks for this video
+			Tasks, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
+				Status: 0,
+				Type: TASK_TYPE_DOWNLOAD,
+				FromVideoId: VideoInfo.Id,
+			})
+			if err == nil {
+				L_Printf("Length tasks: %d\n", len(Tasks)) // TODO: TEMP
+				for _, Task := range(Tasks) {
+					CL_CancelTask(Task)
+				}
+			} else if err != nil {
+				L_Printf("Error: %v\n", err) // TODO: TEMP
+			}
+		}
 	}
 	
 	if Body.RefreshState != nil {

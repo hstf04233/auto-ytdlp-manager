@@ -378,6 +378,13 @@ func GetRealArgs(Args []string) string {
 }
 
 func CL_CancelTask(Task *CommandTask) error {
+	ARCT_Lock.Lock()
+	ActiveTask := AllRunningCommandTasks[Task.Id]
+	ARCT_Lock.Unlock()
+	if Task != ActiveTask {
+		Task = ActiveTask
+	}
+	
 	CanCancel := false
 	if Task.Status == TASK_STATUS_RUNNING {
 		CanCancel = true
