@@ -386,7 +386,6 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		
 		DB_UpdateCommandTaskInfo(Task)
 	}
-	DB_UpdateCommandTaskInfo(Task)
 	
 	VideosCheckedCount := 0
 	
@@ -398,8 +397,8 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		if CheckVideoAndDownload(AChannel, &Video, Task, CheckSettings) {
 			VideosCheckedCount += 1
 		}
+		DB_UpdateCommandTaskInfo(Task)
 	}
-	DB_UpdateCommandTaskInfo(Task)
 	
 	QueuedVideosList, err := DB_ListVideos(-1, 0, ListVideosQuery{
 		RefreshState: -1,
