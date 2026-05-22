@@ -643,16 +643,15 @@ function renderChannels() {
     <div class="stat-card"><div class="stat-value" style="color:var(--text-secondary)">${disabled}</div><div class="stat-label">Disabled</div></div>
   `;
   */
-
-  if (allChannels.length === 0) {
-    container.innerHTML = '<div class="loading">No channels yet. Add one to get started!</div>';
-    return;
-  }
   
   container.innerHTML = '';
   
+  let visibleChannelsCount = 0;
+  
   for (const ch of allChannels) {
     if (ch.hidden) continue;
+    
+    visibleChannelsCount += 1;
     
     channelHtml = `
       <div class="card channel-card" id="channel-${ch.id}">
@@ -680,6 +679,11 @@ function renderChannels() {
     container.insertAdjacentHTML("beforeend", channelHtml);
     
     renderUpdateChannel(ch);
+  }
+  
+  if (visibleChannelsCount === 0) {
+    container.innerHTML = '<div class="loading">No channels yet. Add one to get started!</div>';
+    return;
   }
 }
 
