@@ -93,6 +93,7 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
 		return err
 	}
 	WD.ChannelsLock.Lock()
+	defer WD.ChannelsLock.Unlock()
 	NewChannels := make([]*ArchiveChannel, 0, len(WD.Channels))
 	
 	for _, AChannel := range(WD.Channels) {
@@ -105,14 +106,11 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
 	}
 	
 	WD.Channels = NewChannels
-	WD.ChannelsLock.Unlock()
 	
 	return nil
 }
 
 func GetManualArchiveChannel(WD *WatchingBundle) *ArchiveChannel {
-	WD.ChannelsLock.RLock()
-	defer WD.ChannelsLock.RUnlock()
 	AChannel := GetArchiveChannelFromId(WD, MANUAL_CHANNEL_ID)
 	if AChannel == nil {
 		// Create the manual channel
@@ -638,8 +636,6 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 }
 
 func CheckChannels(WD *WatchingBundle) {
-	WD.ChannelsLock.RLock()
-	
 	TimeNow := time.Now().UTC().UnixMilli()
 	
 	for _, AChannel := range(WD.Channels) {
@@ -675,8 +671,6 @@ func CheckChannels(WD *WatchingBundle) {
 			CheckAllVideos: CheckAll,
 		})
 	}
-	
-	WD.ChannelsLock.RUnlock()
 }
 
 func InitDownloading() {
