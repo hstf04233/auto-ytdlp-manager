@@ -16,6 +16,8 @@ _(You might be able to build from source on other platforms, although I haven't 
 
 # Installation
 
+Download autoytdlpmanager-windows.zip from the [latest release](https://github.com/hstf04233/auto-ytdlp-manager/releases/latest)
+
 Extract the contents of autoytdlpmanager-windows.zip into a new folder then run autoytdlpmanager.exe
 The program should open and tell you where the server is being hosted, by default it's localhost:8867 (The server port can be changed in config.json)
 
