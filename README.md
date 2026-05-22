@@ -1,6 +1,8 @@
 # auto-ytdlp-manager
 
-Simple web ui program for archiving videos, and livestreams in real time!
+![Example of what the web ui looks like](./.github/webui_example.png)
+
+Simple web ui program for archiving videos, and downloading YouTube livestreams in real time!
 
 I really only built this for myself because I needed something that supports yt-dlp and ytarchive at the same time.
 
