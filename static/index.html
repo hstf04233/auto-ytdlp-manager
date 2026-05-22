@@ -61,6 +61,7 @@
     <div class="page" id="page-videos">
       <div class="page-header">
         <h2>Videos</h2>
+        <button class="btn btn-primary" onclick="openAddVideosModal()">+ Download Or Add Videos</button>
       </div>
 
       <div class="stats-row" id="videoStats"></div>
@@ -391,6 +392,7 @@
     </div>
   </div>
   
+    <!-- START CHANNEL MODAL (What should this channel do?) -->
   <div class="modal-overlay" id="channelStartModal">
     <div class="modal" onclick="event.stopPropagation();">
       <div class="modal-header">
@@ -411,6 +413,31 @@
     </div>
   </div>
 
+  <!-- ADD VIDEOS MODAL -->
+  <div class="modal-overlay" id="addVideosModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Video Details</h2>
+        <button class="modal-close" onclick="closeAddVideosModal()">&times;</button>
+      </div>
+      
+      <form id="channelForm" onsubmit="event.preventDefault();sendAddVideosForm(0);" autocomplete="off">
+        <div class="form-group">
+          <label for="avm-ChannelUrl">Video URL / Channel URL / Playlist URL</label>
+          <input type="url" id="avm-ChannelUrl" placeholder="https://www.youtube.com/watch?v=..." maxlength="8192" required>
+        </div>
+        
+        <hr>
+        
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeAddVideosModal();">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="sendAddVideosForm(0);">Download</button>
+          <button type="button" class="btn btn-primary" onclick="sendAddVideosForm(3);">Don't download, just grab metadata</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
   <!-- VIDEO DETAILS MODAL -->
   <div class="modal-overlay" id="videoDetailsModal">
     <div class="modal modal-video-details">

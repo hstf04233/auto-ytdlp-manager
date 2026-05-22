@@ -230,6 +230,7 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 	
 	if Body.InstantCheck {
 		go CheckChannel(AChannel, ChannelCheckSettings{
+			QualitySelect: -1,
 			ForceEnable: true,
 			
 			CheckAllVideos: Body.CheckAll,
@@ -356,6 +357,63 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 			}
 		}
 	}
+}
+
+func API_AddVideos(w http.ResponseWriter, r *http.Request) {
+	var Body struct {
+		DownloadUrl string `json:"download_url"`
+		TargetChannel string `json:"target_channel_id"`
+		
+		QualitySelect int `json:"quality_select"`
+		Type int `json:"type"`
+	}
+	Body.QualitySelect = -1
+	
+	dec := json.NewDecoder(r.Body)
+	if err := dec.Decode(&Body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if len(Body.DownloadUrl) > API_MAX_URL_LENGTH {
+		http.Error(w, fmt.Sprintf("Download url must be shorter than %d characters.", API_MAX_URL_LENGTH), http.StatusBadRequest)
+		return
+	}
+	
+	AChannel := GetManualArchiveChannel(&WatchedDownloading)
+	if AChannel == nil {
+		http.Error(w, fmt.Sprintf("Could not find target channel.", API_MAX_URL_LENGTH), http.StatusNotFound)
+		return
+	}
+	
+	CS := &CheckStatus{}
+	
+	go ManuallyAddVideos(AChannel, Body.DownloadUrl, Body.Type, CS)
+	
+	Status := 0
+	QuitTime := time.Now().UTC().Add(time.Duration(time.Minute * 1))
+	
+	for {
+		time.Sleep(time.Duration(time.Millisecond * 50))
+		CS.Mutex.RLock()
+		Status = CS.Status
+		CS.Mutex.RUnlock()
+		
+		if time.Now().UTC().UnixMilli() > QuitTime.UnixMilli() {
+			Status = CHECK_STATUS_FAILED
+		}
+		
+		if Status >= CHECK_STATUS_ADDED_VIDEOS || Status == CHECK_STATUS_FAILED {
+			break
+		}
+	}
+	
+	if Status == CHECK_STATUS_FAILED {
+		http.Error(w, "An error occured when trying to check videos...", http.StatusInternalServerError)
+		return
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte("{\"Success\":true}"))
 }
 
 func API_GetVideos(w http.ResponseWriter, r *http.Request) {
@@ -912,6 +970,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "DELETE" {
 		// DELETE api/videos/{video_id} will delete a video
 		API_DeleteVideo(w, r)
+	} else if (strings.HasPrefix(Path, "add-videos")) && Method == "POST" {
+		API_AddVideos(w, r)
 	} else if (strings.HasPrefix(Path, "get-video-status/")) && Method == "GET" {
 		// api/get-video-status/{video_id} will return just the status of the video and nothing else.
 		// Returns as json (example: {status: 0})

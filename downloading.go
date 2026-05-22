@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	ACHANNEL_TYPE_VIDEOS = 0
-	ACHANNEL_TYPE_LIVE   = 1
+	ACHANNEL_TYPE_VIDEOS  = 0
+	ACHANNEL_TYPE_LIVE    = 1
 	ACHANNEL_TYPE__UNUSED = 2
 	ACHANNEL_TYPE_LIST_AND_IGNORE = 3
 )
@@ -27,6 +27,10 @@ const (
 	VIDEO_STATUS_DOWNLOADED  = 2
 	VIDEO_STATUS_FAILED      = 3
 	VIDEO_STATUS_IGNORED     = 4
+)
+
+const (
+	MANUAL_CHANNEL_ID = "-Manual-Channel-"
 )
 
 type ArchiveChannel struct {
@@ -46,6 +50,7 @@ type ArchiveChannel struct {
 	NeedsRefreshing bool `json:"-"`
 	
 	Enabled        bool `json:"enabled"`
+	Hidden         bool `json:"hidden"`
 	IsBeingChecked bool `json:"-"`
 	
 	NextCheckMSEC            int64 `json:"_nextCheckMsec"`
@@ -105,6 +110,32 @@ func RemoveArchiveChannel(WD *WatchingBundle, Id string) error {
 	return nil
 }
 
+func GetManualArchiveChannel(WD *WatchingBundle) *ArchiveChannel {
+	WD.ChannelsLock.RLock()
+	defer WD.ChannelsLock.RUnlock()
+	AChannel := GetArchiveChannelFromId(WD, MANUAL_CHANNEL_ID)
+	if AChannel == nil {
+		// Create the manual channel
+		AChannel = &ArchiveChannel{
+			Id: MANUAL_CHANNEL_ID,
+			Name: "Manually Downloaded Videos",
+			Enabled: false,
+			
+			Hidden: true,
+			PlaylistEnd: -1,
+		}
+		err := AddArchiveChannel(WD, AChannel)
+		if err != nil {
+			L_Printf("Error when creating manual channel: %s\n", err)
+			return nil
+		}
+	} else {
+		AChannel.Hidden = true
+	}
+	
+	return AChannel
+}
+
 func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
 	WD.ChannelsLock.RLock()
 	defer WD.ChannelsLock.RUnlock()
@@ -114,7 +145,7 @@ func GetArchiveChannelFromId(WD *WatchingBundle, Id string) *ArchiveChannel {
 		}
 	}
 	
-	return  nil
+	return nil
 }
 
 func DoesFileExist(FilePath string) bool {
@@ -202,13 +233,13 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 	DB_UpdateVideoRefreshState(Video, 0)
 }
 
-func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) error {
+func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int, Task *CommandTask) error {
 	if AChannel.Type == ACHANNEL_TYPE__UNUSED || AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
 		L_Printf("DownloadVideo tried to download from a channel that doesn't allow downloads? Name: \"%s\"\n", AChannel.Name)
 		return nil
 	}
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
-	err := yt_dlp_DownloadVideo(AChannel, Video)
+	err := yt_dlp_DownloadVideo(AChannel, Video, QualitySelect)
 	if err != nil {
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		return err
@@ -217,9 +248,9 @@ func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask
 	
 	return nil
 }
-func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
+func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int, Task *CommandTask) {
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
-	err := ytarchive_DownloadLive(AChannel, Video)
+	err := ytarchive_DownloadLive(AChannel, Video, QualitySelect)
 	if err != nil {
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		return
@@ -229,8 +260,11 @@ func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTas
 }
 
 type ChannelCheckSettings struct{
+	CheckUrl    string
 	ForceEnable bool
 	OverrideChannelType int
+	
+	QualitySelect int
 	
 	CheckAllVideos bool
 }
@@ -274,6 +308,11 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		return false
 	}
 	
+	QualitySelect := AChannel.QualitySelect
+	if CheckSettings.QualitySelect >= 0 {
+		QualitySelect = CheckSettings.QualitySelect
+	}
+	
 	switch Video.VideoType {
 	case VIDEO_TYPE_ISLIVE:
 		// TODO:
@@ -282,7 +321,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 			if Task != nil {
 				CL_Logf(Task, "Downloading live stream: \"%s\" %s\n", Video.Title, Video.Url)
 			}
-			go DownloadYTLive(AChannel, Video, Task)
+			go DownloadYTLive(AChannel, Video, QualitySelect, Task)
 			break
 		}
 		
@@ -294,7 +333,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 			CL_Logf(Task, "Downloading video: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
 		}
-		err := DownloadVideo(AChannel, Video, Task)
+		err := DownloadVideo(AChannel, Video, QualitySelect, Task)
 		if err != nil {
 			if Task != nil {
 				CL_Logf(Task, "Failed to download video \"%s\" because: %v\n", Video.Title, err)
@@ -318,19 +357,118 @@ func IsChannelEnabledWithCheck(AChannel *ArchiveChannel, CheckSettings ChannelCh
 	return IsChannelEnabled(AChannel)
 }
 
+const (
+	CHECK_STATUS_GETTING_VIDEOS  = 0
+	CHECK_STATUS_ADDED_VIDEOS    = 1
+	CHECK_STATUS_CHECKING_VIDEOS = 2
+	CHECK_STATUS_FINISHED        = 3
+	
+	
+	CHECK_STATUS_FAILED = 10
+)
+
+type CheckStatus struct{
+	Mutex sync.RWMutex
+	
+	Status int
+}
+
+func SetCheckStatus(CS *CheckStatus, NewStatus int) {
+	if CS == nil {
+		return
+	}
+	
+	CS.Mutex.Lock()
+	CS.Status = NewStatus
+	CS.Mutex.Unlock()
+}
+
+func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, CS *CheckStatus) {
+	Task := CL_NewGenericTask()
+	defer func() {
+		if Task.Status == TASK_STATUS_RUNNING {
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
+		}
+	}()
+	Task.Type = TASK_TYPE_LISTING
+	Task.FromChannelId = AChannel.Id
+	Task.Title = fmt.Sprintf("Checking: \"%s\"", Url)
+	DB_UpdateCommandTaskInfo(Task)
+	
+	SetCheckStatus(CS, CHECK_STATUS_GETTING_VIDEOS)
+	VideoList, err := yt_dlp_ListVideos(Url, -1, Task)
+	if err != nil {
+		SetCheckStatus(CS, CHECK_STATUS_FAILED)
+		CL_FinishTask(Task, TASK_STATUS_FAILED)
+		return
+	}
+	DB_UpdateCommandTaskInfo(Task)
+	
+	CL_Logf(Task, "Found %d videos\n", len(VideoList))
+	
+	// Add the videos to the queued list.
+	for i := len(VideoList)-1; i >= 0; i-- {
+		if Task.Status != TASK_STATUS_RUNNING { return }
+		
+		Video := &VideoList[i]
+		Video.FromChannel = AChannel.Id
+		Exists, err := DB_GetVideo(Video.Id)
+		if Exists == nil && err == nil {
+			CL_Logf(Task, "Adding new video \"%s\" %s ! \n", Video.Id, Video.Url)
+			DB_UpdateVideoInfo(Video)
+		} else if err == nil && Type != ACHANNEL_TYPE_LIST_AND_IGNORE {
+			Video = Exists
+			DB_UpdateVideoStatus(Video, VIDEO_STATUS_QUEUED)
+		}
+		time.Sleep(time.Millisecond * 1)
+		
+		DB_UpdateCommandTaskInfo(Task)
+	}
+	
+	SetCheckStatus(CS, CHECK_STATUS_ADDED_VIDEOS)
+	
+	if len(VideoList) <= 0 {
+		// This must just be a video url...
+	}
+	
+	CheckSettings := ChannelCheckSettings{
+		OverrideChannelType: Type,
+		QualitySelect: AChannel.QualitySelect,
+	}
+	
+	SetCheckStatus(CS, CHECK_STATUS_CHECKING_VIDEOS)
+	for _, Video := range(VideoList) {
+		if Task.Status != TASK_STATUS_RUNNING { return }
+		
+		Video.FromChannel = AChannel.Id
+		CheckVideoAndDownload(AChannel, &Video, Task, CheckSettings)
+		DB_UpdateCommandTaskInfo(Task)
+	}
+	
+	CL_FinishTask(Task, TASK_STATUS_FINISHED)
+}
+
 func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) {
 	AChannel.Lock.Lock()
 	if AChannel.Url == "" {
 		AChannel.Lock.Unlock()
 		return
 	}
-	if AChannel.IsBeingChecked {
-		AChannel.Lock.Unlock()
-		return
+	if AChannel.Id != MANUAL_CHANNEL_ID {
+		if AChannel.IsBeingChecked {
+			AChannel.Lock.Unlock()
+			return
+		}
+		
+		AChannel.IsBeingChecked = true
+		defer func() {AChannel.IsBeingChecked = false}()
 	}
 	
-	AChannel.IsBeingChecked = true
-	defer func() {AChannel.IsBeingChecked = false}()
+	Url := AChannel.Url
+	if CheckSettings.CheckUrl != "" {
+		Url = CheckSettings.CheckUrl
+	}
+	ChannelId := AChannel.Id
 	
 	TimeNow := time.Now().UTC().UnixMilli()
 	
@@ -343,12 +481,13 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		}
 	}()
 	Task.Type = TASK_TYPE_LISTING
-	Task.FromChannelId = AChannel.Id
-	Task.Title = fmt.Sprintf("Checking channel: \"%s\"", AChannel.Name)
+	Task.FromChannelId = ChannelId
+	if ChannelId != MANUAL_CHANNEL_ID {
+		Task.Title = fmt.Sprintf("Checking channel: \"%s\"", AChannel.Name)
+	} else {
+		Task.Title = fmt.Sprintf("Checking: \"%s\"", Url)
+	}
 	DB_UpdateCommandTaskInfo(Task)
-	
-	Url := AChannel.Url
-	ChannelId := AChannel.Id
 	
 	PlaylistEnd := AChannel.PlaylistEnd
 	if PlaylistEnd <= -1 {
@@ -357,7 +496,7 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 	}
 	if CheckSettings.CheckAllVideos {
 		PlaylistEnd = -1
-		L_Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
+		//L_Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
 		CL_Logf(Task, "Checking every video for \"%s\" ! \n", AChannel.Name)
 	}
 	AChannel.Lock.Unlock()
@@ -521,6 +660,7 @@ func CheckChannels(WD *WatchingBundle) {
 		}
 		
 		go CheckChannel(AChannel, ChannelCheckSettings{
+			QualitySelect: -1,
 			OverrideChannelType: -1,
 			ForceEnable: false,
 			
@@ -536,6 +676,8 @@ func InitDownloading() {
 	if err != nil {
 		panic(err)
 	}
+	
+	GetManualArchiveChannel(&WatchedDownloading)
 	
 	NextTasksDatabaseCleanUp := time.Now().UTC().Unix()+10
 	

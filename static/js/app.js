@@ -626,6 +626,8 @@ function renderChannels() {
   container.innerHTML = '';
   
   for (const ch of allChannels) {
+    if (ch.hidden) continue;
+    
     channelHtml = `
       <div class="card channel-card" id="channel-${ch.id}">
         <div class="channel-info">
@@ -895,6 +897,35 @@ async function checkCurrentChannel(overrideType, allVideos) {
   }
   
   closeChannelStartModal();
+}
+
+
+function openAddVideosModal() {
+  document.getElementById('addVideosModal').classList.add('active');
+  
+  document.getElementById('avm-ChannelUrl').value = '';
+}
+function closeAddVideosModal() {
+  document.getElementById('addVideosModal').classList.remove('active');
+}
+
+async function sendAddVideosForm(type) {
+  const url = document.getElementById('avm-ChannelUrl').value.trim();
+  
+  const body = {
+    download_url: url,
+    type: type,
+  };
+  
+  try {
+    await API.post('/api/add-videos', body);
+    //showToast('Channel added!', 'success');
+    
+    closeAddVideosModal();
+    loadVideos();
+  } catch (err) {
+    showToast(`Failed: ${err.message}`, 'error');
+  }
 }
 
 async function saveChannel(e) {
@@ -1648,6 +1679,7 @@ function setupModalClickExit(modalId, callback) {
 }
 setupModalClickExit("channelModal", closeChannelModal)
 setupModalClickExit("videoDetailsModal", closeVideoDetailsModal)
+setupModalClickExit("addVideosModal", closeAddVideosModal)
 
 window.addEventListener('popstate', function (e) {
   const tab = window.location.pathname.replace(/^\//, '') || '';
@@ -1658,6 +1690,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeVideoDetailsModal();
     closeChannelModal();
+    closeAddVideosModal();
   }
 });
 

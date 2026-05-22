@@ -357,12 +357,14 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 	}
 	
 	scanner := bufio.NewScanner(strings.NewReader(string(Out)))
+	ScannedAnything := false
 	for scanner.Scan() {
+		ScannedAnything = true
 		OutVideo := YT_DLP_OUTVIDEO{}
 		err = json.Unmarshal([]byte(scanner.Text()), &OutVideo)
 		if err != nil {
 			ErrorMsg := fmt.Sprintf("Error when decoding json: %v\n", err)
-			fmt.Print(ErrorMsg)
+			L_Printf("%s", ErrorMsg)
 			if Task != nil {
 				CL_Logf(Task, "%s", ErrorMsg)
 				CL_FinishTask(Task, TASK_STATUS_FAILED)
@@ -381,6 +383,19 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 		}
 		*/
 	}
+	if ScannedAnything == false {
+		// The output json must not be a playlist?
+		var VideoInfo VideoInfo
+		
+		OutVideo := YT_DLP_OUTVIDEO{}
+		err = json.Unmarshal([]byte(Out), &OutVideo)
+		if err == nil {
+			PopulateVideoInfoFromOutVideo(&VideoInfo, OutVideo)
+			OutVideos = append(OutVideos, VideoInfo)
+		} else {
+			L_Printf("Json error: %v\n", err)
+		}
+	}
 	
 	if Task != nil {
 		DB_UpdateCommandTaskInfo(Task)
@@ -391,7 +406,7 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 
 
 // This must be called with a Video that has been passed through RequestVideoInfo()
-func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
+func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
 	//OutputTemplate := GetOutputTemplate(AChannel)
 	
@@ -421,7 +436,7 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 		
 		Args = append(Args, "--ffmpeg-location", Get_FFmpegPath(G_Config))
 	}
-	if AChannel.QualitySelect > 0 {
+	if QualitySelect > 0 {
 		Args = append(Args, "-S", fmt.Sprintf("res:%d", AChannel.QualitySelect))
 	}
 	
@@ -445,7 +460,7 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 }
 
 // This must be called with a Video that has been passed through RequestVideoInfo()
-func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) {
+func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int) (error) {
 	DownloadDir := GetDownloadDir(AChannel)
 	
 	err := os.MkdirAll(DownloadDir, 0755)
@@ -454,7 +469,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo) (error) 
 	}
 	
 	//144p, 240p, 360p, 480p, 720p, 720p60, 1080p, 1080p60, 1440p, 1440p60, 2160p, 2160p60, best
-	QualitySelect := AChannel.QualitySelect
+	//QualitySelect := AChannel.QualitySelect
 	QualityString := "144p/best"
 	if QualitySelect >= 2160 {
 		QualityString = "2160p60/2160p/best"
