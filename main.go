@@ -127,6 +127,7 @@ func main() {
 	
 	err = OpenDB()
 	if err != nil {
+		L_Printf("Database failed to open because: %v\n", err)
 		panic(err)
 	}
 	
