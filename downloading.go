@@ -224,9 +224,9 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 	err := RequestVideoInfo(AChannel, Video.Url, Video)
 	if err != nil {
 		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
-		//DB_UpdateVideoAvalibility(Video, "UNKNOWN")
 		DB_UpdateVideoInfo(Video)
 		DB_UpdateVideoRefreshState(Video, 0)
+		DB_UpdateVideoAvalibility(Video, Video.Availability)
 		return
 	}
 	DB_UpdateVideoInfo(Video)
@@ -288,6 +288,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 	err := RequestVideoInfo(AChannel, Video.Url, Video)
 	if err != nil {
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
+		DB_UpdateVideoAvalibility(Video, Video.Availability)
 		CL_Logf(Task, "Failed to grab video info for \"%s\"... Error: %v\n", Video.Title, err)
 		return false
 	}
