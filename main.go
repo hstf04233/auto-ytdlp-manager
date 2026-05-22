@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	//"yt-stream-manager/webstatic"
@@ -31,6 +32,12 @@ func CommandExists(cmd string) bool {
 	return err == nil
 }
 func FindCommand(cmd string) string {
+	if runtime.GOOS == "windows" {
+		if filepath.Ext(cmd) == "" {
+			cmd += ".exe"
+		}
+	}
+	
 	if filepath.IsLocal(cmd) {
 		LocalCmd := fmt.Sprintf("%s/%s", CURRENT_WORKING_DIRECTORY, cmd)
 		if CommandExists(LocalCmd) {
@@ -40,7 +47,7 @@ func FindCommand(cmd string) string {
 	}
 	
 	if CommandExists(cmd) {
-		// Program exists in the path environment
+		// Program exists in the system path environment
 		return cmd
 	}
 	
