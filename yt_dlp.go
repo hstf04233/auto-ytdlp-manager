@@ -343,6 +343,9 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 	
 	Out, err := Cmd.Output()
 	if err != nil {
+		if Task != nil && Task.Status != TASK_STATUS_RUNNING {
+			return nil, err
+		}
 		ErrOut.Lock.RLock()
 		ErrOutput := ErrOut.RawOutput
 		ErrOut.Lock.RUnlock()

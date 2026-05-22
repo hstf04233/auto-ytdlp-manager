@@ -398,7 +398,9 @@ func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, QualitySe
 	VideoList, err := yt_dlp_ListVideos(Url, -1, Task)
 	if err != nil {
 		SetCheckStatus(CS, CHECK_STATUS_FAILED)
-		CL_FinishTask(Task, TASK_STATUS_FAILED)
+		if Task.Status == TASK_STATUS_RUNNING {
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
+		}
 		return
 	}
 	DB_UpdateCommandTaskInfo(Task)
@@ -407,7 +409,10 @@ func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, QualitySe
 	
 	// Add the videos to the queued list.
 	for i := len(VideoList)-1; i >= 0; i-- {
-		if Task.Status != TASK_STATUS_RUNNING { return }
+		if Task.Status != TASK_STATUS_RUNNING {
+			SetCheckStatus(CS, CHECK_STATUS_FAILED)
+			return
+		}
 		
 		Video := &VideoList[i]
 		Video.FromChannel = AChannel.Id
@@ -441,7 +446,10 @@ func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, QualitySe
 	
 	SetCheckStatus(CS, CHECK_STATUS_CHECKING_VIDEOS)
 	for _, Video := range(VideoList) {
-		if Task.Status != TASK_STATUS_RUNNING { return }
+		if Task.Status != TASK_STATUS_RUNNING {
+			SetCheckStatus(CS, CHECK_STATUS_FAILED)
+			return
+		}
 		
 		Video.FromChannel = AChannel.Id
 		CheckVideoAndDownload(AChannel, &Video, Task, CheckSettings)
