@@ -172,7 +172,7 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 			AChannel.NextFullChannelCheckMSEC = CheckTime
 		}
 	}
-	if Body.PlaylistEnd != -2 {		// -1 is reserved for all videos.
+	if Body.PlaylistEnd != -2 {		// -1 is reserved for 'All Videos'.
 		AChannel.PlaylistEnd = Body.PlaylistEnd
 	}
 	if Body.Enabled != nil {

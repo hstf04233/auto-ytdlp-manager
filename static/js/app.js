@@ -917,7 +917,7 @@ async function saveChannel(e) {
     download_dir: downloadDir,
     output_template: outputTemplate,
     check_interval: checkInterval,
-    plalist_end: playlistEnd,
+    playlist_end: playlistEnd,
   };
 
   try {
