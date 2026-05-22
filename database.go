@@ -15,7 +15,7 @@ const DATABASE_FILE_DEBUG = "autoytdlpmanager_DEBUG.db"
 
 const db_SQL_Header = `
 PRAGMA foreign_keys = ON;
-/* PRAGMA journal_mode = WAL; */
+PRAGMA journal_mode = WAL;
 PRAGMA secure_delete = ON;
 PRAGMA busy_timeout = 5000;
 PRAGMA synchronous = normal;
@@ -119,7 +119,7 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	PlaylistEnd=excluded.PlaylistEnd,
 	Enabled=excluded.Enabled,
 	UpdatedAt=excluded.UpdatedAt
-	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.PlaylistEnd, AChannel.Type, AChannel.Enabled, TimeNow, TimeNow)
+	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.PlaylistEnd, AChannel.Enabled, TimeNow, TimeNow)
 	
 	if err != nil {
 		L_Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
