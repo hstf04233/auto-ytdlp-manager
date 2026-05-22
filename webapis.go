@@ -379,10 +379,43 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	AChannel := GetManualArchiveChannel(&WatchedDownloading)
+	var AChannel *ArchiveChannel
+	if Body.TargetChannel == "" || Body.TargetChannel == MANUAL_CHANNEL_ID {
+		AChannel = GetManualArchiveChannel(&WatchedDownloading)
+	} else {
+		if len(Body.TargetChannel) > API_MAX_REQUEST_ID {
+			http.Error(w, "Invalid target channel id.", http.StatusBadRequest)
+			return
+		}
+		AChannel = GetManualArchiveChannel(&WatchedDownloading)
+	}
 	if AChannel == nil {
-		http.Error(w, fmt.Sprintf("Could not find target channel.", API_MAX_URL_LENGTH), http.StatusNotFound)
+		http.Error(w, "Could not find target channel.", http.StatusNotFound)
 		return
+	}
+	
+	if Body.Type == -2 {
+		// Download
+		if AChannel.Type == ACHANNEL_TYPE_LIVE {
+			Body.Type = ACHANNEL_TYPE_LIVE
+		} else {
+			Body.Type = ACHANNEL_TYPE_VIDEOS
+		}
+	}
+	
+	NoWait := false
+	if nw := r.URL.Query().Get("no_wait"); nw != "" {
+		NoWait = true
+	}
+	if queue_video_id := r.URL.Query().Get("queue_video_id"); queue_video_id != "" {
+		if len(queue_video_id) > API_MAX_REQUEST_ID {
+			http.Error(w, "Invalid video id (queue_video_id).", http.StatusBadRequest)
+			return
+		}
+		VideoInfo, err := DB_GetVideo(queue_video_id)
+		if err == nil && VideoInfo != nil { 
+			DB_UpdateVideoStatus(VideoInfo, VIDEO_STATUS_QUEUED)
+		}
 	}
 	
 	CS := &CheckStatus{}
@@ -392,24 +425,26 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 	Status := 0
 	QuitTime := time.Now().UTC().Add(time.Duration(time.Minute * 1))
 	
-	for {
-		time.Sleep(time.Duration(time.Millisecond * 50))
-		CS.Mutex.RLock()
-		Status = CS.Status
-		CS.Mutex.RUnlock()
-		
-		if time.Now().UTC().UnixMilli() > QuitTime.UnixMilli() {
-			Status = CHECK_STATUS_FAILED
+	if !NoWait {
+		for {
+			time.Sleep(time.Duration(time.Millisecond * 50))
+			CS.Mutex.RLock()
+			Status = CS.Status
+			CS.Mutex.RUnlock()
+			
+			if time.Now().UTC().UnixMilli() > QuitTime.UnixMilli() {
+				Status = CHECK_STATUS_FAILED
+			}
+			
+			if Status >= CHECK_STATUS_ADDED_VIDEOS || Status == CHECK_STATUS_FAILED {
+				break
+			}
 		}
 		
-		if Status >= CHECK_STATUS_ADDED_VIDEOS || Status == CHECK_STATUS_FAILED {
-			break
+		if Status == CHECK_STATUS_FAILED {
+			http.Error(w, "An error occured when trying to check videos...", http.StatusInternalServerError)
+			return
 		}
-	}
-	
-	if Status == CHECK_STATUS_FAILED {
-		http.Error(w, "An error occured when trying to check videos...", http.StatusInternalServerError)
-		return
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
@@ -994,6 +1029,7 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasPrefix(Path, "config") && Method == "PATCH" {
 		API_SetConfig(w, r)
 	} else {
+		fmt.Printf("Api path: '%s' Method: '%s' not found\n", Path, Method)
 		http.NotFound(w, r)
 	}
 }

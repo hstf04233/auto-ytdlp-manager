@@ -38,7 +38,7 @@ type VideoInfo struct {
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
 	Status       int     `json:"status"`
-	QueuedAction int     `json:"queued_action"`
+	QueuedAction int     `json:"queued_action"`	// Currently unused...
 	
 	TasksCount   int `json:"tasks_count"`
 	ActiveTaskId string `json:"active_task"`

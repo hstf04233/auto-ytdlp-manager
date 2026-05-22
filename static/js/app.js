@@ -298,6 +298,8 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
     closeStatusDropdown();
     return;
   }
+  const videoData = allVideos.find(x => x.id === videoId);
+  
   statusDropdownIsActive = true;
   const rect = buttonEl.getBoundingClientRect();
   const dropdown = document.createElement('div');
@@ -305,23 +307,29 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
   dropdown.style.top = (rect.bottom + 4) + 'px';
   dropdown.style.left = rect.left + 'px';
   
-  const statuses = [
-    [0, "Set to 'Queued' (Download if channel allows for downloads.)"],
+  let statuses = [
+    [0, "Set to 'Queued'"],
     //[1, 'Downloading'],
     //[2, 'Downloaded'],
     //[3, 'Failed'],
     [4, "Set to 'Ignored' (Don't download)"],
+    //[-100, "Download this video"],
   ];
+  
+  if (videoData && videoData.status != 2 && videoData.status != 1) {
+    statuses.push([-100, "Download this video"]);
+  }
+  
   dropdown.innerHTML = statuses.map(([val, label]) =>
-    `<div class="status-option ${val === currentStatus ? 'active' : ''}" data-video-id="${videoId}" data-new-status="${val}">${label}${val === currentStatus ? ' ✓' : ''}</div>`
+    `<div class="status-option ${val === currentStatus ? 'active' : ''}" data-video-id="${videoId}" data-new-status="${val}">${label}</div>`
   ).join('');
   
   dropdown.addEventListener('click', (e) => {
     e.stopPropagation();
     const option = e.target.closest('.status-option');
     if (option) {
+      closeStatusDropdown();
       changeVideoStatus(option.dataset.videoId, parseInt(option.dataset.newStatus));
-      closeStatusDropdown()
     }
   });
   
@@ -334,6 +342,24 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
 
 async function changeVideoStatus(videoId, newStatus) {
   try {
+    const videoData = allVideos.find(x => x.id === videoId);
+    if (newStatus == -100) {
+      // Download this video
+      if (!videoData) return;
+      
+      const body = {
+        download_url: videoData.url,
+        type: -2,
+        
+        target_channel_id: videoData.from_channel,
+      };
+      
+      await API.post(`/api/add-videos?no_wait=true&queue_video_id=${videoId}`, body);
+      showToast('Status changed', 'success');
+      loadVideos();
+      return;
+    }
+    
     await API.patch(`/api/videos/${videoId}`, { status: parseInt(newStatus) });
     showToast('Status changed', 'success');
     loadVideos();
