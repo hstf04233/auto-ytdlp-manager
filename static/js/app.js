@@ -1127,7 +1127,7 @@ function renderVideos() {
           }
           <button class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
           <button class="btn btn-secondary btn-sm" onclick="openVideoDetailsModal('${v.id}')">Details</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteVideo('${v.id}')">Delete</button>
+          <button class="btn btn-danger btn-sm" title="Deleting a video does not remove the video file." onclick="deleteVideo('${v.id}')">Delete</button>
         </div>
       </div>
     `;
