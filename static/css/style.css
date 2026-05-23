@@ -708,7 +708,7 @@ form hr {
   flex: 0 0 450px;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 175px);
+  max-height: calc(100vh - 240px);
   overflow-y: auto;
   scrollbar-width: thin;
 }
