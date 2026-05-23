@@ -55,6 +55,8 @@ type ProgramConfig struct {
 	TaskLog_AutoDelete_Enabled      bool
 	TaskLog_AutoDelete_Seconds      int
 	TaskLog_List_AutoDelete_Seconds int
+	
+	APPLICATION_VERSION string `json:"application_version"`
 }
 
 var G_Config = &ProgramConfig{
@@ -75,6 +77,9 @@ var G_Config = &ProgramConfig{
 	TaskLog_AutoDelete_Enabled:      true,
 	TaskLog_AutoDelete_Seconds:      MAX_TASK_LOG_LIFETIME,
 	TaskLog_List_AutoDelete_Seconds: MAX_CHANNEL_LISTING_LIFETIME,
+	
+	
+	APPLICATION_VERSION: APPLICATION_VERSION,
 }
 
 func Get_YtDlpPath(Config *ProgramConfig) string {
@@ -136,7 +141,7 @@ func SaveConfig(Config *ProgramConfig, File *os.File) error {
 }
 
 func OpenConfig(ConfigPath string) error {
-	if APPLICATION_VERSION == "debug" {
+	if APPLICATION_VERSION_TYPE == "debug" {
 		G_Config.ServerPort = DEFAULT_SERVER_PORT_DEBUG
 	}
 	

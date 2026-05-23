@@ -21,7 +21,7 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	if path == "favicon.ico" {
 		path = "favicon.png"
-		if APPLICATION_VERSION == "debug" {
+		if APPLICATION_VERSION_TYPE == "debug" {
 			path = "favicon_debog.png"
 		}
 	} else if path == "" || path == "/" {

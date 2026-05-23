@@ -835,7 +835,7 @@ func DB_DeleteCommandTask(TaskId string) error {
 
 func OpenDB() error {
 	DatabaseFilePath := DATABASE_FILE
-	if APPLICATION_VERSION == "debug" {
+	if APPLICATION_VERSION_TYPE == "debug" {
 		DatabaseFilePath = DATABASE_FILE_DEBUG
 	}
 	

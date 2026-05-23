@@ -550,6 +550,12 @@ document.getElementById("configForm").addEventListener('input', () => {
 });
 
 function renderConfig(config) {
+  const ApplicationVersionEl = document.getElementById("side-bar-application-version")
+  if (ApplicationVersionEl) {
+    ApplicationVersionEl.textContent = config.application_version;
+  }
+  
+  
   const YtDlpPathEl = document.getElementById("config-YtDlpPath")
   const YtArchivePathEl = document.getElementById("config-YtArchivePath")
   const FFmpegPathEl = document.getElementById("config-FFmpegPath")
