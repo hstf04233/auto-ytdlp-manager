@@ -606,9 +606,9 @@ function renderUpdateChannel(ch) {
   const channelTaskBtnEl = channelEl.querySelector("#channel-task-btn");
   
   if (channelTaskBtnEl) {
-    let tasksButtonText = `View Tasks[${ch.tasks_count}]`;
+    let tasksButtonText = `View Logs[${ch.tasks_count}]`;
     if (ch.active_task) {
-      tasksButtonText = `View Active Task + [${ch.tasks_count}]`;
+      tasksButtonText = `View Active Task + Logs[${ch.tasks_count-1}]`;
     }
     
     if (channelTaskBtnEl.textContent != tasksButtonText) {
@@ -1091,11 +1091,11 @@ function renderVideos() {
     const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
     const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
     
-    let tasksButtonText = "View Task"
+    let tasksButtonText = "View Logs"
     if (v.active_task) {
-      tasksButtonText = "View Active Task"
+      tasksButtonText = `View Active Task + Logs[${v.tasks_count-1}]`
     } else if (v.tasks_count > 1) {
-      tasksButtonText = `View Tasks[${v.tasks_count}]`
+      tasksButtonText = `View Logs[${v.tasks_count}]`
     }
     let tasksButtonOnClick = `
       event.preventDefault();
@@ -1506,7 +1506,7 @@ function renderTaskStats() {
 function renderTasks() {
   const container = document.getElementById('taskList');
   if (allTasks.length === 0) {
-    container.innerHTML = '<div class="loading">No tasks found.</div>';
+    container.innerHTML = '<div class="loading">No logs/ tasks found.</div>';
     return;
   }
   container.innerHTML = allTasks.map(t => {
