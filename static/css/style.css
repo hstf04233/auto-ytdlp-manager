@@ -546,6 +546,28 @@ form hr {
   font-size: 0.85rem;
 }
 
+.search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 200px;
+}
+.search-clear-btn {
+  position: absolute;
+  right: 0px;
+  top: 48%;
+  width: 35px;
+  height: 100%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+  display: none;
+  color: #999;
+}
+
 .search-bar {
   flex: 1;
   min-width: 200px;

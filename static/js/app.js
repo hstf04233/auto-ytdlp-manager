@@ -94,40 +94,69 @@ let lastVideosCount = 0;
 let lastTaskPage = 0;
 let lastTasksCount = 0;
 
+function setTitle(newTitle) {
+  if (newTitle != "") {
+    document.title = `${newTitle} - Auto yt-dlp Manager`
+  }
+}
+
 function showPage(page, dontSaveHistory) {
+  const basePage = new URL("/"+page, window.location.origin).pathname.replace(/^\//, '');
+  console.log(basePage);
+  
   if (!dontSaveHistory) {
-    if (page != lastPageOpen) {
+    setTitle(basePage);
+    if (basePage != lastPageOpen) {
       history.pushState({}, '', '/' + page);
+    } else {
+      window.history.replaceState(null, "", "/" + page);
     }
   }
-  if (page != lastPageOpen) {
+  if (basePage != lastPageOpen) {
     lastVideoPage = 0;
     lastVideosCount = 0;
     
     lastTaskPage = 0;
     lastTasksCount = 0;
   }
-  lastPageOpen = page
+  lastPageOpen = basePage
   
   document.querySelectorAll('.sidebar nav a').forEach(l => l.classList.remove('active'));
   document.querySelectorAll('.sidebar nav a').forEach(l => {
-    if (l.dataset.page == page) {
+    if (l.dataset.page == basePage) {
       l.classList.add('active');
     }
   })
   
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  let pageDoc = document.getElementById(`page-${page}`)
+  let pageDoc = document.getElementById(`page-${basePage}`)
   if (pageDoc) {
     pageDoc.classList.add('active');
   }
   
-  if (page === 'videos') {
+  if (basePage === 'videos') {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has("channel")) {
+      let channelId = urlParams.get("channel");
+      document.getElementById('videoChannelFilter').value = channelId;
+      
+      const channel = getChannelFromId(channelId);
+      if (channel) {
+        setTitle(`Videos: ${channel.name}`);
+      } else {
+        setTitle("Videos");
+      }
+    } else {
+      document.getElementById('videoChannelFilter').value = '';
+      setTitle("Videos");
+    }
+    
     if (!areVideosLoading) {
       loadVideos();
     }
   }
-  if (page === 'tasks') {
+  if (basePage === 'tasks') {
+    setTitle("Logs")
     stopRealtimePolling();
     if (!areTasksLoading) {
       loadTasks();
@@ -663,7 +692,8 @@ function renderChannels() {
             <span>Quality: ${qualityLabel(ch.quality_select)}</span>
             <span id="next-check">Check: ${intervalLabel(ch.check_interval)}</span>
           </div>
-          <p><a id="channel-task-btn" href="#" onclick="event.preventDefault();gotoTasksPageAndFilterChannel('${ch.id}');">...</a></p>
+          <p><a id="channel-videos-btn" href="/videos?channel=${ch.id}" onclick="event.preventDefault();gotoVideosPageAndFilterChannel('${ch.id}');">View Videos</a></p>
+          <p><a id="channel-task-btn" href="/tasks" onclick="event.preventDefault();gotoTasksPageAndFilterChannel('${ch.id}');">...</a></p>
         </div>
         <div class="video-actions">
           <label class="toggle">
@@ -1125,7 +1155,7 @@ function renderVideos() {
           <p>${escHtml(v.availability)}</p>
           <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
           
-          ${(v.tasks_count > 0 || v.active_task) ? `<p><a href="#" onclick="${tasksButtonOnClick}">${tasksButtonText}</a></p>` : ''}
+          ${(v.tasks_count > 0 || v.active_task) ? `<p><a href="/tasks" onclick="${tasksButtonOnClick}">${tasksButtonText}</a></p>` : ''}
         </div>
         <div class="video-actions">
           ${videoStatusBadge(v.id, v.status)}
@@ -1144,14 +1174,14 @@ function renderVideos() {
   }).join('');
 }
 
-function clearVideoFilters() {
+function clearVideoFilters(dontLoadVideos) {
   document.getElementById('videoSearch').value = '';
   document.getElementById('videoStatusFilter').value = '';
-  document.getElementById('videoChannelFilter').value = '';
+  //document.getElementById('videoChannelFilter').value = '';
   document.getElementById('videoOrderBy').value = 'release_date';
   document.getElementById('videoOrderDirection').value = '-1';
   videoPage = 0;
-  if (!areVideosLoading) {
+  if (!areVideosLoading && !dontLoadVideos) {
     loadVideos();
   }
 }
@@ -1159,8 +1189,38 @@ function clearVideoFilters() {
 let videoSearchDidUpdate = false;
 function videoSearchFilterUpdate() {
   videoSearchDidUpdate = true;
+  const videoSearchClearEl = document.getElementById("video-search-clear-btn");
+  if (videoSearchClearEl) {
+    let searchText = document.getElementById('videoSearch').value;
+    console.log(searchText);
+    if (searchText && searchText.length > 0) {
+      videoSearchClearEl.style.display = 'block';
+    } else {
+      videoSearchClearEl.style.display = 'none';
+    }
+  }
 }
+function clearVideoSearch() {
+  document.getElementById('videoSearch').value = '';
+  videoSearchFilterUpdate();
+}
+
 function onVideoFilterChange() {
+  const channelId = document.getElementById('videoChannelFilter').value
+  if (channelId) {
+    const channel = getChannelFromId(channelId);
+    if (channel) {
+      setTitle(`Videos: ${channel.name}`)
+    } else {
+      setTitle("Videos")
+    }
+    
+    window.history.replaceState(null, "", `/videos?channel=${channelId}`);
+  } else {
+    setTitle("Videos")
+    window.history.replaceState(null, "", `/videos`);
+  }
+  
   videoPage = 0;
   loadVideos();
 }
@@ -1405,6 +1465,16 @@ function gotoTasksPageAndFilterChannel(channelId) {
       selectTask(channel.active_task);
     }
   }
+}
+function gotoVideosPageAndFilterChannel(channelId) {
+  clearVideoFilters(true);
+  
+  videoPage = 0;
+  document.getElementById('videoChannelFilter').value = channelId;
+  
+  showPage(`videos?channel=${channelId}`);
+  loadVideos();
+  renderVideoPagination();
 }
 
 function onTaskFilterChange() {
