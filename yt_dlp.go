@@ -281,6 +281,9 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 				  strings.Contains(ErrOutput, "Video unavailable.") {
 			Video.Availability = "removed"
 			return fmt.Errorf("%s", ErrOutput)
+		} else if strings.Contains(ErrOutput, "This live event will begin in a few moments.") ||
+				  strings.Contains(ErrOutput, "This live event will begin in") {
+			return fmt.Errorf("%s", ErrOutput)
 		}
 		
 		L_Printf("%s\n", ErrOutput)
