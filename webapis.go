@@ -113,6 +113,11 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	if RequestId == MANUAL_CHANNEL_ID {
+		http.Error(w, "Cannot edit manual channel...", http.StatusBadRequest)
+		return
+	}
+	
 	AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
 	if AChannel == nil {
 		http.Error(w, "Channel not found.", http.StatusNotFound)
@@ -247,6 +252,10 @@ func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if len(RequestId) > API_MAX_REQUEST_ID {
 		http.Error(w, "Invalid channel id.", http.StatusBadRequest)
+		return
+	}
+	if RequestId == MANUAL_CHANNEL_ID {
+		http.Error(w, "Cannot delete manual channel...", http.StatusBadRequest)
 		return
 	}
 	

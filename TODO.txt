@@ -2,8 +2,12 @@
 Abillity to add multiple channel urls for a single channel
 Select multiple videos and do bulk actions such as (delete, refresh, etc...)
 
+Tasks tab looks UGLY 🤮🤮🤮 (make it look pretty)
+
 Automatically update yt-dlp binary (if possible)
 
 Download live stream chat in real time
 
 Download the video thumbnails into a database
+
+Fix pagination performance, right now it's shit while having 10,000+ videos in a database...
