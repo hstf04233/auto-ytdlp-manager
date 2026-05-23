@@ -510,6 +510,7 @@ form hr {
   margin-bottom: 15px;
 }
 
+.videoadd-modal-actions-list,
 .modal-actions-list {
   display: flex;
   flex-direction: column;

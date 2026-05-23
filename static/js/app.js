@@ -931,7 +931,7 @@ async function checkCurrentChannel(overrideType, allVideos) {
 
 
 function openAddVideosModal() {
-  document.querySelectorAll('.modal-actions-list button').forEach(l => l.disabled = false);
+  document.querySelectorAll('.videoadd-modal-actions-list button').forEach(l => l.disabled = false);
   
   document.getElementById('addVideosModal').classList.add('active');
   
@@ -943,7 +943,7 @@ function closeAddVideosModal() {
 }
 
 async function sendAddVideosForm(type) {
-  document.querySelectorAll('.modal-actions-list button').forEach(l => l.disabled = true);
+  document.querySelectorAll('.videoadd-modal-actions-list button').forEach(l => l.disabled = true);
   
   const url = document.getElementById('avm-ChannelUrl').value.trim();
   const quality = parseInt(document.getElementById('avm-Quality').value);
@@ -962,7 +962,7 @@ async function sendAddVideosForm(type) {
     loadVideos();
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
-    document.querySelectorAll('.modal-actions-list button').forEach(l => l.disabled = false);
+    document.querySelectorAll('.videoadd-modal-actions-list button').forEach(l => l.disabled = false);
   }
 }
 
