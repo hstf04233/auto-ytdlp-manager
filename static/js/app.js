@@ -228,6 +228,18 @@ function qualityLabel(q) {
   return `${q}p`;
 }
 
+function getQualityFromResolution(res) {
+  const resolutionParts = (res || '0x0').split('x');
+  const width  = parseInt(resolutionParts[0] || 0)
+  const height = parseInt(resolutionParts[1] || 0)
+  
+  if (width > height) {
+    return height;
+  } else {
+    return width;
+  }
+}
+
 function intervalLabel(s) {
   if (s <= 0) return '...';
   
@@ -393,12 +405,19 @@ async function changeVideoStatus(videoId, newStatus) {
       // Download this video
       if (!videoData) return;
       
-      const body = {
+      let body = {
         download_url: videoData.url,
         type: -2,
         
         target_channel_id: videoData.from_channel,
       };
+      
+      let qualitySelect = getQualityFromResolution(videoData.resolution);
+      console.log(videoData.resolution);
+      console.log(qualitySelect);
+      if (qualitySelect > 0) {
+        body.quality_select = qualitySelect;
+      }
       
       await API.post(`/api/add-videos?no_wait=true&queue_video_id=${videoId}`, body);
       showToast('Status changed', 'success');
@@ -1412,7 +1431,7 @@ function updateChannelFilters() {
   const videoSelect = document.getElementById('videoChannelFilter');
   
   let current = videoSelect.value;
-  videoSelect.innerHTML = '<option value="">All Channels</option><hr>';
+  videoSelect.innerHTML = '<option value="">All</option><hr>';
   allChannels.forEach(ch => {
     const opt = document.createElement('option');
     opt.value = ch.id;
@@ -1424,7 +1443,7 @@ function updateChannelFilters() {
   const taskSelect = document.getElementById('taskChannelFilter');
   
   current = taskSelect.value;
-  taskSelect.innerHTML = '<option value="">All Channels</option><hr>';
+  taskSelect.innerHTML = '<option value="">All</option><hr>';
   allChannels.forEach(ch => {
     const opt = document.createElement('option');
     opt.value = ch.id;
