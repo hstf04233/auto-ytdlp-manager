@@ -117,32 +117,40 @@
       </div>
 
       <div class="stats-row" id="taskStats" style="display: none;"></div>
-      
       <div class="filter-bar">
-        <!-- <input type="text" id="taskSearch" maxlength="1024" placeholder="Search videos..." oninput="taskSearchFilterUpdate()"> -->
-        <select id="taskStatusFilter" onchange="onTaskFilterChange()">
-          <option value="">Status: Default</option>
-          <option value="-1">Status: Show All</option>
-          <hr>
-          <option value="0">Status: Running</option>
-          <option value="2">Status: Finished</option>
-          <option value="3">Status: Canceled</option>
-          <option value="1">Status: Failed</option>
-        </select>
-        <select id="taskTypeFilter" onchange="onTaskFilterChange()">
-          <option value="">Type: All</option>
-          <hr>
-          <option value="2">Type: Downloads</option>
-          <option value="1">Type: Channel Check</option>
-          <option value="0">Type: Generic</option>
-        </select>
+        <label>From Channel: </label>
         <select id="taskChannelFilter" onchange="onTaskFilterChange()">
           <option value="">All Channels</option>
         </select>
-        <input type="text" id="taskVideoFilter" class="task-video-text" maxlength="1024" placeholder="VideoId" oninput="onTaskFilterChange()">
+      </div>
+      
+      <div class="filter-bar">
+        <!-- <input type="text" id="taskSearch" maxlength="1024" placeholder="Search videos..." oninput="taskSearchFilterUpdate()"> -->
+         <label>Status: </label>
+        <select id="taskStatusFilter" onchange="onTaskFilterChange()">
+          <option value="">Default</option>
+          <option value="-1">Show All</option>
+          <hr>
+          <option value="0">Running</option>
+          <option value="2">Finished</option>
+          <option value="3">Canceled</option>
+          <option value="1">Failed</option>
+        </select>
+        <label>Type: </label>
+        <select id="taskTypeFilter" onchange="onTaskFilterChange()">
+          <option value="">All</option>
+          <hr>
+          <option value="2">Downloads</option>
+          <option value="1">Channel Check</option>
+          <option value="0">Generic</option>
+        </select>
+        
+        <input type="hidden" id="taskVideoFilter" class="task-video-text" maxlength="1024" placeholder="VideoId" oninput="onTaskFilterChange()">
+        
+        <label>Sort by: </label>
         <select id="taskOrderBy" onchange="onTaskFilterChange()">
-          <option value="end_time">Sort: End Time</option>
-          <option value="start_time">Sort: Start Time</option>
+          <option value="end_time">End Time</option>
+          <option value="start_time">Start Time</option>
         </select>
         <select id="taskOrderDirection" onchange="onTaskFilterChange()">
           <option value="-1">Newest</option>

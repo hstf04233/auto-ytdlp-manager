@@ -103,13 +103,15 @@ function setTitle(newTitle) {
 function showPage(page, dontSaveHistory) {
   const basePage = new URL("/"+page, window.location.origin).pathname.replace(/^\//, '');
   
+  let title = basePage;
+  
   if (!dontSaveHistory) {
-    setTitle(basePage);
     if (basePage != lastPageOpen) {
       history.pushState({}, '', '/' + page);
     } else {
       window.history.replaceState(null, "", "/" + page);
     }
+  } else {
   }
   if (basePage != lastPageOpen) {
     lastVideoPage = 0;
@@ -133,8 +135,9 @@ function showPage(page, dontSaveHistory) {
     pageDoc.classList.add('active');
   }
   
+  const urlParams = new URLSearchParams(new URL(page, window.location.origin).search);
+  
   if (basePage === 'videos') {
-    const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has("channel")) {
       let channelId = urlParams.get("channel");
       document.getElementById('videoChannelFilter').value = channelId;
@@ -143,19 +146,40 @@ function showPage(page, dontSaveHistory) {
     }
     
     updateVideosTabTitle();
+    title = '';   // Won't set title if blank.
     
     if (!areVideosLoading) {
       loadVideos();
     }
   }
   if (basePage === 'tasks') {
-    setTitle("Logs")
+    if (urlParams.has("channel")) {
+      let channelId = urlParams.get("channel");
+      document.getElementById('taskChannelFilter').value = channelId;
+    } else {
+      document.getElementById('taskChannelFilter').value = '';
+    }
+    if (urlParams.has("video")) {
+      let videoId = urlParams.get("video");
+      document.getElementById('taskVideoFilter').value = videoId;
+    } else {
+      document.getElementById('taskVideoFilter').value = '';
+    }
+    
+    updateTasksTabTitle();
+    title = '';   // Won't set title if blank.
+    onTaskFilterChange(true);
+    
     stopRealtimePolling();
     if (!areTasksLoading) {
       loadTasks();
     }
   } else {
     stopRealtimePolling();
+  }
+  
+  if (title !== "") {
+    setTitle(title);
   }
 }
 
@@ -686,7 +710,7 @@ function renderChannels() {
             <span id="next-check">Check: ${intervalLabel(ch.check_interval)}</span>
           </div>
           <p><a id="channel-videos-btn" href="/videos?channel=${ch.id}" onclick="event.preventDefault();gotoVideosPageAndFilterChannel('${ch.id}');">View Videos</a></p>
-          <p><a id="channel-task-btn" href="/tasks" onclick="event.preventDefault();gotoTasksPageAndFilterChannel('${ch.id}');">...</a></p>
+          <p><a id="channel-task-btn" href="/tasks?channel=${ch.id}" onclick="event.preventDefault();gotoTasksPageAndFilterChannel('${ch.id}');">...</a></p>
         </div>
         <div class="video-actions">
           <label class="toggle">
@@ -1091,8 +1115,9 @@ function filterVideosTabByChannel(channelId) {
   }
   
   videoChannelFilterEl.value = channelId;
-  videoPage=0;
-  loadVideos();
+  videoPage = 0;
+  
+  onVideoFilterChange();
 }
 
 function renderVideos() {
@@ -1143,12 +1168,12 @@ function renderVideos() {
             <span title="${escHtml(v.title)}">${escHtml(v.title)}</span>
             <a href="${escHtml(v.url)}" target="_blank">[VideoLink]</a>
           </h3>
-          <p title="Filter by this channel">From: <a href="#" onclick="event.preventDefault();filterVideosTabByChannel('${v.from_channel}');">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
+          <p title="Filter by this channel">From: <a href="/videos?channel=${v.from_channel}" onclick="event.preventDefault();filterVideosTabByChannel('${v.from_channel}');">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
           <p>Released: ${formatDateAndTime(v.release_date)}</p>
           <p>${escHtml(v.availability)}</p>
           <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
           
-          ${(v.tasks_count > 0 || v.active_task) ? `<p><a href="/tasks" onclick="${tasksButtonOnClick}">${tasksButtonText}</a></p>` : ''}
+          ${(v.tasks_count > 0 || v.active_task) ? `<p><a href="/tasks?video=${v.id}" onclick="${tasksButtonOnClick}">${tasksButtonText}</a></p>` : ''}
         </div>
         <div class="video-actions">
           ${videoStatusBadge(v.id, v.status)}
@@ -1213,13 +1238,11 @@ function updateVideosTabTitle() {
 function onVideoFilterChange() {
   const channelId = document.getElementById('videoChannelFilter').value
   if (channelId) {
-    updateVideosTabTitle();
-    
     window.history.replaceState(null, "", `/videos?channel=${channelId}`);
   } else {
-    setTitle("Videos")
     window.history.replaceState(null, "", `/videos`);
   }
+  updateVideosTabTitle();
   
   videoPage = 0;
   loadVideos();
@@ -1386,21 +1409,29 @@ function updateVideoStats() {
 
 // ========== Channel filter dropdown ==========
 function updateChannelFilters() {
-  const select = document.getElementById('videoChannelFilter');
-  if (!select) return;
+  const videoSelect = document.getElementById('videoChannelFilter');
   
-  const current = select.value;
-  select.innerHTML = '<option value="">All Channels</option><hr>';
+  let current = videoSelect.value;
+  videoSelect.innerHTML = '<option value="">All Channels</option><hr>';
   allChannels.forEach(ch => {
     const opt = document.createElement('option');
     opt.value = ch.id;
     opt.textContent = ch.name;
     if (ch.id === current) opt.selected = true;
-    select.appendChild(opt);
+    videoSelect.appendChild(opt);
   });
   
   const taskSelect = document.getElementById('taskChannelFilter');
-  if (taskSelect) taskSelect.innerHTML = select.innerHTML;
+  
+  current = taskSelect.value;
+  taskSelect.innerHTML = '<option value="">All Channels</option><hr>';
+  allChannels.forEach(ch => {
+    const opt = document.createElement('option');
+    opt.value = ch.id;
+    opt.textContent = ch.name;
+    if (ch.id === current) opt.selected = true;
+    taskSelect.appendChild(opt);
+  });
   
 }
 
@@ -1445,7 +1476,7 @@ function gotoTasksPageAndFilterVideo(videoId) {
   taskPage = 0;
   document.getElementById('taskVideoFilter').value = videoId;
   
-  showPage("tasks");
+  showPage(`tasks?video=${videoId}`);
   loadTasks();
   renderTaskPagination();
 }
@@ -1455,7 +1486,7 @@ function gotoTasksPageAndFilterChannel(channelId) {
   taskPage = 0;
   document.getElementById('taskChannelFilter').value = channelId;
   
-  showPage("tasks");
+  showPage(`tasks?channel=${channelId}`);
   loadTasks();
   renderTaskPagination();
   
@@ -1477,20 +1508,61 @@ function gotoVideosPageAndFilterChannel(channelId) {
   renderVideoPagination();
 }
 
-function onTaskFilterChange() {
-  taskPage = 0;
-  loadTasks();
+function updateTasksTabTitle() {
+  if (lastPageOpen != "tasks") return;
+  
+  const channelId = document.getElementById('taskChannelFilter').value
+  
+  const channel = getChannelFromId(channelId);
+  if (channel) {
+    setTitle(`Logs: ${channel.name}`)
+  } else {
+    setTitle("Logs")
+  }
+}
+
+function onTaskFilterChange(dontLoad) {
+  const channelId = document.getElementById('taskChannelFilter').value
+  const videoEl = document.getElementById('taskVideoFilter');
+  const videoId = videoEl.value;
+  if (videoId) {
+    videoEl.type = "text";
+  } else {
+    videoEl.type = "hidden";
+    videoEl.value = '';     // why THE FUCK does setting the type to hidden change the value back to it's original value???
+  }
+  
+  if (channelId) {
+    let url = `/tasks?channel=${channelId}`;
+    if (videoId) {
+      url += `&video=${videoId}`;
+    }
+    window.history.replaceState(null, "", url);
+  } else {
+    if (videoId) {
+      window.history.replaceState(null, "", `/tasks?video=${videoId}`);
+    } else {
+      window.history.replaceState(null, "", `/tasks`);
+    }
+  }
+  updateTasksTabTitle();
+  
+  if (!dontLoad) {
+    taskPage = 0;
+    loadTasks();
+  }
 }
 
 function clearTaskFilters(dontLoadTasks) {
   //document.getElementById('taskSearch').value = '';
   document.getElementById('taskStatusFilter').value = '';
   document.getElementById('taskTypeFilter').value = '';
-  document.getElementById('taskChannelFilter').value = '';
+  //document.getElementById('taskChannelFilter').value = '';
   document.getElementById('taskVideoFilter').value = '';
   document.getElementById('taskOrderBy').value = 'end_time';
   document.getElementById('taskOrderDirection').value = '-1';
   taskPage = 0;
+  onTaskFilterChange(true);     // I HATE THIS CODE BASE FFS
   if (!areTasksLoading && !dontLoadTasks) {
     loadTasks();
   }
@@ -1648,7 +1720,7 @@ function selectTask(id) {
   if (taskTitleEl) {
     if (selectedTask) {
       formatedDuration = getFormatedTaskDuration(selectedTask);
-      taskTitleEl.textContent = escHtml(selectedTask.title) + " " + formatedDuration;
+      taskTitleEl.textContent = (selectedTask.title || selectedTask.id) + " " + formatedDuration;
     } else {
       taskTitleEl.textContent = "Task Output - " + id;
     }
@@ -1730,7 +1802,7 @@ function startRealtimePolling() {
       
       if (statusEl) statusEl.textContent = 'Live';
       if (taskTitleEl) {
-        taskTitleEl.textContent = escHtml(selectedTask.title) + " " + formatedDuration;
+        taskTitleEl.textContent = (selectedTask.title || selectedTask.id) + " " + formatedDuration;
       }
     } catch (err) {
       if (statusEl) statusEl.textContent = 'Poll error';
@@ -1815,7 +1887,7 @@ async function init() {
   await loadChannels();
   
   const lastTab = window.location.pathname.replace(/^\//, '') || 'channels';
-  showPage(lastTab, true)
+  showPage(lastTab + window.location.search, true)
   
   updateChannelFilters();
   let nextSoftChannelsLoad = (new Date()).getTime() + 5000;
