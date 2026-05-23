@@ -15,7 +15,7 @@ var WebStaticContent embed.FS
 
 // TODO: ! this could be set at build time but I'm lazy rn
 var ETag string
-var StartTime = time.Now().UTC()
+var ProgramStartTime = time.Now().UTC()
 
 func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/")
@@ -42,41 +42,13 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	}
 	defer File.Close()
 	
-	if r.Header.Get("If-None-Match") == ETag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-	
-	FileExt := filepath.Ext(path)
-	if FileExt == ".txt" {
-		w.Header().Set("Content-Type", "text/plain")
-	} else if FileExt == ".html" {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	} else if FileExt == ".js" {
-		w.Header().Set("Content-Type", "text/javascript")
-	} else if FileExt == ".css" {
-		w.Header().Set("Content-Type", "text/css")
-	
-	// Images
-	} else if FileExt == ".png" {
-		w.Header().Set("Content-Type", "image/png")
-	} else if FileExt == ".jpeg" || FileExt == ".jpg" {
-		w.Header().Set("Content-Type", "image/jpeg")
-	} else if FileExt == ".gif" {
-		w.Header().Set("Content-Type", "image/gif")
-	} else if FileExt == ".webp" {
-		w.Header().Set("Content-Type", "image/webp")
-	} else if FileExt == ".svg" {
-		w.Header().Set("Content-Type", "image/svg+xml")
-	}
-	
 	FileSeeker, ok := File.(io.ReadSeeker)
 	if !ok {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	
-	http.ServeContent(w, r, filepath.Base(path), StartTime, FileSeeker)
+	http.ServeContent(w, r, filepath.Base(path), ProgramStartTime, FileSeeker)
 	//w.Write(FileContent)
 }
 
