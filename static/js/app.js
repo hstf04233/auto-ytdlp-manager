@@ -102,7 +102,6 @@ function setTitle(newTitle) {
 
 function showPage(page, dontSaveHistory) {
   const basePage = new URL("/"+page, window.location.origin).pathname.replace(/^\//, '');
-  console.log(basePage);
   
   if (!dontSaveHistory) {
     setTitle(basePage);
@@ -139,17 +138,11 @@ function showPage(page, dontSaveHistory) {
     if (urlParams.has("channel")) {
       let channelId = urlParams.get("channel");
       document.getElementById('videoChannelFilter').value = channelId;
-      
-      const channel = getChannelFromId(channelId);
-      if (channel) {
-        setTitle(`Videos: ${channel.name}`);
-      } else {
-        setTitle("Videos");
-      }
     } else {
       document.getElementById('videoChannelFilter').value = '';
-      setTitle("Videos");
     }
+    
+    updateVideosTabTitle();
     
     if (!areVideosLoading) {
       loadVideos();
@@ -1192,7 +1185,6 @@ function videoSearchFilterUpdate() {
   const videoSearchClearEl = document.getElementById("video-search-clear-btn");
   if (videoSearchClearEl) {
     let searchText = document.getElementById('videoSearch').value;
-    console.log(searchText);
     if (searchText && searchText.length > 0) {
       videoSearchClearEl.style.display = 'block';
     } else {
@@ -1205,15 +1197,23 @@ function clearVideoSearch() {
   videoSearchFilterUpdate();
 }
 
+function updateVideosTabTitle() {
+  if (lastPageOpen != "videos") return;
+  
+  const channelId = document.getElementById('videoChannelFilter').value
+  
+  const channel = getChannelFromId(channelId);
+  if (channel) {
+    setTitle(`Videos: ${channel.name}`)
+  } else {
+    setTitle("Videos")
+  }
+}
+
 function onVideoFilterChange() {
   const channelId = document.getElementById('videoChannelFilter').value
   if (channelId) {
-    const channel = getChannelFromId(channelId);
-    if (channel) {
-      setTitle(`Videos: ${channel.name}`)
-    } else {
-      setTitle("Videos")
-    }
+    updateVideosTabTitle();
     
     window.history.replaceState(null, "", `/videos?channel=${channelId}`);
   } else {
@@ -1776,7 +1776,7 @@ function setupModalClickExit(modalId, callback) {
   let backdropMouseDown = false;
   const overlay = document.getElementById(modalId)
   if (!overlay) {
-    console.log("Could not fine modal overlay '" + modalId + "'")
+    console.log("Could not find modal overlay '" + modalId + "'")
     return
   }
   overlay.addEventListener('mousedown', (event) => {
@@ -1798,6 +1798,8 @@ setupModalClickExit("addVideosModal", closeAddVideosModal)
 window.addEventListener('popstate', function (e) {
   const tab = window.location.pathname.replace(/^\//, '') || '';
   showPage(tab, true);
+  
+  updateVideosTabTitle()
 });
 
 document.addEventListener('keydown', (e) => {
