@@ -592,7 +592,6 @@ func CleanUpTasksInDatabase() {
 			DeleteCount += 1
 		}
 	}
-	L_Printf("Auto deleted %d tasks for being outdated.\n", DeleteCount)
 }
 
 func init() {
