@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	APPLICATION_VERSION = "v0.13 Release"
+	APPLICATION_VERSION = "v0.13 Alpha"
 	CURRENT_WORKING_DIRECTORY = ""
 )
 
