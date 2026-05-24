@@ -1186,6 +1186,7 @@ form hr {
 .vd-preview {
   position: relative;
   width: 100%;
+  min-height: 100px;
   max-height: 400px;
   /*height: 321px;*/
   border-radius: 8px;

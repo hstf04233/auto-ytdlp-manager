@@ -849,8 +849,8 @@ function openVideoDetailsModal(videoId) {
   
   document.getElementById('videoDetailsContent').innerHTML = `
     <div class="vd-preview" id="modal-video-preview">
-      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}"
-     ${v.videofile_exists ? ` style="cursor: pointer;" title="Click to play video"` : ''} onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}" onerror="this.src='/static/images/NoThumbnail.jpg';"
+        ${v.videofile_exists ? ` style="cursor: pointer;" title="Click to play video"` : ''}>
         ${v.videofile_exists ? `<span>&#9654;</span>` : ''}
       </img>
       <div class="vd-preview-placeholder" style="display:none">No thumbnail</div>
@@ -864,7 +864,7 @@ function openVideoDetailsModal(videoId) {
       <div class="vd-field"><span class="vd-field-label">Availability</span><span class="vd-field-value">${escHtml(v.availability)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Video Type</span><span class="vd-field-value">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : '\u2014'}</span></div>
       <div class="vd-field"><span class="vd-field-label">Status</span><span class="vd-field-value">${videoStatusBadge(v.id, v.status)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Filename ${(v.videofile_exists || !v.filename) ? '' : '(DELETED?)'}</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Filename ${(v.videofile_exists || !v.filename) ? '' : '(Moved or deleted)'}</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
       <div class="vd-field"><span class="vd-field-label">Resolution</span><span class="vd-field-value">${resolutionText}</span></div>
       <div class="vd-field"><span class="vd-field-label">Release Date</span><span class="vd-field-value">${formatDateAndTime(v.release_date)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Added</span><span class="vd-field-value">${formatDateAndTime(v.added_at)}</span></div>
