@@ -186,6 +186,8 @@ func OpenConfig(ConfigPath string) error {
 		return fmt.Errorf("Error when opening config file '%s' %v\n", ConfigPath, err)
 	}
 	
+	// Read the config file
+	
 	ConfigContent, err := io.ReadAll(ConfigFile)
 	if err != nil {
 		return fmt.Errorf("Error when reading config file '%s' %v\n", ConfigPath, err)
@@ -194,6 +196,8 @@ func OpenConfig(ConfigPath string) error {
 	if err != nil {
 		return fmt.Errorf("Error when decoding config file json '%s' %v\n", ConfigPath, err)
 	}
+	
+	G_Config.APPLICATION_VERSION = APPLICATION_VERSION // bruh
 	
 	G_Config.ConfigFile = ConfigFile
 	
