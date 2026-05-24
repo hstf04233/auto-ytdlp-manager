@@ -219,6 +219,8 @@ func CheckIsVideoDownloaded(Video *VideoInfo) bool {
 }
 
 func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
+	UpdateVideoFileSize(Video, AChannel)
+	
 	err := RequestVideoInfo(AChannel, Video.Url, -1, Video)
 	if err != nil {
 		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
@@ -229,6 +231,28 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 	}
 	DB_UpdateVideoInfo(Video)
 	DB_UpdateVideoRefreshState(Video, 0)
+}
+
+func GetFileSize(FilePath string) (int64, error) {
+	FileStat, err := os.Stat(FilePath)
+	if err != nil {
+		return 0, err
+	}
+	
+	return FileStat.Size(), nil
+}
+
+func UpdateVideoFileSize(Video *VideoInfo, AChannel *ArchiveChannel) {
+	FilePath, fpErr := GetDownloadedVideoFilePath(Video, AChannel)
+	if fpErr == nil && FilePath != "" {
+		FileSize, err := GetFileSize(FilePath)
+		if err == nil {
+			DB_UpdateVideoFileSize(Video, FileSize)
+		}
+	} else if FilePath == "" {
+		// File doesn't exist.
+		DB_UpdateVideoFileSize(Video, 0)
+	}
 }
 
 func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int, Task *CommandTask) error {
@@ -247,6 +271,8 @@ func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int
 	}
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADED)
 	
+	UpdateVideoFileSize(Video, AChannel)
+	
 	return nil
 }
 func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int, Task *CommandTask) {
@@ -257,6 +283,7 @@ func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect in
 		return
 	}
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADED)
+	
 	RefreshVideoInfo(AChannel, Video, Task)
 }
 

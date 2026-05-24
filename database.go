@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS Videos (
 	Url          TEXT NOT NULL,
 	Availability TEXT DEFAULT '',
 	Filename     TEXT DEFAULT '',
+	FileSize     INTEGER DEFAULT 0,
 	Resolution   TEXT DEFAULT '',
 	Thumbnail    TEXT DEFAULT '',
 	Duration     FLOAT DEFAULT 0,
@@ -280,6 +281,15 @@ func DB_UpdateVideoFilename(Video *VideoInfo, Filename string) error {
 	`, Filename, time.Now().UTC(), Video.Id)
 	return err
 }
+func DB_UpdateVideoFileSize(Video *VideoInfo, FileSize int64) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
+	Video.FileSize = FileSize
+	_, err := GDB.Exec(`
+	UPDATE Videos SET FileSize = ?, UpdatedAt = ? WHERE Id = ?
+	`, FileSize, time.Now().UTC(), Video.Id)
+	return err
+}
 
 func DB_UpdateVideoRefreshState(Video *VideoInfo, RefreshState int) error {
 	VideoDBLock.Lock()
@@ -308,7 +318,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, QueuedAction, ReleaseDate, Duration,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, FileSize, Status, QueuedAction, ReleaseDate, Duration,
 	UploaderName, UploaderUrl,
 	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
@@ -323,6 +333,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		&VideoInfo.Resolution,
 		&VideoInfo.Thumbnail,
 		&VideoInfo.DownloadedFilename,
+		&VideoInfo.FileSize,
 		
 		&VideoInfo.Status,
 		&VideoInfo.QueuedAction,
@@ -424,7 +435,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	Args := []interface{}{}
 	
 	Statement := `
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, Status, QueuedAction, ReleaseDate, Duration,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, FileSize, Status, QueuedAction, ReleaseDate, Duration,
 	UploaderName, UploaderUrl,
 	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos`
@@ -467,6 +478,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			&VideoInfo.Resolution,
 			&VideoInfo.Thumbnail,
 			&VideoInfo.DownloadedFilename,
+			&VideoInfo.FileSize,
 			
 			&VideoInfo.Status,
 			&VideoInfo.QueuedAction,
@@ -853,6 +865,9 @@ func OpenDB() error {
 		// v0.12
 		"ALTER TABLE Videos ADD COLUMN UploaderName TEXT DEFAULT ''",
 		"ALTER TABLE Videos ADD COLUMN UploaderUrl  TEXT DEFAULT ''",
+		
+		// v0.14
+		"ALTER TABLE Videos ADD COLUMN FileSize     INTEGER DEFAULT 0",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

@@ -32,8 +32,9 @@ type VideoInfo struct {
 	UploaderName string `json:"uploader"`
 	
 	Filename           string `json:"-"`
-	DownloadedFilename string `json:"filename"`		// Where the video is stored on device (This is only the file name, not the file path...)
-	VideoFileExists    bool   `json:"videofile_exists"`
+	DownloadedFilename string `json:"filename"` // Where the video is stored on device (This is only the file name, not the file path...)
+	VideoFileExists    bool  `json:"videofile_exists"`
+	FileSize           int64 `json:"filesize"` // Size (in bytes) of video file on device.
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
