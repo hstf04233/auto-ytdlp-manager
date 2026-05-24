@@ -28,10 +28,12 @@ If the program closes after a few seconds (or it closes instantly) then you migh
 
 # Dependencies
 
+To quickly install yt-dlp and ffmpeg, you can run 'winget install yt-dlp.yt-dlp' in a windows command prompt running as administrator. This will not download the ytarchive dependency, you have to get ytarchive below:
+
 This program depends on:
 - yt-dlp ([github.com/yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp))
 - ytarchive ([This forked version by dreammu specificly](https://github.com/dreammu/ytarchive))
-- ffmpeg (and ffprobe) ([ffmpeg.org/download.html](https://ffmpeg.org/download.html), I recommend the builds from [gyan.dev/ffmpeg/builds/](https://www.gyan.dev/ffmpeg/builds/))
+- ffmpeg (and ffprobe) ([ffmpeg.org/download.html](https://ffmpeg.org/download.html), I recommend the builds from [www.gyan.dev/ffmpeg/builds/](https://www.gyan.dev/ffmpeg/builds/))
 
 Although it's supported to just put these dependencies straight into the program's directory,
 it's recommended that you add these to your system path environment!
