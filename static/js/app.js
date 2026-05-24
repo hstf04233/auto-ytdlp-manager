@@ -849,7 +849,7 @@ function openVideoDetailsModal(videoId) {
   
   document.getElementById('videoDetailsContent').innerHTML = `
     <div class="vd-preview" id="modal-video-preview">
-      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}" onerror="this.src='/static/images/NoThumbnail.jpg';"
+      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg';"
         ${v.videofile_exists ? ` style="cursor: pointer;" title="Click to play video"` : ''}>
         ${v.videofile_exists ? `<span>&#9654;</span>` : ''}
       </img>
@@ -1185,8 +1185,8 @@ function renderVideos() {
     return `
       <div class="card video-card">
         <div class="video-thumb">
-          <img src="${thumbnailUrl}" alt="" onerror="this.style.display='none';this.parentElement.textContent='No thumbnail'">
-          <span class="video-duration">${durationText}</span>
+          <img src="${thumbnailUrl}" alt="" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg'">
+          <span class="video-duration" title="Video duration">${durationText}</span>
         </div>
         <div class="video-info">
           <h3 class="video-title">
