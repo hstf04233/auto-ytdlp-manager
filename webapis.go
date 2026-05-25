@@ -631,6 +631,9 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 	
 	if Body.Status != nil && *Body.Status >= 0 && *Body.Status <= 10 {
 		DB_UpdateVideoStatus(VideoInfo, *Body.Status)
+		if VideoInfo.Status == VIDEO_STATUS_IGNORED {
+			DB_UpdateVideoQueuedAction(VideoInfo, VIDEO_QACTION_NONE)
+		}
 		if VideoInfo.Status == VIDEO_STATUS_IGNORED || VideoInfo.Status == VIDEO_STATUS_QUEUED {
 			// Cancel all download tasks for this video
 			Tasks, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{

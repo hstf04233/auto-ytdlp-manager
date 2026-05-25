@@ -586,12 +586,12 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		if ExistingVideo == nil && err == nil {
 			CL_Logf(Task, "Adding new video \"%s\" %s ! \n", Video.Id, Video.Url)
 			DB_UpdateVideoInfo(&Video)
-		}
-		
-		if ChannelType == ACHANNEL_TYPE_LIST_AND_IGNORE {
-			DB_UpdateVideoQueuedAction(&Video, VIDEO_QACTION_WILL_IGNORE)
-		} else if ChannelType == ACHANNEL_TYPE_VIDEOS || ChannelType == ACHANNEL_TYPE_LIVE {
-			DB_UpdateVideoQueuedAction(&Video, VIDEO_QACTION_WILL_DOWNLOAD)
+			
+			if ChannelType == ACHANNEL_TYPE_LIST_AND_IGNORE {
+				DB_UpdateVideoQueuedAction(&Video, VIDEO_QACTION_WILL_IGNORE)
+			} else if ChannelType == ACHANNEL_TYPE_VIDEOS || ChannelType == ACHANNEL_TYPE_LIVE {
+				DB_UpdateVideoQueuedAction(&Video, VIDEO_QACTION_WILL_DOWNLOAD)
+			}
 		}
 		
 		time.Sleep(time.Millisecond * 1)
