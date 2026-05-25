@@ -2,8 +2,6 @@ package main
 
 import (
 	"os"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	//"yt-stream-manager/webstatic"
@@ -11,7 +9,6 @@ import (
 	//"yt-stream-manager/database"
 	"fmt"
 	"net/http"
-	"os/exec"
 )
 
 var (
@@ -21,33 +18,6 @@ var (
 	
 	CURRENT_WORKING_DIRECTORY = ""
 )
-
-func CommandExists(cmd string) bool {
-	_, err := exec.LookPath(cmd)
-	return err == nil
-}
-func FindCommand(cmd string) string {
-	if runtime.GOOS == "windows" {
-		if filepath.Ext(cmd) == "" {
-			cmd += ".exe"
-		}
-	}
-	
-	if filepath.IsLocal(cmd) {
-		LocalCmd := fmt.Sprintf("%s/%s", CURRENT_WORKING_DIRECTORY, cmd)
-		if CommandExists(LocalCmd) {
-			// Program exists in working directory
-			return LocalCmd
-		}
-	}
-	
-	if CommandExists(cmd) {
-		// Program exists in the system path environment
-		return cmd
-	}
-	
-	return cmd
-}
 
 func StartServer(ServerPort int) {
 	Mux := http.NewServeMux()

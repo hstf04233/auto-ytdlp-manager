@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -80,6 +82,33 @@ var G_Config = &ProgramConfig{
 	
 	
 	APPLICATION_VERSION: APPLICATION_VERSION,
+}
+
+func CommandExists(cmd string) bool {
+	_, err := exec.LookPath(cmd)
+	return err == nil
+}
+func FindCommand(cmd string) string {
+	if runtime.GOOS == "windows" {
+		if filepath.Ext(cmd) == "" {
+			cmd += ".exe"
+		}
+	}
+	
+	if filepath.IsLocal(cmd) {
+		LocalCmd := fmt.Sprintf("%s/%s", CURRENT_WORKING_DIRECTORY, cmd)
+		if CommandExists(LocalCmd) {
+			// Program exists in working directory
+			return LocalCmd
+		}
+	}
+	
+	if CommandExists(cmd) {
+		// Program exists in the system path environment
+		return cmd
+	}
+	
+	return cmd
 }
 
 func Get_YtDlpPath(Config *ProgramConfig) string {
