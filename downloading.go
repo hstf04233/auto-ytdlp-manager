@@ -469,7 +469,7 @@ func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, QualitySe
 		
 		if Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
 			DB_UpdateVideoQueuedAction(Video, VIDEO_QACTION_WILL_IGNORE)
-		} else if Type == ACHANNEL_TYPE_LIVE || Type == ACHANNEL_TYPE_VIDEOS {
+		} else if Type == ACHANNEL_TYPE_VIDEOS || Type == ACHANNEL_TYPE_LIVE {
 			DB_UpdateVideoQueuedAction(Video, VIDEO_QACTION_WILL_DOWNLOAD)
 		}
 		
@@ -559,6 +559,12 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		//L_Printf("Checking every video for \"%s\" ! \n", AChannel.Name)
 		CL_Logf(Task, "Checking every video for \"%s\" ! \n", AChannel.Name)
 	}
+	
+	ChannelType := AChannel.Type
+	if CheckSettings.OverrideChannelType >= 0 {
+		ChannelType = int32(CheckSettings.OverrideChannelType)
+	}
+	
 	AChannel.Lock.Unlock()
 	
 	VideoList, err := yt_dlp_ListVideos(Url, PlaylistEnd, Task)
@@ -576,12 +582,19 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		
 		Video := VideoList[i]
 		Video.FromChannel = ChannelId
-		Exists, err := DB_GetVideo(Video.Id)
-		if Exists == nil && err == nil {
+		ExistingVideo, err := DB_GetVideo(Video.Id)
+		if ExistingVideo == nil && err == nil {
 			CL_Logf(Task, "Adding new video \"%s\" %s ! \n", Video.Id, Video.Url)
 			DB_UpdateVideoInfo(&Video)
-			time.Sleep(time.Millisecond * 1)
 		}
+		
+		if ChannelType == ACHANNEL_TYPE_LIST_AND_IGNORE {
+			DB_UpdateVideoQueuedAction(&Video, VIDEO_QACTION_WILL_IGNORE)
+		} else if ChannelType == ACHANNEL_TYPE_VIDEOS || ChannelType == ACHANNEL_TYPE_LIVE {
+			DB_UpdateVideoQueuedAction(&Video, VIDEO_QACTION_WILL_DOWNLOAD)
+		}
+		
+		time.Sleep(time.Millisecond * 1)
 		
 		DB_UpdateCommandTaskInfo(Task)
 	}
