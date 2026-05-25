@@ -307,6 +307,19 @@ function formatDuration(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function formatBytesSize(sizeInBytes) {
+  const kb = Math.ceil(sizeInBytes/1000*10)/10;   // Rounded by one decimal place.
+  if (kb < 1000) {
+    return `${kb} KB`
+  }
+  const mb = Math.ceil(sizeInBytes/1000/1000*10)/10;
+  if (mb < 1000) {
+    return `${mb} MB`
+  }
+  const gb = Math.ceil(sizeInBytes/1000/1000/1000*10)/10;
+  return `${gb} GB`
+}
+
 function getFormatedTaskDuration(task) {
   let startDate = new Date(task.start_time);
   if (task.status == 0) {
@@ -867,7 +880,7 @@ function openVideoDetailsModal(videoId) {
       <div class="vd-field"><span class="vd-field-label">Video Type</span><span class="vd-field-value">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : '\u2014'}</span></div>
       <div class="vd-field"><span class="vd-field-label">Status</span><span class="vd-field-value">${videoStatusBadge(v.id, v.status)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Filename ${(v.videofile_exists || !v.filename || v.status == 1) ? '' : '(Moved or deleted)'}</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Filesize</span><span class="vd-field-value">${Math.ceil((v.filesize || 0)/1000)} KB</span></div>
+      <div class="vd-field"><span class="vd-field-label">Filesize</span><span class="vd-field-value">${formatBytesSize(v.filesize || 0)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Resolution</span><span class="vd-field-value">${resolutionText}</span></div>
       <div class="vd-field"><span class="vd-field-label">Release Date</span><span class="vd-field-value">${formatDateAndTime(v.release_date)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Added</span><span class="vd-field-value">${formatDateAndTime(v.added_at)}</span></div>
