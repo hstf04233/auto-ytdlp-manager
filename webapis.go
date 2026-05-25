@@ -347,6 +347,8 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 		if Filepath == "" {
 			// Video file was not found... Deleted?
 			Video.VideoFileExists = false
+			
+			Video.FileSize = 0   // This is for the web ui, this doesn't save into the database.
 		} else {
 			Video.VideoFileExists = true
 		}
