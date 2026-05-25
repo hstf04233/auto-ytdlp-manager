@@ -25,6 +25,10 @@ body {
   min-height: 100vh;
 }
 
+.modal-active {
+  overflow: hidden;
+}
+
 a {
   color: var(--accent);
   text-decoration: none;

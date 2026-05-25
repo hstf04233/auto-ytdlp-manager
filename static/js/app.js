@@ -908,6 +908,7 @@ function openVideoDetailsModal(videoId) {
   `;
 
   document.getElementById('videoDetailsModal').classList.add('active');
+  document.body.classList.add('modal-active');
 }
 
 function closeVideoDetailsModal() {
@@ -918,6 +919,7 @@ function closeVideoDetailsModal() {
   }
   
   document.getElementById('videoDetailsModal').classList.remove('active');
+  document.body.classList.remove('modal-active');
 }
 
 function updateChannelModalPlaceholders() {
@@ -937,6 +939,7 @@ function updateChannelModalPlaceholders() {
 
 // ========== Channel Modal ==========
 function openAddChannelModal() {
+  
   document.getElementById('channelModalTitle').textContent = 'Add Channel';
   document.getElementById('channelId').value = '';
   document.getElementById('channelName').value = '';
@@ -948,6 +951,8 @@ function openAddChannelModal() {
   document.getElementById('channelCheckInterval').value = '';
   document.getElementById('channelPlaylistEnd').value = '20';
   document.getElementById('channelSubmitBtn').textContent = 'Add Channel';
+  
+  document.body.classList.add('modal-active');
   document.getElementById('channelModal').classList.add('active');
   
   updateChannelModalPlaceholders();
@@ -980,15 +985,18 @@ function openEditChannelModal(id) {
 
 function closeChannelModal() {
   document.getElementById('channelModal').classList.remove('active');
+  document.body.classList.remove('modal-active');
 }
 
 let currentChannel;
 
 function openChannelStartModal() {
   document.getElementById('channelStartModal').classList.add('active');
+  document.body.classList.add('modal-active');
 }
 function closeChannelStartModal() {
   document.getElementById('channelStartModal').classList.remove('active');
+  document.body.classList.remove('modal-active');
   
   if (currentChannel) {
     enableChannel(currentChannel.id, true);
@@ -1021,12 +1029,14 @@ function openAddVideosModal() {
   document.querySelectorAll('.videoadd-modal-actions-list button').forEach(l => l.disabled = false);
   
   document.getElementById('addVideosModal').classList.add('active');
+  document.body.classList.add('modal-active');
   
   document.getElementById('avm-ChannelUrl').value = '';
   document.getElementById('avm-DownloadDir').textContent = `Default download directory: "${escHtml(programConfig.Default_DownloadDir)}"`;
 }
 function closeAddVideosModal() {
   document.getElementById('addVideosModal').classList.remove('active');
+  document.body.classList.remove('modal-active');
 }
 
 async function sendAddVideosForm(type) {
@@ -1091,14 +1101,16 @@ async function saveChannel(e) {
       patch.playlist_end = playlistEnd;
       newChannelData = await API.patch(`/api/channels/${id}`, patch);
       showToast('Channel updated!', 'success');
+      
+      closeChannelModal();
     } else {
       newChannelData = await API.post('/api/channels', body);
       showToast('Channel added!', 'success');
       
       currentChannel = newChannelData;
+      closeChannelModal();
       openChannelStartModal();
     }
-    closeChannelModal();
     loadChannels();
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
