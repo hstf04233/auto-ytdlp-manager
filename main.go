@@ -31,6 +31,7 @@ func StartServer(ServerPort int) {
 	Mux.HandleFunc("/favicon.ico", webstatic_ServeStaticContent)
 	Mux.HandleFunc("/api/", ServeApi)
 	Mux.HandleFunc("/video-file/", ServeVideoDownload)
+	Mux.HandleFunc("/db-image/", ServeDBImage)
 	
 	L_Printf("Starting server at http://localhost:%d\n", ServerPort)
 	

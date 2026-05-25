@@ -839,6 +839,19 @@ function videoPreviewClick(videoId) {
   }
 }
 
+function getThumbnail(videoInfo) {
+  if (videoInfo.stored_thumbnail) {
+    return `/db-image/${videoInfo.stored_thumbnail}`
+  }
+  if (videoInfo.origin_thumbnail_url) {
+    return videoInfo.origin_thumbnail_url
+  }
+  
+  // This video contains no thumbnail url?
+  // Default to youtube's thumbnail url and hope it's correct...
+  return `https://img.youtube.com/vi/${videoInfo.id}/mqdefault.jpg`
+}
+
 function openVideoDetailsModal(videoId) {
   const v = allVideos.find(x => x.id === videoId);
   if (!v) return;
@@ -861,7 +874,7 @@ function openVideoDetailsModal(videoId) {
     videoPreviewOnClick = `event.preventDefault(); videoPreviewClick('${videoId}');`;
   }
   
-  var thumbnailUrl = v.thumbnail_url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
+  var thumbnailUrl = getThumbnail(v);
   
   document.getElementById('videoDetailsContent').innerHTML = `
     <div class="vd-preview" id="modal-video-preview">
@@ -1184,7 +1197,7 @@ function renderVideos() {
   }
 
   container.innerHTML = allVideos.map(v => {
-    var thumbnailUrl = v.thumbnail_url || `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`;
+    var thumbnailUrl = getThumbnail(v);
     var durationText = formatDuration(v.duration)
     if (v.video_type == 2 && (v.duration <= 1)) {  // VIDEO_TYPE_ISLIVE
       durationText = "LIVE"

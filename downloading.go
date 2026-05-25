@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -237,6 +240,13 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 	DB_UpdateVideoInfo(Video)
 	DB_UpdateVideoRefreshState(Video, 0)
 	
+	if Video.OriginThumbnail != "" {
+		_, err := DownloadThumbnailForVideo(Video, Video.OriginThumbnail)
+		if err != nil {
+			CL_Logf(Task, "Failed to download thumbnail | %v\n", err)
+		}
+	}
+	
 	if Video.QueuedAction == VIDEO_QACTION_WILL_IGNORE {
 		// This video was queued to be ignored.
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_IGNORED)
@@ -266,14 +276,69 @@ func UpdateVideoFileSize(Video *VideoInfo, AChannel *ArchiveChannel) {
 	}
 }
 
-func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int, Task *CommandTask) error {
-	/*
-	if AChannel.Type == ACHANNEL_TYPE__UNUSED || AChannel.Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
-		L_Printf("DownloadVideo tried to download from a channel that doesn't allow downloads? Name: \"%s\"\n", AChannel.Name)
-		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
-		return nil
+func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, error) {
+	Response, err := http.Get(ThumbnailUrl)
+	if err != nil {
+		return "", fmt.Errorf("Failed because http.Get error: %v", err)
 	}
-	*/
+	defer Response.Body.Close()
+	
+	if Response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Failed because response status: %s", Response.Status)
+	}
+	
+	ContentType := Response.Header.Get("Content-Type")
+	
+	ImageContainer := ""
+	if ContentType == "image/jpeg" {
+		ImageContainer = "jpg"
+	} else if ContentType == "image/png" {
+		ImageContainer = "png"
+	} else if ContentType == "image/webp" {
+		ImageContainer = "webp"
+	} else if ContentType == "image/avif" {
+		ImageContainer = "avif"
+	} else {
+		return "", fmt.Errorf("Unknown Content-Type: '%s'", ContentType)
+	}
+	
+	ImageContent, err := io.ReadAll(Response.Body)
+	if err != nil {
+		return "", fmt.Errorf("Could not read response body because: %v", err)
+	}
+	if len(ImageContent) > DB_IMAGE_MAX_FILESIZE {
+		// Image file is too big!!!
+		return "", fmt.Errorf("The downloaded thumbnail is larger than 10MB...")
+	}
+	
+	// TODO: auto convert webp and avif to png or jpeg (We don't want none of that yucky shit 🤣)
+	
+	ImageHash := fmt.Sprintf("%x", sha256.Sum256(ImageContent))
+	ImageId := ImageHash
+	NewDBImage := &DB_Image{
+		Id: ImageId,
+		Filename: fmt.Sprintf("%s-thumbnail.%s", Video.Id, ImageContainer),
+		
+		Type: DB_IMAGE_TYPE_THUMBNAIL,
+	}
+	err = DB_UpdateImage(NewDBImage)
+	if err != nil {
+		return "", fmt.Errorf("DB_UpdateImage Database error: %v", err)
+	}
+	
+	err = DB_SetImageData(NewDBImage, ImageContent)
+	if err != nil {
+		return "", fmt.Errorf("Could not save image into database because: %v", err)
+	}
+	
+	StoredThumbnailId := fmt.Sprintf("%s.%s", NewDBImage.Id, ImageContainer)
+	
+	DB_UpdateVideoStoredThumbnail(Video, StoredThumbnailId)
+	
+	return StoredThumbnailId, nil
+}
+
+func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int, Task *CommandTask) error {
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADING)
 	err := yt_dlp_DownloadVideo(AChannel, Video, QualitySelect)
 	if err != nil {
@@ -341,6 +406,13 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		DB_UpdateVideoAvalibility(Video, Video.Availability)
 		CL_Logf(Task, "Failed to grab video info for \"%s\"... Error: %v\n", Video.Title, err)
 		return false
+	}
+	
+	if Video.OriginThumbnail != "" && Video.Thumbnail == "" {
+		_, err := DownloadThumbnailForVideo(Video, Video.OriginThumbnail)
+		if err != nil {
+			CL_Logf(Task, "Failed to download thumbnail | %v\n", err)
+		}
 	}
 	
 	DB_UpdateVideoInfo(Video)

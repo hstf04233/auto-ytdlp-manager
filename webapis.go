@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -551,7 +552,7 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	
 	VideosList, err := DB_ListVideos(Limit, Offset, Query)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("DB_ListVideos ERROR! | %s", err.Error()), http.StatusInternalServerError)
 		return
 	}
 	
@@ -1114,4 +1115,38 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	http.ServeFile(w, r, FilePath)
+}
+
+func ServeDBImage(w http.ResponseWriter, r *http.Request) {
+	ImageId := path.Base(r.URL.Path)
+	if len(ImageId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid image.", http.StatusBadRequest)
+		return
+	}
+	
+	ImageExtension := filepath.Ext(ImageId)
+	ImageIdWithoutExt := strings.TrimSuffix(ImageId, ImageExtension)
+	
+	ImageInfo, err := DB_GetImageInfo(ImageIdWithoutExt)
+	if err != nil {
+		L_Printf("Failed to serve image because DB_GetImageInfo errored: %v\n", err)
+		http.Error(w, "Error getting image info?", http.StatusInternalServerError)
+		return
+	}
+	
+	if ImageInfo == nil || filepath.Ext(ImageInfo.Filename) != ImageExtension {
+		http.Error(w, "Image not found.", http.StatusNotFound)
+		return
+	}
+	
+	ImageData, err := DB_GetImageData(ImageIdWithoutExt)
+	if err != nil {
+		L_Printf("Failed to serve image because DB_GetImageData errored: %v\n", err)
+		http.Error(w, "Error getting image info?", http.StatusInternalServerError)
+		return
+	}
+	
+	Seeker := bytes.NewReader(ImageData)
+	
+	http.ServeContent(w, r, ImageInfo.Filename, ImageInfo.UpdatedAt, Seeker)
 }

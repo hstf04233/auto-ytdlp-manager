@@ -12,8 +12,6 @@ Automatically update yt-dlp binary (if possible)
 
 Download live stream chat in real time
 
-Download the video thumbnails into a database
-
 Fix pagination performance, right now it's shit while having 10,000+ videos in a database...
 
 Use yt-dlp as a fallback when ytarchive doesn't exist... (use --live-from-start, YUCK, that shi has never worked for me...)

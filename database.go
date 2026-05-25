@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS Videos (
 	Filename     TEXT DEFAULT '',
 	FileSize     INTEGER DEFAULT 0,
 	Resolution   TEXT DEFAULT '',
-	Thumbnail    TEXT DEFAULT '',
+	Thumbnail       TEXT DEFAULT '',   /* Origin thumbnail */
+	StoredThumbnail TEXT DEFAULT '',   /* Downloaded thumbnail id */
 	Duration     FLOAT DEFAULT 0,
 	
 	UploaderName TEXT DEFAULT '',
@@ -82,6 +83,20 @@ CREATE TABLE IF NOT EXISTS CommandTasks (
 	UpdatedAt DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS Images (
+	Id        TEXT PRIMARY KEY,  /* Should a hashed value of ImageData */
+	Filename  TEXT,
+	ImageData BLOB,
+	
+	Type INTEGER NOT NULL DEFAULT 0,   /* Where did this image come from? */
+	OriginUrl TEXT,
+	
+	AddedAt   DATETIME NOT NULL DEFAULT (datetime('now')),
+	UpdatedAt DATETIME
+);
+
+
+
 /*
 	Set all videos that were previously "downloading" videos to queued.
 */
@@ -100,6 +115,24 @@ This task was abruptly canceled because the server closed before this task could
 WHERE Status = 0;
 
 `
+
+const (
+	DB_IMAGE_TYPE_UPLOADED  = 0
+	DB_IMAGE_TYPE_THUMBNAIL = 1
+	
+	DB_IMAGE_MAX_FILESIZE = (10 * 1000 * 1000)  // 10 MB
+)
+
+type DB_Image struct {
+	Id        string `json:"id"`  /* Should a hashed value of ImageData */
+	Filename  string `json:"filename"`
+	
+	Type int `json:"type"`
+	OriginUrl string `json:"origin_url"`
+	
+	AddedAt   time.Time `json:"added_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
 
 var GDB *sql.DB
 var VideoDBLock sync.RWMutex
@@ -221,7 +254,7 @@ func DB_UpdateVideoInfo(Video *VideoInfo) error {
 	
 	VideoType=excluded.VideoType,
 	UpdatedAt=excluded.UpdatedAt
-	`, Video.Id, Video.FromChannel, Video.Title, Video.Description, Video.Url, Video.Availability, Video.Resolution, Video.Thumbnail, Video.ReleaseDate, Video.Duration, Video.UploaderName, Video.UploaderUrl, Video.VideoType, TimeNow, TimeNow)
+	`, Video.Id, Video.FromChannel, Video.Title, Video.Description, Video.Url, Video.Availability, Video.Resolution, Video.OriginThumbnail, Video.ReleaseDate, Video.Duration, Video.UploaderName, Video.UploaderUrl, Video.VideoType, TimeNow, TimeNow)
 	
 	if err != nil {
 		L_Printf("DB_UpdateVideoInfo ERR: %v\n", err)
@@ -288,6 +321,15 @@ func DB_UpdateVideoFileSize(Video *VideoInfo, FileSize int64) error {
 	`, FileSize, time.Now().UTC(), Video.Id)
 	return err
 }
+func DB_UpdateVideoStoredThumbnail(Video *VideoInfo, StoredThumbnail string) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
+	Video.Thumbnail = StoredThumbnail
+	_, err := GDB.Exec(`
+	UPDATE Videos SET StoredThumbnail = ?, UpdatedAt = ? WHERE Id = ?
+	`, StoredThumbnail, time.Now().UTC(), Video.Id)
+	return err
+}
 
 func DB_UpdateVideoRefreshState(Video *VideoInfo, RefreshState int) error {
 	VideoDBLock.Lock()
@@ -316,7 +358,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, FileSize, Status, QueuedAction, ReleaseDate, Duration,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, Status, QueuedAction, ReleaseDate, Duration,
 	UploaderName, UploaderUrl,
 	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
@@ -329,6 +371,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		&VideoInfo.Url,
 		&VideoInfo.Availability,
 		&VideoInfo.Resolution,
+		&VideoInfo.OriginThumbnail,
 		&VideoInfo.Thumbnail,
 		&VideoInfo.DownloadedFilename,
 		&VideoInfo.FileSize,
@@ -433,7 +476,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	Args := []interface{}{}
 	
 	Statement := `
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, Filename, FileSize, Status, QueuedAction, ReleaseDate, Duration,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, Status, QueuedAction, ReleaseDate, Duration,
 	UploaderName, UploaderUrl,
 	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos`
@@ -474,6 +517,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			&VideoInfo.Url,
 			&VideoInfo.Availability,
 			&VideoInfo.Resolution,
+			&VideoInfo.OriginThumbnail,
 			&VideoInfo.Thumbnail,
 			&VideoInfo.DownloadedFilename,
 			&VideoInfo.FileSize,
@@ -587,12 +631,6 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 		Output = TruncateOutput(Output)
 	}
 	Status := Task.Status
-	/*
-	if Status == TASK_STATUS_RUNNING {
-		// Don't save the running status incase the program abruptly quits!
-		Status = TASK_STATUS_CANCELED
-	}
-	*/
 	
 	_, err := GDB.Exec(`
 	INSERT INTO CommandTasks(Id, Title, Type, Status, FromChannel, FromVideo, RunArgs, Output, StartTime, EndTime, UpdatedAt)
@@ -843,6 +881,79 @@ func DB_DeleteCommandTask(TaskId string) error {
 	return err
 }
 
+func DB_UpdateImage(Image *DB_Image) error {
+	_, err := GDB.Exec(`
+	INSERT INTO Images(Id, Filename, Type, OriginUrl, AddedAt, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	DO UPDATE SET
+	Filename=excluded.Filename,
+	Type=excluded.Type,
+	OriginUrl=excluded.OriginUrl,
+	
+	UpdatedAt=excluded.UpdatedAt
+	`, Image.Id, Image.Filename, Image.Type, Image.OriginUrl, time.Now().UTC(), time.Now().UTC())
+	
+	if err != nil {
+		L_Printf("DB_UpdateImage ERR: %v\n", err)
+		return err
+	}
+	
+	return nil
+}
+
+func DB_GetImageInfo(ImageId string) (*DB_Image, error) {
+	ImageInfo := &DB_Image{}
+	VideoRow := GDB.QueryRow(`
+	SELECT Id, Filename, Type, OriginUrl, AddedAt, UpdatedAt FROM Images WHERE Id = ?
+	`, ImageId)
+	err := VideoRow.Scan(
+		&ImageInfo.Id,
+		&ImageInfo.Filename,
+		
+		&ImageInfo.Type,
+		&ImageInfo.OriginUrl,
+		
+		&ImageInfo.AddedAt,
+		&ImageInfo.UpdatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	
+	return ImageInfo, nil
+}
+func DB_GetImageData(ImageId string) ([]byte, error) {
+	var ImageData []byte
+	
+	VideoRow := GDB.QueryRow(`
+	SELECT ImageData FROM Images WHERE Id = ?
+	`, ImageId)
+	err := VideoRow.Scan(
+		&ImageData,
+	)
+	if err != nil {
+		return nil, err
+	}
+	
+	return ImageData, nil
+}
+
+func DB_SetImageData(Image *DB_Image, ImageContent []byte) error {
+	_, err := GDB.Exec(`
+	UPDATE Images SET ImageData = ?, UpdatedAt = ? WHERE Id = ?
+	`, ImageContent, time.Now().UTC(), Image.Id)
+	
+	if err != nil {
+		L_Printf("DB_SetImageData ERR: %v\n", err)
+		return err
+	}
+	
+	return nil
+}
+
 func OpenDB() error {
 	DatabaseFilePath := DATABASE_FILE
 	if APPLICATION_VERSION_TYPE == "debug" {
@@ -866,6 +977,7 @@ func OpenDB() error {
 		
 		// v0.14
 		"ALTER TABLE Videos ADD COLUMN FileSize     INTEGER DEFAULT 0",
+		"ALTER TABLE Videos ADD COLUMN StoredThumbnail TEXT DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

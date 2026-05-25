@@ -26,7 +26,8 @@ type VideoInfo struct {
 	Id           string `json:"id"`
 	Availability string `json:"availability"`  // public, unlisted, private etc...
 	Resolution   string `json:"resolution"`
-	Thumbnail    string `json:"thumbnail_url"`
+	OriginThumbnail string `json:"origin_thumbnail_url"`
+	Thumbnail       string `json:"stored_thumbnail"`    // Downloaded thumbnail image
 	
 	UploaderUrl  string `json:"uploader_url"`
 	UploaderName string `json:"uploader"`
@@ -106,7 +107,7 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 		VideoInfo.Resolution = OutVideo.Resolution
 	}
 	if OutVideo.Thumbnail != "" {
-		VideoInfo.Thumbnail = OutVideo.Thumbnail
+		VideoInfo.OriginThumbnail = OutVideo.Thumbnail
 	}
 	if OutVideo.UploaderName != "" {
 		VideoInfo.UploaderName = OutVideo.UploaderName
