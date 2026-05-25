@@ -187,13 +187,11 @@ func DB_LoadChannels(WD *WatchingBundle) error {
 	}
 	WD.ChannelsLock.Lock()
 	defer WD.ChannelsLock.Unlock()
-	var i int64
 	for _, Channel := range(ChannelsList) {
-		Channel.NextFullChannelCheckMSEC = time.Now().UTC().UnixMilli() + (i*1000 * 60*2)
+		Channel.NextCheckMSEC = 0
+		Channel.NextFullChannelCheckMSEC = 0
 		
 		WD.Channels = append(WD.Channels, Channel)
-		
-		i += 1
 	}
 	
 	return nil
