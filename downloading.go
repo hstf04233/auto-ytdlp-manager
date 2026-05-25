@@ -319,18 +319,16 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 	}
 	
 	err := RequestVideoInfo(AChannel, Video.Url, QualitySelect, Video)
+	if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
+		// This task was canceled!! Don't do anything else.
+		return false
+	}
 	if err != nil {
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		DB_UpdateVideoAvalibility(Video, Video.Availability)
 		CL_Logf(Task, "Failed to grab video info for \"%s\"... Error: %v\n", Video.Title, err)
 		return false
 	}
-	
-	if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
-		// This task was canceled!! don't do anything.
-		return false
-	}
-	
 	
 	DB_UpdateVideoInfo(Video)
 	
@@ -347,9 +345,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		// TODO:
 		if Video.Url[0:23] == "https://www.youtube.com" {
 			// use ytarchive
-			if Task != nil {
-				CL_Logf(Task, "Downloading live stream: \"%s\" %s\n", Video.Title, Video.Url)
-			}
+			CL_Logf(Task, "Downloading live stream: \"%s\" %s\n", Video.Title, Video.Url)
 			go DownloadYTLive(AChannel, Video, QualitySelect, Task)
 			break
 		}
@@ -363,10 +359,11 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 			DB_UpdateCommandTaskInfo(Task)
 		}
 		err := DownloadVideo(AChannel, Video, QualitySelect, Task)
+		if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
+			return false
+		}
 		if err != nil {
-			if Task != nil {
-				CL_Logf(Task, "Failed to download video \"%s\" because: %v\n", Video.Title, err)
-			}
+			CL_Logf(Task, "Failed to download video \"%s\" because: %v\n", Video.Title, err)
 		}
 	}
 	
