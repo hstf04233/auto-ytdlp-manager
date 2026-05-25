@@ -856,15 +856,18 @@ function openVideoDetailsModal(videoId) {
       <div class="vd-preview-placeholder" style="display:none">No thumbnail</div>
     </div>
     <h3 class="vd-title">${escHtml(v.title)}</h3>
+    ${v.uploader ? `<p class="vd-header">Uploader: <a href="${escHtml(v.uploader_url)}" target="_blank">${escHtml(v.uploader)}</a></p>` : ''}
+    <p class="vd-header">${escHtml(v.availability)}</p>
+    <hr>
     <div class="vd-grid">
-      <div class="vd-field"><span class="vd-field-label">From: <a href="${channelUrl}" target="_blank">${escHtml(channelName)}</a></span></div>
+      <div class="vd-field"><span class="vd-field-label">Channel</span><span class="vd-field-value">${escHtml(channelName)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Video ID</span><span class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(v.id)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Video URL</span><span class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(v.url)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Video URL</span><a href="${escHtml(v.url)}" target="_blank" class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(v.url)}</a></div>
       <div class="vd-field"><span class="vd-field-label">Duration</span><span class="vd-field-value">${formatDuration(v.duration)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Availability</span><span class="vd-field-value">${escHtml(v.availability)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Video Type</span><span class="vd-field-value">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : '\u2014'}</span></div>
       <div class="vd-field"><span class="vd-field-label">Status</span><span class="vd-field-value">${videoStatusBadge(v.id, v.status)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Filename ${(v.videofile_exists || !v.filename) ? '' : '(Moved or deleted)'}</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Filename ${(v.videofile_exists || !v.filename || v.status == 1) ? '' : '(Moved or deleted)'}</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Filesize</span><span class="vd-field-value">${Math.ceil((v.filesize || 0)/1000)} KB</span></div>
       <div class="vd-field"><span class="vd-field-label">Resolution</span><span class="vd-field-value">${resolutionText}</span></div>
       <div class="vd-field"><span class="vd-field-label">Release Date</span><span class="vd-field-value">${formatDateAndTime(v.release_date)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Added</span><span class="vd-field-value">${formatDateAndTime(v.added_at)}</span></div>
@@ -882,7 +885,6 @@ function openVideoDetailsModal(videoId) {
   const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
 
   document.getElementById('videoDetailsActions').innerHTML = `
-    <a href="${escHtml(v.url)}" target="_blank" class="btn btn-secondary btn-sm" title="Open original video link">Open Video</a>
     ${
       v.videofile_exists ?
     `<a href="/video-file/${escHtml(v.id)}?download=true" target="_blank" class="btn btn-secondary btn-sm" title="Download video file">Download Video</a>` :
