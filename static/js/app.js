@@ -757,7 +757,7 @@ function renderChannels() {
           </label>
           <button class="btn btn-secondary btn-sm" onclick="runChannelCheck('${ch.id}')" id="channel-check-btn">Check videos now</button>
           <button class="btn btn-secondary btn-sm" onclick="openEditChannelModal('${ch.id}')">Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}', '${ch.name}')">Delete</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteChannel('${ch.id}')">Delete</button>
         </div>
       </div>
     `;
@@ -796,7 +796,10 @@ async function runChannelCheck(id, name) {
   }
 }
 
-async function deleteChannel(id, name) {
+async function deleteChannel(id) {
+  const ch = getChannelFromId(id);
+  const name = ch ? (ch.name) : "UNKNOWN CHANNEL"
+  
   if (!confirm("Delete channel \"" + name + "\"?")) return;
   try {
     await API.del(`/api/channels/${id}`);
