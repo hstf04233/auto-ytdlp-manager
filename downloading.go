@@ -28,6 +28,11 @@ const (
 	VIDEO_STATUS_FAILED      = 3
 	VIDEO_STATUS_IGNORED     = 4
 )
+const (
+	VIDEO_QACTION_NONE = 0
+	VIDEO_QACTION_WILL_DOWNLOAD = 1
+	VIDEO_QACTION_WILL_IGNORE = 2
+)
 
 const (
 	MANUAL_CHANNEL_ID = "-Manual-Channel-"
@@ -221,16 +226,22 @@ func CheckIsVideoDownloaded(Video *VideoInfo) bool {
 func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
 	UpdateVideoFileSize(Video, AChannel)
 	
-	err := RequestVideoInfo(AChannel, Video.Url, -1, Video)
+	err := RequestVideoInfo(AChannel, Video.Url, -1, Video, Task)
 	if err != nil {
 		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoInfo(Video)
 		DB_UpdateVideoRefreshState(Video, 0)
-		DB_UpdateVideoAvalibility(Video, Video.Availability)
+		DB_UpdateVideoAvalibility(Video, Video.Availability)   // RequestVideoInfo() might have updated the Availability tag.
 		return
 	}
 	DB_UpdateVideoInfo(Video)
 	DB_UpdateVideoRefreshState(Video, 0)
+	
+	if Video.QueuedAction == VIDEO_QACTION_WILL_IGNORE {
+		// This video was queued to be ignored.
+		DB_UpdateVideoStatus(Video, VIDEO_STATUS_IGNORED)
+		DB_UpdateVideoQueuedAction(Video, VIDEO_QACTION_NONE)
+	}
 }
 
 func GetFileSize(FilePath string) (int64, error) {
@@ -270,6 +281,7 @@ func DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int
 		return err
 	}
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADED)
+	DB_UpdateVideoQueuedAction(Video, VIDEO_QACTION_NONE)
 	
 	UpdateVideoFileSize(Video, AChannel)
 	
@@ -283,6 +295,7 @@ func DownloadYTLive(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect in
 		return
 	}
 	DB_UpdateVideoStatus(Video, VIDEO_STATUS_DOWNLOADED)
+	DB_UpdateVideoQueuedAction(Video, VIDEO_QACTION_NONE)
 	
 	RefreshVideoInfo(AChannel, Video, Task)
 }
@@ -318,7 +331,7 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		QualitySelect = CheckSettings.QualitySelect
 	}
 	
-	err := RequestVideoInfo(AChannel, Video.Url, QualitySelect, Video)
+	err := RequestVideoInfo(AChannel, Video.Url, QualitySelect, Video, Task)
 	if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
 		// This task was canceled!! Don't do anything else.
 		return false
@@ -339,6 +352,8 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		
 		return false
 	}
+	
+	DB_UpdateVideoQueuedAction(Video, VIDEO_QACTION_WILL_DOWNLOAD)
 	
 	switch Video.VideoType {
 	case VIDEO_TYPE_ISLIVE:
@@ -451,6 +466,13 @@ func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, QualitySe
 			Video = Exists
 			DB_UpdateVideoStatus(Video, VIDEO_STATUS_QUEUED)
 		}
+		
+		if Type == ACHANNEL_TYPE_LIST_AND_IGNORE {
+			DB_UpdateVideoQueuedAction(Video, VIDEO_QACTION_WILL_IGNORE)
+		} else if Type == ACHANNEL_TYPE_LIVE || Type == ACHANNEL_TYPE_VIDEOS {
+			DB_UpdateVideoQueuedAction(Video, VIDEO_QACTION_WILL_DOWNLOAD)
+		}
+		
 		time.Sleep(time.Millisecond * 1)
 		
 		DB_UpdateCommandTaskInfo(Task)
@@ -615,8 +637,8 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 			if !IsChannelEnabledWithCheck(AChannel, CheckSettings) { break }
 			
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
-			DB_UpdateCommandTaskInfo(Task)
 			RefreshVideoInfo(AChannel, Video, Task)
+			DB_UpdateCommandTaskInfo(Task)
 		}
 	}
 	
@@ -645,7 +667,9 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 	Task.Title = fmt.Sprintf("Refreshing videos for: \"%s\"", AChannel.Name)
 	DB_UpdateCommandTaskInfo(Task)
 	
-	RefreshableVideos, err := DB_ListVideos(10, 0, ListVideosQuery{
+	MaxVideosToRefresh := 10
+	
+	RefreshableVideos, err := DB_ListVideos(MaxVideosToRefresh, 0, ListVideosQuery{
 		RefreshState: 1,
 		FromChannelId: AChannel.Id,
 		Status: -1,
@@ -657,15 +681,18 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 	if err == nil && len(RefreshableVideos) > 0 {
 		for _, Video := range(RefreshableVideos) {
 			if Task.Status != TASK_STATUS_RUNNING { return }
+			
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
 			RefreshVideoInfo(AChannel, Video, Task)
 		}
 		
-		if len(RefreshableVideos) >= 10 {
+		if len(RefreshableVideos) >= MaxVideosToRefresh {
 			AChannel.NeedsRefreshing = true
 		}
 	}
+	
+	DB_UpdateCommandTaskInfo(Task)
 	
 	CL_FinishTask(Task, TASK_STATUS_FINISHED)
 }

@@ -210,13 +210,13 @@ func GetVideoFileInfo(filePath string) (*VideoFileInfo, error) {
 	return &Info, nil
 }
 
-func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect int, Video *VideoInfo) (error) {
+func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect int, Video *VideoInfo, Task *CommandTask) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
 	OutputTemplate := GetOutputTemplate(AChannel)
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
-		L_Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
+		CL_Logf(Task, "Could not make directory \"%s\" err: %v\n", DownloadDir, err)
 	}
 	
 	Args := []string{
@@ -245,12 +245,15 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 	
 	stderr, err := Cmd.StderrPipe()
 	if err != nil {
-		L_Printf("Error when creating StderrPipe: %v\n", err)
+		CL_Logf(Task, "Error when creating StderrPipe: %v\n", err)
 		return err
 	}
 	ErrOut := CL_BasicWatchStdPipe(stderr)
 	
 	Out, err := Cmd.Output()
+	if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
+		return nil
+	}
 	if err != nil {
 		ErrOut.Lock.RLock()
 		ErrOutput := ErrOut.RawOutput
@@ -264,7 +267,7 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 		if fpErr == nil && FilePath != "" {
 			VFileInfo, err := GetVideoFileInfo(FilePath)
 			if err != nil {
-				L_Printf("Could not get video file info because: %v\n", err)
+				CL_Logf(Task, "Could not get video file info because: %v\n", err)
 			}
 			if Video.Duration <= 1 {
 				Video.Duration = VFileInfo.Duration
@@ -287,14 +290,14 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 			return fmt.Errorf("%s", ErrOutput)
 		}
 		
-		L_Printf("%s\n", ErrOutput)
-		L_Printf("Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
+		CL_Logf(Task, "%s\n", ErrOutput)
+		CL_Logf(Task, "Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
 		return fmt.Errorf("%s", ErrOutput)
 	}
 	var OutVideo YT_DLP_OUTVIDEO
 	err = json.Unmarshal(Out, &OutVideo)
 	if err != nil {
-		L_Printf("json.Unmarshal err: %v\n", err)
+		CL_Logf(Task, "json.Unmarshal err: %v\n", err)
 		return err
 	}
 	
@@ -305,13 +308,6 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 	if OldVideoId != "" {
 		Video.Id = OldVideoId
 	}
-	
-	/*
-	if Video.VideoType == VIDEO_TYPE_ISLIVE || Video.VideoType == VIDEO_TYPE_WASLIVE {
-		DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
-		Video.Filename = fmt.Sprintf("%s %s", DateAndTime, Video.Filename)
-	}
-	*/
 	
 	return nil
 }
