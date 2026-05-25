@@ -197,7 +197,7 @@ func GetDownloadedVideoFilePath(Video *VideoInfo, AChannel *ArchiveChannel) (str
 	FileExtension := filepath.Ext(Filename)
 	FilenameWithoutExt := strings.TrimSuffix(Filename, FileExtension)
 	
-	AlternativeFileExtensions := []string{".mp4", ".mkv", ".webm", ".mov", ".mp4.part"}
+	AlternativeFileExtensions := []string{".mp4", ".mkv", ".webm", ".mov"}
 	for _, Ext := range(AlternativeFileExtensions) {
 		FilePath = filepath.Join(DownloadDir, fmt.Sprintf("%s%s", FilenameWithoutExt, Ext))
 		if DoesFileExist(FilePath) {
