@@ -549,7 +549,8 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			for _, Word := range(SearchWords) {
 				if !strings.Contains(TitleLowercase, Word) &&
 				   !strings.Contains(strings.ToLower(VideoInfo.Availability), Word) &&
-				   !strings.Contains(strings.ToLower(VideoInfo.Id), Word) {
+				   !strings.Contains(strings.ToLower(VideoInfo.Id), Word) &&
+				   !strings.Contains(strings.ToLower(VideoInfo.UploaderName), Word) {
 					// This video is NOT what we are looking for...
 					IsWhatWeAreLookingFor = false
 					break
