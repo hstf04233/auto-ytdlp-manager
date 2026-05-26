@@ -996,3 +996,9 @@ func OpenDB() error {
 	
 	return nil
 }
+
+func DB_Close() {
+	if GDB != nil {
+		GDB.Close()
+	}
+}

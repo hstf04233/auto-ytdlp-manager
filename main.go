@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	//"yt-stream-manager/webstatic"
@@ -19,6 +23,8 @@ var (
 	CURRENT_WORKING_DIRECTORY = ""
 )
 
+var HttpServer *http.Server
+
 func StartServer(ServerPort int) {
 	Mux := http.NewServeMux()
 	
@@ -33,15 +39,24 @@ func StartServer(ServerPort int) {
 	Mux.HandleFunc("/video-file/", ServeVideoDownload)
 	Mux.HandleFunc("/db-image/", ServeDBImage)
 	
+	HttpServer = &http.Server{
+		Addr: fmt.Sprintf(":%d", ServerPort),
+		Handler: Mux,
+	}
+	
 	L_Printf("Starting server at http://localhost:%d\n", ServerPort)
 	
 	// TODO: I'm planning on adding an auth system.
 	L_Printf("!!! THIS PROGRAM IS IN TESTING PHASE AND IS UNSAFE OUTSIDE OF THE LOCAL NETWORK!!! PLEASE DO NOT HOST THIS ON A WEBSITE !!!\n")
 	
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", ServerPort), Mux); err != nil {
-		L_Printf("Cannot start server because: %v\n", err)
-		L_Printf("The server port might be currently occupied... Edit the server port in config.json if you need to change the server port!\n")
-		panic(err)
+	if err := HttpServer.ListenAndServe(); err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			L_Printf("The http server has closed.\n")
+		} else {
+			L_Printf("Cannot start server because: %v\n", err)
+			L_Printf("The server port might be currently occupied... Edit the server port in config.json if you need to change the server port!\n")
+			panic(err)
+		}
 	}
 }
 
@@ -104,11 +119,37 @@ func main() {
 		panic(err)
 	}
 	
-	//CleanUpTasksInDatabase()
-	
 	go InitDownloading()
 	
 	// TODO: THIS IS TEMP! go yt_chat_Run("https://www.youtube.com/watch?v=G5oz2dQLi00", "./test-chat-output.json", nil)
 	
-	StartServer(int(G_Config.ServerPort))
+	go StartServer(int(G_Config.ServerPort))
+	
+	ExitSignal := make(chan os.Signal, 1)
+	signal.Notify(ExitSignal, syscall.SIGINT, syscall.SIGTERM)
+	
+	for {
+		select {
+		case sig := <-ExitSignal:
+			// 😈
+			if sig != nil {
+				Exit = true
+			}
+		default:
+		}
+		if Exit == true {
+			break
+		}
+		
+		time.Sleep(33 * time.Millisecond)
+	}
+	
+	// The program will exit now.
+	
+	err = HttpServer.Shutdown(context.Background())
+	if err != nil {
+		L_Printf("Failed to shutdown http server. Error: %v\n", err)
+	}
+	DB_Close()
+	
 }
