@@ -800,7 +800,7 @@ async function deleteChannel(id) {
   const ch = getChannelFromId(id);
   const name = ch ? (ch.name) : "UNKNOWN CHANNEL"
   
-  if (!confirm("Delete channel \"" + name + "\"?")) return;
+  if (!confirm("Delete channel \"" + name + "\"? This will not delete any saved videos from this channel.")) return;
   try {
     await API.del(`/api/channels/${id}`);
     showToast("Channel \"" + name + "\" was deleted!", 'success');
@@ -1342,6 +1342,10 @@ function renderVideoPagination() {
     cbsId: cbsId,
   });
   
+  if (videoPage > totalPages) {
+    videoPage = totalPages;
+  }
+  
   if (container_top)    container_top.innerHTML = paginationHtml;
   if (container_bottom) container_bottom.innerHTML = paginationHtml;
 }
@@ -1371,7 +1375,7 @@ function buildPaginationHTML(cfg) {
   //const singlePageMsg = `All ${label} shown (page 1 of 1)`;
   const countMsg = `Showing ${currentItems} ${label} out of ${totalCount}`;
   
-  if (totalPages <= 1) {
+  if (totalPages <= 1 && currentPage < totalPages) {
     return `<span class="single-page-msg">${countMsg}</span>`;
   }
   
@@ -1448,6 +1452,10 @@ function renderTaskPagination() {
     label: 'tasks',
     cbsId: cbsId,
   });
+  
+  if (taskPage > totalPages) {
+    taskPage = totalPages;
+  }
   
   if (container_top)    container_top.innerHTML = paginationHtml;
   if (container_bottom) container_bottom.innerHTML = paginationHtml;
