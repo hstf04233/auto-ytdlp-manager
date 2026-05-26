@@ -1146,6 +1146,8 @@ func ServeDBImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", ImageInfo.Filename))
+	
 	Seeker := bytes.NewReader(ImageData)
 	
 	http.ServeContent(w, r, ImageInfo.Filename, ImageInfo.UpdatedAt, Seeker)
