@@ -64,12 +64,14 @@ type YT_DLP_OUTVIDEO struct {
 	Thumbnail    string `json:"thumbnail"`
 	Filename     string `json:"filename"`
 	
+	Extractor string `json:"extractor"`
+	
 	ChannelUrl   string `json:"channel_url"`
 	UploaderUrl  string `json:"uploader_url"`
 	UploaderName string `json:"uploader"`
 	UploaderId   string `json:"uploader_id"`
 	
-	Duration     float64 `json:"duration"`
+	Duration float64 `json:"duration"`
 	
 	Timestamp        int64 `json:"timestamp"`
 	ReleaseTimestamp int64 `json:"release_timestamp"`
@@ -84,6 +86,13 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	} else {
 		VideoInfo.Title = OutVideo.Title
 	}
+	if OutVideo.Extractor == "twitch:stream" {
+		// yt-dlp thinks the title for twitch live streams should be '{name} (live)'... The description is the actual title.
+		if OutVideo.Description != "" {
+			VideoInfo.Title = OutVideo.Description
+		}
+	}
+	
 	if OutVideo.Description != "" {
 		VideoInfo.Description = OutVideo.Description
 	}
@@ -120,7 +129,16 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 		VideoInfo.UploaderUrl = OutVideo.ChannelUrl
 	} else if OutVideo.UploaderUrl != "" {
 		VideoInfo.UploaderUrl = OutVideo.UploaderUrl
+	} else {
+		// Try to get uploader url...
+		if OutVideo.Extractor == "twitch:vod" || OutVideo.Extractor == "twitch:stream" {
+			// yt-dlp doesn't set uploader_url for twitch
+			if OutVideo.UploaderId != "" {
+				VideoInfo.UploaderUrl = fmt.Sprintf("https://www.twitch.tv/%s", OutVideo.UploaderId)
+			}
+		}
 	}
+	
 	VideoInfo.Filename = OutVideo.Filename
 	
 	if OutVideo.ReleaseTimestamp != 0 {
