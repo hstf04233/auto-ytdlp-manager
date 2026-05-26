@@ -307,8 +307,8 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 	
 	OldVideoId := Video.Id
 	PopulateVideoInfoFromOutVideo(Video, OutVideo)
-	if OutVideo.Availability != "" {
-		// The grabbing video info was successful! Assume availability is 'public'.
+	if OutVideo.Availability == "" {
+		// Grabbing video info was successful! Assume availability is 'public'.
 		Video.Availability = "public"
 	}
 	
