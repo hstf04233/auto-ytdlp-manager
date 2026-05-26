@@ -15,7 +15,7 @@ var (
 )
 
 func L_Printf(format string, a ... any) {
-	TimeNow := time.Now().Local().Format("2006-01-02 15-04-05")
+	TimeNow := time.Now().Local().Format("2006-01-02 15:04:05")
 	Msg := fmt.Sprintf(format, a ...)
 	
 	fmt.Print(Msg)

@@ -365,7 +365,7 @@ func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, e
 			ImageContent = JpegContent
 			ImageContainer = "jpg"
 		} else if err != nil {
-			L_Printf("Failed to convert '%' to jpg because %v\n", ImageContainer, err)
+			L_Printf("Failed to convert '%s' to jpg because %v\n", ImageContainer, err)
 		}
 	}
 	
@@ -762,7 +762,9 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		}
 	}
 	
-	RefreshableVideos, err := DB_ListVideos(10, 0, ListVideosQuery{
+	MaxVideosToRefresh := 20
+	
+	RefreshableVideos, err := DB_ListVideos(MaxVideosToRefresh, 0, ListVideosQuery{
 		RefreshState: 1,
 		FromChannelId: ChannelId,
 		Status: -1,
@@ -807,7 +809,7 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 	Task.Title = fmt.Sprintf("Refreshing videos for: \"%s\"", AChannel.Name)
 	DB_UpdateCommandTaskInfo(Task)
 	
-	MaxVideosToRefresh := 10
+	MaxVideosToRefresh := 20
 	
 	RefreshableVideos, err := DB_ListVideos(MaxVideosToRefresh, 0, ListVideosQuery{
 		RefreshState: 1,
