@@ -230,11 +230,11 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 	UpdateVideoFileSize(Video, AChannel)
 	
 	err := RequestVideoInfo(AChannel, Video.Url, -1, Video, Task)
+	DB_UpdateVideoAvalibility(Video, Video.Availability)   // RequestVideoInfo() might have updated the Availability tag.
 	if err != nil {
 		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoInfo(Video)
 		DB_UpdateVideoRefreshState(Video, 0)
-		DB_UpdateVideoAvalibility(Video, Video.Availability)   // RequestVideoInfo() might have updated the Availability tag.
 		return
 	}
 	DB_UpdateVideoInfo(Video)
