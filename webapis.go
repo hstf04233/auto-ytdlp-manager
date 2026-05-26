@@ -896,6 +896,8 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 		TaskLog_AutoDelete_Enabled *bool `json:"TaskLog_AutoDelete_Enabled"`
 		TaskLog_AutoDelete_Seconds      int `json:"TaskLog_AutoDelete_Seconds"`
 		TaskLog_List_AutoDelete_Seconds int `json:"TaskLog_List_AutoDelete_Seconds"`
+		
+		Download_Video_Thumbnails *bool `json:"Download_Video_Thumbnails"`
 	}
 	Body.TaskLog_AutoDelete_Seconds = -1
 	Body.TaskLog_List_AutoDelete_Seconds = -1
@@ -960,6 +962,9 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if Body.TaskLog_AutoDelete_Enabled != nil {
 		G_Config.TaskLog_AutoDelete_Enabled = *Body.TaskLog_AutoDelete_Enabled
+	}
+	if Body.Download_Video_Thumbnails != nil {
+		G_Config.Download_Video_Thumbnails = *Body.Download_Video_Thumbnails
 	}
 	
 	if Body.YtDlp_Path != "" {

@@ -4,6 +4,9 @@ Task log output should stop auto scrolling when you scroll up...
 Abillity to add multiple channel urls for a single channel
 Select multiple videos and do bulk actions such as (delete, refresh, etc...)
 
+Add a setting in the config that downloads the thumbnails into a folder instead of the sqlite database
+Deleting a video should delete the downloaded thumbnail (Don't delete thumbnail if other videos are using the same thumbnail hash)
+
 Tasks tab looks UGLY 🤮🤮🤮 (make it look pretty)
 
 Store a history for videos

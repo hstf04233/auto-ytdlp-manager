@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -276,7 +278,50 @@ func UpdateVideoFileSize(Video *VideoInfo, AChannel *ArchiveChannel) {
 	}
 }
 
+func ConvertImageDataToJpg(ImageContent []byte) ([]byte, error) {
+	JpegContent, err := RunFFmpegWithStdinStdout(ImageContent,
+		[]string{
+			"-i", "pipe:0",   // Stdin
+			"-q:v", "10",
+			"-f", "image2pipe",
+			"-c:v", "mjpeg",
+			"-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+			"-vframes", "1",
+			
+			"pipe:1",
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	
+	return JpegContent, nil
+}
+
+func RunFFmpegWithStdinStdout(Input []byte, args []string) ([]byte, error) {
+	cmd := exec.Command(Get_FFmpegPath(G_Config), args...)
+	
+	cmd.Stdin = bytes.NewReader(Input)
+	
+	var stdout, stderr bytes.Buffer
+	
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	
+	err := cmd.Run()
+	if err != nil {
+		return nil, fmt.Errorf("ffmpeg failed: %w\nStderr: %s", err, stderr.String())
+	}
+	
+	return stdout.Bytes(), nil
+}
+
 func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, error) {
+	if !G_Config.Download_Video_Thumbnails {
+		// Don't download thumbnail!
+		return "", nil
+	}
+	
 	Response, err := http.Get(ThumbnailUrl)
 	if err != nil {
 		return "", fmt.Errorf("Failed because http.Get error: %v", err)
@@ -311,9 +356,19 @@ func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, e
 		return "", fmt.Errorf("The downloaded thumbnail is larger than 10MB...")
 	}
 	
-	// TODO: auto convert webp and avif to png or jpeg (We don't want none of that yucky shit 🤣)
-	
 	ImageHash := fmt.Sprintf("%x", sha256.Sum256(ImageContent))
+	
+	if ImageContainer != "jpg" && ImageContainer != "png" {
+		// Auto convert webp and avif to jpeg (We don't want none of that yucky shit 🤣)
+		JpegContent, err := ConvertImageDataToJpg(ImageContent)
+		if err == nil {
+			ImageContent = JpegContent
+			ImageContainer = "jpg"
+		} else if err != nil {
+			L_Printf("Failed to convert '%' to jpg because %v\n", ImageContainer, err)
+		}
+	}
+	
 	ImageId := ImageHash
 	NewDBImage := &DB_Image{
 		Id: ImageId,

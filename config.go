@@ -58,6 +58,10 @@ type ProgramConfig struct {
 	TaskLog_AutoDelete_Seconds      int
 	TaskLog_List_AutoDelete_Seconds int
 	
+	//
+	
+	Download_Video_Thumbnails bool
+	
 	APPLICATION_VERSION string `json:"application_version"`
 }
 
@@ -79,6 +83,8 @@ var G_Config = &ProgramConfig{
 	TaskLog_AutoDelete_Enabled:      true,
 	TaskLog_AutoDelete_Seconds:      MAX_TASK_LOG_LIFETIME,
 	TaskLog_List_AutoDelete_Seconds: MAX_CHANNEL_LISTING_LIFETIME,
+	
+	Download_Video_Thumbnails: true,
 	
 	
 	APPLICATION_VERSION: APPLICATION_VERSION,
