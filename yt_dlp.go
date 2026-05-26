@@ -286,7 +286,8 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 			Video.Availability = "age-restricted"
 			return fmt.Errorf("%s", ErrOutput)
 		} else if strings.Contains(ErrOutput, "This video has been removed by the uploader") ||
-				  strings.Contains(ErrOutput, "Video unavailable.") {
+				  strings.Contains(ErrOutput, "Video unavailable.") ||
+				  strings.Contains(ErrOutput, "This video has been removed for violating") {
 			Video.Availability = "removed"
 			return fmt.Errorf("%s", ErrOutput)
 		} else if strings.Contains(ErrOutput, "This live event will begin in a few moments.") ||
