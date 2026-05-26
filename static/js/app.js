@@ -1244,7 +1244,9 @@ function renderVideos() {
             <span title="${escHtml(v.title)}">${escHtml(v.title)}</span>
             <a href="${escHtml(v.url)}" target="_blank">[VideoLink]</a>
           </h3>
-          <p title="Filter by this channel">From: <a href="/videos?channel=${v.from_channel}" onclick="event.preventDefault();filterVideosTabByChannel('${v.from_channel}');">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a></p>
+          <p>From: <a title="Filter by this channel" href="/videos?channel=${v.from_channel}" onclick="event.preventDefault();filterVideosTabByChannel('${v.from_channel}');">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a>
+          ${v.uploader ? `Uploader: <a href="${escHtml(v.uploader_url)}">${escHtml(v.uploader)}</a>` : ''}
+          </p>
           <p>Released: ${formatDateAndTime(v.release_date)}</p>
           <p>${escHtml(v.availability)}</p>
           <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
