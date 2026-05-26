@@ -67,6 +67,7 @@ type YT_DLP_OUTVIDEO struct {
 	ChannelUrl   string `json:"channel_url"`
 	UploaderUrl  string `json:"uploader_url"`
 	UploaderName string `json:"uploader"`
+	UploaderId   string `json:"uploader_id"`
 	
 	Duration     float64 `json:"duration"`
 	
@@ -111,7 +112,10 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	}
 	if OutVideo.UploaderName != "" {
 		VideoInfo.UploaderName = OutVideo.UploaderName
+	} else if OutVideo.UploaderId != "" {
+		VideoInfo.UploaderName = OutVideo.UploaderId
 	}
+	
 	if OutVideo.ChannelUrl != "" {
 		VideoInfo.UploaderUrl = OutVideo.ChannelUrl
 	} else if OutVideo.UploaderUrl != "" {
