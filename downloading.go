@@ -635,6 +635,39 @@ func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, QualitySe
 	CL_FinishTask(Task, TASK_STATUS_FINISHED)
 }
 
+var MaxVideosToRefresh = 20
+func GetRefreshableVideos(AChannel *ArchiveChannel) ([]*VideoInfo) {
+	RefreshableVideos := []*VideoInfo{}
+	
+	List1, err := DB_ListVideos(MaxVideosToRefresh, 0, ListVideosQuery{
+		FromChannelId: AChannel.Id,
+		RefreshState: 1,
+		Status: -1,
+		VideoType: -1,
+		QueuedAction: -1,
+	})
+	if err == nil {
+		RefreshableVideos = append(RefreshableVideos, List1...)
+	} else {
+		L_Printf("Failed to get refreshable videos from DB_ListVideos, err: %v\n", err)
+	}
+	
+	List2, err := DB_ListVideos(-1, 0, ListVideosQuery{
+		FromChannelId: AChannel.Id,
+		VideoType: VIDEO_TYPE_ISLIVE,
+		RefreshState: -1,
+		Status: -1,
+		QueuedAction: -1,
+	})
+	for _, Vid := range(List2) {
+		if Vid.Status != VIDEO_STATUS_DOWNLOADING && Vid.Status != VIDEO_STATUS_QUEUED {
+			RefreshableVideos = append(RefreshableVideos, Vid)
+		}
+	}
+	
+	return RefreshableVideos
+}
+
 func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) {
 	AChannel.Lock.Lock()
 	if AChannel.Url == "" {
@@ -739,9 +772,11 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		DB_UpdateCommandTaskInfo(Task)
 	}
 	
+	// Get queued videos in the database.
 	QueuedVideosList, err := DB_ListVideos(-1, 0, ListVideosQuery{
 		RefreshState: -1,
 		QueuedAction: -1,
+		VideoType: -1,
 		Status: 0,
 		FromChannelId: ChannelId,
 	})
@@ -762,18 +797,8 @@ func CheckChannel(AChannel *ArchiveChannel, CheckSettings ChannelCheckSettings) 
 		}
 	}
 	
-	MaxVideosToRefresh := 20
-	
-	RefreshableVideos, err := DB_ListVideos(MaxVideosToRefresh, 0, ListVideosQuery{
-		RefreshState: 1,
-		FromChannelId: ChannelId,
-		Status: -1,
-		QueuedAction: -1,
-	})
-	if err != nil {
-		CL_Logf(Task, "Failed to grab refreshable videos from DB_ListVideos, error: %v\n", err)
-	}
-	if err == nil && len(RefreshableVideos) > 0 {
+	RefreshableVideos := GetRefreshableVideos(AChannel)
+	if len(RefreshableVideos) > 0 {
 		for _, Video := range(RefreshableVideos) {
 			if Task.Status != TASK_STATUS_RUNNING { return }
 			if !IsChannelEnabledWithCheck(AChannel, CheckSettings) { break }
@@ -809,18 +834,8 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 	Task.Title = fmt.Sprintf("Refreshing videos for: \"%s\"", AChannel.Name)
 	DB_UpdateCommandTaskInfo(Task)
 	
-	MaxVideosToRefresh := 20
-	
-	RefreshableVideos, err := DB_ListVideos(MaxVideosToRefresh, 0, ListVideosQuery{
-		RefreshState: 1,
-		FromChannelId: AChannel.Id,
-		Status: -1,
-		QueuedAction: -1,
-	})
-	if err != nil {
-		CL_Logf(Task, "Failed to grab refreshable videos from DB_ListVideos, error: %v\n", err)
-	}
-	if err == nil && len(RefreshableVideos) > 0 {
+	RefreshableVideos := GetRefreshableVideos(AChannel)
+	if len(RefreshableVideos) > 0 {
 		for _, Video := range(RefreshableVideos) {
 			if Task.Status != TASK_STATUS_RUNNING { return }
 			

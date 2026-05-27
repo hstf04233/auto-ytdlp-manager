@@ -410,6 +410,7 @@ type ListVideosQuery struct {
 	Status int
 	FromChannelId string
 	SearchQuery string
+	VideoType   int
 	RefreshState int
 	QueuedAction int
 	
@@ -418,7 +419,7 @@ type ListVideosQuery struct {
 }
 
 func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, Statement *string, Args *[]interface{}) {
-	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 || Query.QueuedAction != -1 {
+	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 || Query.QueuedAction != -1 || Query.VideoType != -1 {
 		*Statement += " WHERE "
 		AddAnd := false
 		if Query.Status != -1 {
@@ -432,6 +433,14 @@ func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, 
 			}
 			*Statement += " FromChannel = ?"
 			*Args = append(*Args, Query.FromChannelId)
+			AddAnd = true
+		}
+		if Query.VideoType != -1 {
+			if AddAnd {
+				*Statement += " AND "
+			}
+			*Statement += " VideoType = ?"
+			*Args = append(*Args, Query.VideoType)
 			AddAnd = true
 		}
 		if Query.RefreshState != -1 {

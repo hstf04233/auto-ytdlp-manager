@@ -542,6 +542,7 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	Query := ListVideosQuery{
 		RefreshState: -1,
 		QueuedAction: -1,
+		VideoType:    -1,
 		Status: Status,
 		FromChannelId: FromChannelId,
 		SearchQuery:   SearchQuery,
