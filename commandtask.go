@@ -528,6 +528,19 @@ func CL_GetCommandTask(TaskId string) (*CommandTask, error) {
 	return Task, nil
 }
 
+func CL_CancelTasksForVideo(VideoId string, TaskType int) {
+	Tasks, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
+		Status: 0,   // Search for running tasks.
+		Type: TaskType,
+		FromVideoId: VideoId,
+	})
+	if err == nil {
+		for _, Task := range(Tasks) {
+			CL_CancelTask(Task)
+		}
+	}
+}
+
 func CL_Logf(Task *CommandTask, format string, a ... any) {
 	if Task == nil {
 		L_Printf(format, a ...)

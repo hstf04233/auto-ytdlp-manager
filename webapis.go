@@ -638,16 +638,7 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 		}
 		if VideoInfo.Status == VIDEO_STATUS_IGNORED || VideoInfo.Status == VIDEO_STATUS_QUEUED {
 			// Cancel all download tasks for this video
-			Tasks, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
-				Status: 0,
-				Type: TASK_TYPE_DOWNLOAD,
-				FromVideoId: VideoInfo.Id,
-			})
-			if err == nil {
-				for _, Task := range(Tasks) {
-					CL_CancelTask(Task)
-				}
-			}
+			CL_CancelTasksForVideo(VideoInfo.Id, TASK_TYPE_DOWNLOAD)
 		}
 	}
 	
@@ -675,20 +666,22 @@ func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	Video, err := DB_GetVideo(RequestId)
+	VideoInfo, err := DB_GetVideo(RequestId)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error when checking if video exists: %v !", err), http.StatusInternalServerError)
 		return
 	}
-	if Video == nil {
+	if VideoInfo == nil {
 		http.Error(w, "Video not found.", http.StatusNotFound)
 		return
 	}
-	err = DB_DeleteVideo(Video)
+	err = DB_DeleteVideo(VideoInfo)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error when deleting video: %v !", err), http.StatusInternalServerError)
 		return
 	}
+	
+	CL_CancelTasksForVideo(VideoInfo.Id, TASK_TYPE_DOWNLOAD)
 	
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("{\"Success\":true}"))
