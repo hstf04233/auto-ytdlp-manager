@@ -146,9 +146,6 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 			}
 		}
 	}
-	if OutVideo.Extractor == "twitch:clips" {
-		
-	}
 	
 	VideoInfo.Filename = OutVideo.Filename
 	
@@ -164,6 +161,11 @@ func GetDownloadDir(AChannel *ArchiveChannel) string {
 	if DownloadDir == "" {
 		DownloadDir = G_Config.Default_DownloadDir
 	}
+	
+	if filepath.IsLocal(DownloadDir) {
+		DownloadDir = filepath.Join(CURRENT_WORKING_DIRECTORY, DownloadDir)
+	}
+	
 	return DownloadDir
 }
 func GetOutputTemplate(AChannel *ArchiveChannel) string {

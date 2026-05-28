@@ -21,7 +21,8 @@ const (
 	DEFAULT_SERVER_PORT = 8867
 	DEFAULT_SERVER_PORT_DEBUG = 6788
 	
-	DEFAULT_DOWNLOAD_DIR = "./downloads"
+	TEMPORARY_DIRECTORY = "./temp"
+	
 	DEFAULT_YT_DLP_OUTPUT_TEMPLATE      = "%(title)s %(id)s.%(ext)s"
 	DEFAULT_YT_DLP_OUTPUT_TEMPLATE_LIVE = "%(release_date>%Y-%m-%d,upload_date>%Y-%m-%d)s %(title)s %(id)s.%(ext)s"
 	

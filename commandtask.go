@@ -528,6 +528,18 @@ func CL_GetCommandTask(TaskId string) (*CommandTask, error) {
 	return Task, nil
 }
 
+func CL_IsRunning(Task *CommandTask) bool {
+	if Task == nil {
+		return false
+	}
+	
+	if Task.Status == TASK_STATUS_RUNNING {
+		return true
+	}
+	
+	return false
+}
+
 func CL_CancelTasksForVideo(VideoId string, TaskType int) {
 	Tasks, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
 		Status: 0,   // Search for running tasks.
