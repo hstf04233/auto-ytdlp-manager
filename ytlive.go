@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"autoytdlpmanager/os_tings"
+	"github.com/natefinch/npipe" // Only used on Windows
 )
 
 type ytarchive_State struct {
@@ -133,9 +134,14 @@ func GetPipeName(PipeName string) string {
 	return filepath.Join("/tmp", PipeName)
 }
 
-func CreatePipe(PipeName string) error {
+func CreatePipe(PipeName string) (io.WriteCloser, error) {
 	if runtime.GOOS == "windows" {
-		return nil
+		listener, err := npipe.Listen(PipeName)
+		if err != nil {
+			return nil, err
+		}
+		// Accept one connection (FFmpeg will connect as client)
+		return listener.Accept()
 	}
 	
 	// Remove old pipe if exists
@@ -144,9 +150,16 @@ func CreatePipe(PipeName string) error {
 	// Create FIFO on Unix
 	cmd := exec.Command("mkfifo", PipeName)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to create fifo %s: %v", PipeName, err)
+		return nil, fmt.Errorf("failed to create fifo %s: %v", PipeName, err)
 	}
-	return nil
+	return os.OpenFile(PipeName, os.O_WRONLY, 0666)
+}
+
+func OpenPipe(PipeName string) (io.WriteCloser, error) {
+	if runtime.GOOS == "windows" {
+		return npipe.DialTimeout(PipeName, time.Second * 5)
+	}
+	return os.OpenFile(PipeName, os.O_WRONLY, 0666)
 }
 
 func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string, AChannel *ArchiveChannel, Video *VideoInfo) (error) {
@@ -192,12 +205,6 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	
 	Pipe1Name := GetPipeName(fmt.Sprintf("video_pipe_%s", VideoId))
 	Pipe2Name := GetPipeName(fmt.Sprintf("audio_pipe_%s", VideoId))
-	if err := CreatePipe(Pipe1Name); err != nil {
-		return fmt.Errorf("Failed to create video pipe: '%s': %v", Pipe2Name, err)
-	}
-	if err := CreatePipe(Pipe2Name); err != nil {
-		return fmt.Errorf("Failed to create audio pipe: '%s': %v", Pipe2Name, err)
-	}
 	
 	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("streamed_video-%s*", VideoId))
 	if err != nil {
@@ -208,6 +215,8 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	FFmpegCmd := exec.Command(Get_FFmpegPath(G_Config),
 		"-i", Pipe1Name,
 		"-i", Pipe2Name,
+		"-loglevel", "warning", "-stats",
+		"-y",
 		
 		"-c", "copy",
 		"-f", "hls",
@@ -229,41 +238,58 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		return fmt.Errorf("Failed to start ffmpeg because: %v", err)
 	}
 	
-	VideoPipe, err := os.OpenFile(Pipe1Name, os.O_WRONLY, 0666)
-	if err != nil {
-		return err
-	}
-	AudioPipe, err := os.OpenFile(Pipe2Name, os.O_WRONLY, 0666)
-	if err != nil {
-		return err
-	}
-	
 	go func() {
+		L_Printf("Creating pipe: %v\n", Pipe1Name)
+		VideoPipe, err := CreatePipe(Pipe1Name)
+		if err != nil {
+			L_Printf("Failed to create video pipe: '%s': %v", Pipe1Name, err)
+			return
+		}
+		defer VideoPipe.Close()
+		L_Printf("Video pipe created!: %v\n", Pipe1Name)
+		
 		VideoBuf := make([]byte, 4096)
 		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
+			L_Printf("Reading video!\n")
 			Count, err := VideoFile.Read(VideoBuf)
 			if err == io.EOF {
+				L_Printf("Video EOF...\n")
 				time.Sleep(500 * time.Millisecond)
 				continue
 			} else if err != nil {
 				L_Printf("VideoFile Read error: %v\n", err)
 				break
 			}
+			L_Printf("Writing video...\n")
 			VideoPipe.Write(VideoBuf[0:Count])
+			L_Printf("Finished writing video!\n")
 		}
 	}()
 	go func() {
+		L_Printf("Creating pipe: %v\n", Pipe2Name)
+		AudioPipe, err := CreatePipe(Pipe2Name)
+		if err != nil {
+			L_Printf("Failed to create audio pipe: '%s': %v", Pipe2Name, err)
+			return
+		}
+		defer AudioPipe.Close()
+		L_Printf("Audio pipe created!: %v\n", Pipe1Name)
+		
 		AudioBuf := make([]byte, 4096)
 		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
+			L_Printf("Reading audio!\n")
 			Count, err := AudioFile.Read(AudioBuf)
 			if err == io.EOF {
+				L_Printf("Audio EOF...\n")
 				time.Sleep(500 * time.Millisecond)
 				continue
 			} else if err != nil {
 				L_Printf("AudioFile Read error: %v\n", err)
 				break
 			}
+			L_Printf("Writing video...\n")
 			AudioPipe.Write(AudioBuf[0:Count])
+			L_Printf("Finished writing video!\n")
 		}
 	}()
 	
