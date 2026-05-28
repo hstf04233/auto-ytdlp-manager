@@ -1969,6 +1969,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 async function init() {
+  videoSearchFilterUpdate();
+  
   await loadConfig();
   await loadChannels();
   
