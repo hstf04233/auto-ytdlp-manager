@@ -86,6 +86,11 @@ func Get_ytarchive_VideoAndAudioDownloadFiles(State ytarchive_State) (ytarchive_
 			if File.IsDir() { continue }
 			
 			FileName := File.Name()
+			if strings.Contains(FileName, ".frag") {
+				// TODO: This is a VERY crude way of checking if this is a fragment file or not...
+				continue
+			}
+			
 			FilePath := filepath.Join(State.TempDir, FileName)
 			FileInfo, ierr := File.Info()
 			if ierr != nil {
@@ -222,6 +227,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		"-f", "hls",
 		"-hls_time", "1",
 		"-hls_list_size", "20",
+		"-hls_flags", "delete_segments+append_list+omit_endlist",
 		
 		"-hls_segment_filename", "segment_%03d.ts",
 		
@@ -248,21 +254,21 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		defer VideoPipe.Close()
 		L_Printf("Video pipe created!: %v\n", Pipe1Name)
 		
-		VideoBuf := make([]byte, 4096)
+		VideoBuf := make([]byte, 8192)
 		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
-			L_Printf("Reading video!\n")
+			//L_Printf("Reading video!\n")
 			Count, err := VideoFile.Read(VideoBuf)
 			if err == io.EOF {
-				L_Printf("Video EOF...\n")
+				//L_Printf("Video EOF...\n")
 				time.Sleep(500 * time.Millisecond)
 				continue
 			} else if err != nil {
 				L_Printf("VideoFile Read error: %v\n", err)
 				break
 			}
-			L_Printf("Writing video...\n")
+			//L_Printf("Writing video...\n")
 			VideoPipe.Write(VideoBuf[0:Count])
-			L_Printf("Finished writing video!\n")
+			//L_Printf("Finished writing video!\n")
 		}
 	}()
 	go func() {
@@ -275,21 +281,21 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		defer AudioPipe.Close()
 		L_Printf("Audio pipe created!: %v\n", Pipe1Name)
 		
-		AudioBuf := make([]byte, 4096)
+		AudioBuf := make([]byte, 8192)
 		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
-			L_Printf("Reading audio!\n")
+			//L_Printf("Reading audio!\n")
 			Count, err := AudioFile.Read(AudioBuf)
 			if err == io.EOF {
-				L_Printf("Audio EOF...\n")
+				//L_Printf("Audio EOF...\n")
 				time.Sleep(500 * time.Millisecond)
 				continue
 			} else if err != nil {
 				L_Printf("AudioFile Read error: %v\n", err)
 				break
 			}
-			L_Printf("Writing video...\n")
+			//L_Printf("Writing video...\n")
 			AudioPipe.Write(AudioBuf[0:Count])
-			L_Printf("Finished writing video!\n")
+			//L_Printf("Finished writing video!\n")
 		}
 	}()
 	
