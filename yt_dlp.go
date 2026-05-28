@@ -66,6 +66,7 @@ type YT_DLP_OUTVIDEO struct {
 	
 	Extractor string `json:"extractor"`
 	
+	ChannelName  string `json:"channel"`
 	ChannelUrl   string `json:"channel_url"`
 	UploaderUrl  string `json:"uploader_url"`
 	UploaderName string `json:"uploader"`
@@ -119,7 +120,10 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	if OutVideo.Thumbnail != "" {
 		VideoInfo.OriginThumbnail = OutVideo.Thumbnail
 	}
-	if OutVideo.UploaderName != "" {
+	
+	if OutVideo.Extractor == "twitch:clips" && OutVideo.ChannelName != "" {
+		VideoInfo.UploaderName = OutVideo.ChannelName
+	} else if OutVideo.UploaderName != "" {
 		VideoInfo.UploaderName = OutVideo.UploaderName
 	} else if OutVideo.UploaderId != "" {
 		VideoInfo.UploaderName = OutVideo.UploaderId
@@ -136,7 +140,14 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 			if OutVideo.UploaderId != "" {
 				VideoInfo.UploaderUrl = fmt.Sprintf("https://www.twitch.tv/%s", OutVideo.UploaderId)
 			}
+		} else if OutVideo.Extractor == "twitch:clips" {
+			if OutVideo.ChannelName != "" {
+				VideoInfo.UploaderUrl = fmt.Sprintf("https://www.twitch.tv/%s", OutVideo.ChannelName)
+			}
 		}
+	}
+	if OutVideo.Extractor == "twitch:clips" {
+		
 	}
 	
 	VideoInfo.Filename = OutVideo.Filename
