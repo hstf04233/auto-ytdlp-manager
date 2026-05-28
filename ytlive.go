@@ -211,7 +211,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	Pipe1Name := GetPipeName(fmt.Sprintf("video_pipe_%s", VideoId))
 	Pipe2Name := GetPipeName(fmt.Sprintf("audio_pipe_%s", VideoId))
 	
-	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("streamed_video-%s*", VideoId))
+	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("streamed_video-%s-*", VideoId))
 	if err != nil {
 		return fmt.Errorf("Failed to create temporary directory, error: %v", err)
 	}
@@ -220,7 +220,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	FFmpegCmd := exec.Command(Get_FFmpegPath(G_Config),
 		"-i", Pipe1Name,
 		"-i", Pipe2Name,
-		"-loglevel", "warning", "-stats",
+		"-loglevel", "error", "-stats",
 		"-y",
 		
 		"-c", "copy",
@@ -254,6 +254,8 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		defer VideoPipe.Close()
 		L_Printf("Video pipe created!: %v\n", Pipe1Name)
 		
+		VideoFile.Seek(0, 2)  // Seek to end of file.
+		
 		VideoBuf := make([]byte, 8192)
 		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
 			//L_Printf("Reading video!\n")
@@ -280,6 +282,8 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		}
 		defer AudioPipe.Close()
 		L_Printf("Audio pipe created!: %v\n", Pipe1Name)
+		
+		AudioFile.Seek(0, 2)  // Seek to end of file.
 		
 		AudioBuf := make([]byte, 8192)
 		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
