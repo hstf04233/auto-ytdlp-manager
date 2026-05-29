@@ -37,6 +37,7 @@ func StartServer(ServerPort int) {
 	Mux.HandleFunc("/favicon.ico", webstatic_ServeStaticContent)
 	Mux.HandleFunc("/api/", ServeApi)
 	Mux.HandleFunc("/video-file/", ServeVideoDownload)
+	Mux.HandleFunc("/streamed-live/", ServeVideoStream)
 	Mux.HandleFunc("/db-image/", ServeDBImage)
 	
 	HttpServer = &http.Server{

@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS Videos (
 	Availability TEXT DEFAULT '',
 	Filename     TEXT DEFAULT '',
 	FileSize     INTEGER DEFAULT 0,
+	StreamedDirectory TEXT DEFAULT '',
+	
 	Resolution   TEXT DEFAULT '',
 	Thumbnail       TEXT DEFAULT '',   /* Origin thumbnail */
 	StoredThumbnail TEXT DEFAULT '',   /* Downloaded thumbnail id */
@@ -321,6 +323,15 @@ func DB_UpdateVideoFileSize(Video *VideoInfo, FileSize int64) error {
 	`, FileSize, time.Now().UTC(), Video.Id)
 	return err
 }
+func DB_UpdateVideoStreamedDirectory(Video *VideoInfo, StreamedDirectory string) error {
+	VideoDBLock.Lock()
+	defer VideoDBLock.Unlock()
+	Video.StreamedDirectory = StreamedDirectory
+	_, err := GDB.Exec(`
+	UPDATE Videos SET StreamedDirectory = ?, UpdatedAt = ? WHERE Id = ?
+	`, StreamedDirectory, time.Now().UTC(), Video.Id)
+	return err
+}
 func DB_UpdateVideoStoredThumbnail(Video *VideoInfo, StoredThumbnail string) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
@@ -358,7 +369,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	defer VideoDBLock.RUnlock()
 	VideoInfo := &VideoInfo{}
 	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, Status, QueuedAction, ReleaseDate, Duration,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, StreamedDirectory, Status, QueuedAction, ReleaseDate, Duration,
 	UploaderName, UploaderUrl,
 	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
@@ -375,6 +386,7 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		&VideoInfo.Thumbnail,
 		&VideoInfo.DownloadedFilename,
 		&VideoInfo.FileSize,
+		&VideoInfo.StreamedDirectory,
 		
 		&VideoInfo.Status,
 		&VideoInfo.QueuedAction,
@@ -485,7 +497,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	Args := []interface{}{}
 	
 	Statement := `
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, Status, QueuedAction, ReleaseDate, Duration,
+	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, StreamedDirectory, Status, QueuedAction, ReleaseDate, Duration,
 	UploaderName, UploaderUrl,
 	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos`
@@ -530,6 +542,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			&VideoInfo.Thumbnail,
 			&VideoInfo.DownloadedFilename,
 			&VideoInfo.FileSize,
+			&VideoInfo.StreamedDirectory,
 			
 			&VideoInfo.Status,
 			&VideoInfo.QueuedAction,
@@ -988,6 +1001,9 @@ func OpenDB() error {
 		// v0.14
 		"ALTER TABLE Videos ADD COLUMN FileSize     INTEGER DEFAULT 0",
 		"ALTER TABLE Videos ADD COLUMN StoredThumbnail TEXT DEFAULT ''",
+		
+		// v0.15
+		"ALTER TABLE Videos ADD COLUMN StreamedDirectory TEXT DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

@@ -532,6 +532,8 @@ func CL_IsRunning(Task *CommandTask) bool {
 	if Task == nil {
 		return false
 	}
+	Task.Lock.Lock()
+	defer Task.Lock.Unlock()
 	
 	if Task.Status == TASK_STATUS_RUNNING {
 		return true

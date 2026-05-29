@@ -211,11 +211,12 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	Pipe1Name := GetPipeName(fmt.Sprintf("video_pipe_%s", VideoId))
 	Pipe2Name := GetPipeName(fmt.Sprintf("audio_pipe_%s", VideoId))
 	
-	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("streamed_video-%s-*", VideoId))
+	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("WILL_DELETE_TEMP_streamed_live-%s-*", VideoId))
 	if err != nil {
 		return fmt.Errorf("Failed to create temporary directory, error: %v", err)
 	}
 	defer os.RemoveAll(TempDirectory)
+	DB_UpdateVideoStreamedDirectory(Video, TempDirectory)
 	
 	FFmpegCmd := exec.Command(Get_FFmpegPath(G_Config),
 		"-i", Pipe1Name,
@@ -227,6 +228,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		"-f", "hls",
 		"-hls_time", "1",
 		"-hls_list_size", "20",
+		"-hls_delete_threshold", "10",
 		"-hls_flags", "delete_segments+append_list+omit_endlist",
 		
 		"-hls_segment_filename", "segment_%03d.ts",
@@ -239,6 +241,11 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	if err != nil {
 		return fmt.Errorf("Failed to create download task: %v", err)
 	}
+	defer func() {
+		if Task != nil && CL_IsRunning(Task) {
+			CL_CancelTask(Task)
+		}
+	}()
 	
 	if err := FFmpegCmd.Start(); err != nil {
 		return fmt.Errorf("Failed to start ffmpeg because: %v", err)
@@ -254,7 +261,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		defer VideoPipe.Close()
 		L_Printf("Video pipe created!: %v\n", Pipe1Name)
 		
-		VideoFile.Seek(0, 2)  // Seek to end of file.
+		//VideoFile.Seek(0, 2)  // Seek to end of file.
 		
 		VideoBuf := make([]byte, 8192)
 		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
@@ -283,7 +290,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		defer AudioPipe.Close()
 		L_Printf("Audio pipe created!: %v\n", Pipe1Name)
 		
-		AudioFile.Seek(0, 2)  // Seek to end of file.
+		//AudioFile.Seek(0, 2)  // Seek to end of file.
 		
 		AudioBuf := make([]byte, 8192)
 		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {

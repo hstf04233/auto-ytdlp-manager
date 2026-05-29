@@ -1116,6 +1116,77 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, FilePath)
 }
 
+func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
+	Path := r.URL.Path
+	Path = strings.TrimPrefix(Path, "/streamed-live/")
+	PathArgs := strings.Split(Path, "/")
+	if len(PathArgs) < 2 {
+		http.Error(w, "Invalid request path.", http.StatusBadRequest)
+		return
+	}
+	
+	RequestId := PathArgs[0]
+	if RequestId == "" {
+		http.Error(w, "Video id required.", http.StatusBadRequest)
+		return
+	}
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid video id.", http.StatusBadRequest)
+		return
+	}
+	
+	RequestFile := PathArgs[1]
+	if RequestFile == "" {
+		http.Error(w, "File name required.", http.StatusBadRequest)
+		return
+	}
+	if len(RequestFile) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid file name.", http.StatusBadRequest)
+		return
+	}
+	
+	VideoInfo, err := DB_GetVideo(RequestId)
+	if err != nil {
+		http.Error(w, "Internal error when getting video details.", http.StatusInternalServerError)
+		return
+	}
+	if VideoInfo == nil {
+		http.Error(w, "Video not found.", http.StatusNotFound)
+		return
+	}
+	StreamedDirectory := VideoInfo.StreamedDirectory
+	if StreamedDirectory == "" {
+		http.Error(w, "Video contains no stream data attached.", http.StatusNotFound)
+		return
+	}
+	if !DoesFileExist(StreamedDirectory) {
+		http.Error(w, "Stream directory does not exist on disk?", http.StatusNotFound)
+		return
+	}
+	
+	FilePath := filepath.Join(StreamedDirectory, RequestFile)
+	
+	if !DoesFileExist(FilePath) {
+		http.Error(w, fmt.Sprintf("Could not find file '%s'...", VideoInfo.DownloadedFilename), http.StatusNotFound)
+		return
+	}
+	Filename := filepath.Base(FilePath)
+	
+	if DownloadVal := r.URL.Query().Get("download"); DownloadVal != "" {
+		// User wants to download this video
+		DownloadVal = strings.ToLower(DownloadVal)
+		if DownloadVal == "true" || DownloadVal == "1" || DownloadVal == "yes" {
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", Filename))
+		} else {
+			w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
+		}
+	} else {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
+	}
+	
+	http.ServeFile(w, r, FilePath)
+}
+
 func ServeDBImage(w http.ResponseWriter, r *http.Request) {
 	ImageId := path.Base(r.URL.Path)
 	if len(ImageId) > API_MAX_REQUEST_ID {
