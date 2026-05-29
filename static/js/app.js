@@ -1842,7 +1842,7 @@ function formatTerminalOutput(text, status, run_args) {
       return `<span class="${cls}"><br></span>`
     }
     return `<span class="${cls}">${escHtml(line)}</span>`;
-  }).join('\n');
+  }).join('<br>');
   
   let runArgsContent = `<span class="terminal-line">${escHtml(">") + escHtml(run_args)}</span><br><span class="terminal-line"></span>`;
   if (run_args === "") {

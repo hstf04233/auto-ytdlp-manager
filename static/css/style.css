@@ -934,7 +934,7 @@ form hr {
 }
 
 .terminal-body .terminal-line {
-  display: block;
+  /*display: block;*/
 }
 
 .terminal-body .terminal-line-running {
