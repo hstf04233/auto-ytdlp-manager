@@ -16,6 +16,8 @@ import (
 )
 
 type ytarchive_State struct {
+	StateFilePath string
+	
 	StartFrag int
 	Fragments int
 	Size      uint64
@@ -63,7 +65,9 @@ func Get_ytarchive_State(DownloadDir string, VideoId string) (*ytarchive_State, 
 	err = json.Unmarshal(FileContents, State)
 	if err != nil {
 		L_Printf("Failed to decode state file '%s', error: %v\n", StateFilePath, err)
+		return nil, false
 	}
+	State.StateFilePath = StateFilePath
 	
 	return State, true
 }
@@ -167,6 +171,30 @@ func OpenPipe(PipeName string) (io.WriteCloser, error) {
 	return os.OpenFile(PipeName, os.O_WRONLY, 0666)
 }
 
+func ReadFileAndWriteToPipe(PipeName string, InputFile *os.File, DownloadTask *CommandTask, Task *CommandTask) {
+	L_Printf("Creating pipe: %v\n", PipeName)
+	VideoPipe, err := CreatePipe(PipeName)
+	if err != nil {
+		L_Printf("Failed to create pipe: '%s': %v", PipeName, err)
+		return
+	}
+	defer VideoPipe.Close()
+	L_Printf("Video pipe created!: %v\n", PipeName)
+	
+	VideoBuf := make([]byte, 16384)
+	for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
+		Count, err := InputFile.Read(VideoBuf)
+		if err == io.EOF {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		} else if err != nil {
+			L_Printf("File read errored for pipe: '%s' error: %v\n", PipeName, err)
+			break
+		}
+		VideoPipe.Write(VideoBuf[0:Count])
+	}
+}
+
 func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string, AChannel *ArchiveChannel, Video *VideoInfo) (error) {
 	VideoId := Video.Id
 	var State *ytarchive_State
@@ -211,11 +239,16 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	Pipe1Name := GetPipeName(fmt.Sprintf("video_pipe_%s", VideoId))
 	Pipe2Name := GetPipeName(fmt.Sprintf("audio_pipe_%s", VideoId))
 	
-	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("WILL_DELETE_TEMP_streamed_live-%s-*", VideoId))
+	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("TEMP_WILL_DELETE_streamed_live-%s-*", VideoId))
 	if err != nil {
 		return fmt.Errorf("Failed to create temporary directory, error: %v", err)
 	}
-	defer os.RemoveAll(TempDirectory)
+	defer func(){
+		err := os.RemoveAll(TempDirectory)
+		if err != nil {
+			DB_UpdateVideoStreamedDirectory(Video, "")
+		}
+	}()
 	DB_UpdateVideoStreamedDirectory(Video, TempDirectory)
 	
 	FFmpegCmd := exec.Command(Get_FFmpegPath(G_Config),
@@ -227,7 +260,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		"-c", "copy",
 		"-f", "hls",
 		"-hls_time", "1",
-		"-hls_list_size", "20",
+		"-hls_list_size", "60",
 		"-hls_delete_threshold", "10",
 		"-hls_flags", "delete_segments+append_list+omit_endlist",
 		
@@ -243,7 +276,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	}
 	defer func() {
 		if Task != nil && CL_IsRunning(Task) {
-			CL_CancelTask(Task)
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
 		}
 	}()
 	
@@ -251,66 +284,24 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		return fmt.Errorf("Failed to start ffmpeg because: %v", err)
 	}
 	
+	go ReadFileAndWriteToPipe(Pipe1Name, VideoFile, DownloadTask, Task)
+	go ReadFileAndWriteToPipe(Pipe2Name, AudioFile, DownloadTask, Task)
+	
 	go func() {
-		L_Printf("Creating pipe: %v\n", Pipe1Name)
-		VideoPipe, err := CreatePipe(Pipe1Name)
-		if err != nil {
-			L_Printf("Failed to create video pipe: '%s': %v", Pipe1Name, err)
-			return
-		}
-		defer VideoPipe.Close()
-		L_Printf("Video pipe created!: %v\n", Pipe1Name)
-		
-		//VideoFile.Seek(0, 2)  // Seek to end of file.
-		
-		VideoBuf := make([]byte, 8192)
-		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
-			//L_Printf("Reading video!\n")
-			Count, err := VideoFile.Read(VideoBuf)
-			if err == io.EOF {
-				//L_Printf("Video EOF...\n")
-				time.Sleep(500 * time.Millisecond)
-				continue
-			} else if err != nil {
-				L_Printf("VideoFile Read error: %v\n", err)
-				break
-			}
-			//L_Printf("Writing video...\n")
-			VideoPipe.Write(VideoBuf[0:Count])
-			//L_Printf("Finished writing video!\n")
-		}
-	}()
-	go func() {
-		L_Printf("Creating pipe: %v\n", Pipe2Name)
-		AudioPipe, err := CreatePipe(Pipe2Name)
-		if err != nil {
-			L_Printf("Failed to create audio pipe: '%s': %v", Pipe2Name, err)
-			return
-		}
-		defer AudioPipe.Close()
-		L_Printf("Audio pipe created!: %v\n", Pipe1Name)
-		
-		//AudioFile.Seek(0, 2)  // Seek to end of file.
-		
-		AudioBuf := make([]byte, 8192)
-		for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
-			//L_Printf("Reading audio!\n")
-			Count, err := AudioFile.Read(AudioBuf)
-			if err == io.EOF {
-				//L_Printf("Audio EOF...\n")
-				time.Sleep(500 * time.Millisecond)
-				continue
-			} else if err != nil {
-				L_Printf("AudioFile Read error: %v\n", err)
-				break
-			}
-			//L_Printf("Writing video...\n")
-			AudioPipe.Write(AudioBuf[0:Count])
-			//L_Printf("Finished writing video!\n")
+		if err := FFmpegCmd.Wait(); err != nil {
+			L_Printf("Vid stream failed, error: %v\n", err)
 		}
 	}()
 	
 	for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
+		// Check if the video and audio are still being downloaded.
+		if !DoesFileExist(VideoAndAudio.VideoPath) {
+			break
+		}
+		if !DoesFileExist(VideoAndAudio.AudioPath) {
+			break
+		}
+		
 		time.Sleep(50 * time.Millisecond)
 	}
 	
@@ -389,10 +380,12 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo, QualityS
 	}
 	
 	if task_err == nil {
-		err := TurnYTLiveIntoM3U8LiveStream(DownloadTask, DownloadDir, AChannel, Video)
-		if err != nil {
-			L_Printf("Failed to TurnYTLiveIntoM3U8LiveStream, error: %v\n", err)
-		}
+		go func() {
+			err := TurnYTLiveIntoM3U8LiveStream(DownloadTask, DownloadDir, AChannel, Video)
+			if err != nil {
+				L_Printf("Failed to TurnYTLiveIntoM3U8LiveStream, error: %v\n", err)
+			}
+		}()
 	}
 	
 	err = Cmd.Wait()
