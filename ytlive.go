@@ -174,14 +174,12 @@ func OpenPipe(PipeName string) (io.WriteCloser, error) {
 }
 
 func ReadFileAndWriteToPipe(PipeName string, InputFile *os.File, DownloadTask *CommandTask, Task *CommandTask) {
-	L_Printf("Creating pipe: %v\n", PipeName)
 	VideoPipe, err := CreatePipe(PipeName)
 	if err != nil {
 		L_Printf("Failed to create pipe: '%s': %v", PipeName, err)
 		return
 	}
 	defer VideoPipe.Close()
-	L_Printf("Video pipe created!: %v\n", PipeName)
 	
 	VideoBuf := make([]byte, 16384)
 	for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
@@ -309,20 +307,11 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	}()
 	
 	for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
-		/*
-		// Check if the video and audio are still being downloaded.
-		if !DoesFileExist(VideoAndAudio.VideoPath) {
-			break
-		}
-		if !DoesFileExist(VideoAndAudio.AudioPath) {
-			break
-		}
-		*/
-		
+		// Wait for the tasks to end.
 		time.Sleep(50 * time.Millisecond)
 	}
 	
-	cancel()
+	cancel()  // Cancel the ffmpeg command
 	
 	if Task.Status == TASK_STATUS_RUNNING {
 		CL_FinishTask(Task, TASK_STATUS_FINISHED)

@@ -358,7 +358,6 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 	if !Video.VideoFileExists && Video.StreamedDirectory != "" {
 		// Share m3u8 stream instead.
 		Video.VideoStreamUrl = fmt.Sprintf("/video-stream/%s/playlist.m3u8", Video.Id)
-		Video.VideoFileExists = true
 	}
 	
 	TasksList, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{

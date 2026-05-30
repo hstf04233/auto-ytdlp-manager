@@ -861,7 +861,7 @@ function videoPreviewClick(videoId) {
     if (Hls.isSupported()) {
       const hls = new Hls({
         liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 10
+        liveMaxLatencyDurationCount: 9999
       });
       
       hls.loadSource(video_stream_url);
@@ -917,8 +917,10 @@ function openVideoDetailsModal(videoId) {
     ? escHtml(v.description).replace(/\n/g, '<br>')
     : '\u2014';
   
+  const videoIsPlayable = (v.videofile_exists || (v.video_stream_url && v.video_stream_url !== ""))
+  
   let videoPreviewOnClick = "";
-  if (v.videofile_exists) {
+  if (videoIsPlayable) {
     videoPreviewOnClick = `event.preventDefault(); videoPreviewClick('${videoId}');`;
   }
   
@@ -927,8 +929,8 @@ function openVideoDetailsModal(videoId) {
   document.getElementById('videoDetailsContent').innerHTML = `
     <div class="vd-preview" id="modal-video-preview">
       <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg';"
-        ${v.videofile_exists ? ` style="cursor: pointer;" title="Click to play video"` : ''}>
-        ${v.videofile_exists ? `<span>&#9654;</span>` : ''}
+        ${videoIsPlayable ? ` style="cursor: pointer;" title="Click to play video"` : ''}>
+        ${videoIsPlayable ? `<span>&#9654;</span>` : ''}
       </img>
       <div class="vd-preview-placeholder" style="display:none">No thumbnail</div>
     </div>

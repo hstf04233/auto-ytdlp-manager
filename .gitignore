@@ -30,3 +30,4 @@ config.json
 config_DEBUG.json
 log_current.log
 ytdlp_config.txt
+static/test/
