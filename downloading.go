@@ -267,10 +267,33 @@ func GetFileSize(FilePath string) (int64, error) {
 
 func UpdateVideoFileSize(Video *VideoInfo, AChannel *ArchiveChannel) {
 	FilePath, fpErr := GetDownloadedVideoFilePath(Video, AChannel)
+	if FilePath == "" && Video.Status == VIDEO_STATUS_DOWNLOADING && Video.VideoType == VIDEO_TYPE_ISLIVE {
+		// Find ytarchive temp directory
+		ytaState, ok := Get_ytarchive_State(GetDownloadDir(AChannel), Video.Id)
+		
+		var TotalSize uint64
+		
+		if ok {
+			Files, err := os.ReadDir(ytaState.TempDir)
+			if err == nil {
+				for _, File := range(Files) {
+					Info, err := File.Info()
+					if err == nil {
+						TotalSize += uint64(Info.Size())
+					}
+				}
+			}
+		}
+		
+		DB_UpdateVideoFileSize(Video, TotalSize)
+		
+		return
+	}
+	
 	if fpErr == nil && FilePath != "" {
 		FileSize, err := GetFileSize(FilePath)
 		if err == nil {
-			DB_UpdateVideoFileSize(Video, FileSize)
+			DB_UpdateVideoFileSize(Video, uint64(FileSize))
 		}
 	} else if FilePath == "" {
 		// File doesn't exist.

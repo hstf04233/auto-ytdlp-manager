@@ -314,7 +314,7 @@ func DB_UpdateVideoFilename(Video *VideoInfo, Filename string) error {
 	`, Filename, time.Now().UTC(), Video.Id)
 	return err
 }
-func DB_UpdateVideoFileSize(Video *VideoInfo, FileSize int64) error {
+func DB_UpdateVideoFileSize(Video *VideoInfo, FileSize uint64) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
 	Video.FileSize = FileSize
@@ -428,6 +428,8 @@ type ListVideosQuery struct {
 	
 	OrderBy int
 	OrderDirection int
+	
+	IgnoreFullInformation bool
 }
 
 func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, Statement *string, Args *[]interface{}) {
@@ -497,10 +499,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	Args := []interface{}{}
 	
 	Statement := `
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, StreamedDirectory, Status, QueuedAction, ReleaseDate, Duration,
-	UploaderName, UploaderUrl,
-	VideoType,
-	AddedAt, UpdatedAt, RefreshState FROM Videos`
+	SELECT Id, Title, Description, Availability, UploaderName, Status FROM Videos`
 	
 	QLimit := Limit
 	QOffset := Offset
@@ -529,34 +528,15 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	Si := 0
 	
 	for Rows.Next() {
-		VideoInfo := &VideoInfo{}
+		TinyVideoInfo := &VideoInfo{}
 		err := Rows.Scan(
-			&VideoInfo.FromChannel,
-			&VideoInfo.Id,
-			&VideoInfo.Title,
-			&VideoInfo.Description,
-			&VideoInfo.Url,
-			&VideoInfo.Availability,
-			&VideoInfo.Resolution,
-			&VideoInfo.OriginThumbnail,
-			&VideoInfo.Thumbnail,
-			&VideoInfo.DownloadedFilename,
-			&VideoInfo.FileSize,
-			&VideoInfo.StreamedDirectory,
+			&TinyVideoInfo.Id,
+			&TinyVideoInfo.Title,
+			&TinyVideoInfo.Description,
+			&TinyVideoInfo.Availability,
+			&TinyVideoInfo.UploaderName,
 			
-			&VideoInfo.Status,
-			&VideoInfo.QueuedAction,
-			&VideoInfo.ReleaseDate,
-			&VideoInfo.Duration,
-			
-			&VideoInfo.UploaderName,
-			&VideoInfo.UploaderUrl,
-			
-			&VideoInfo.VideoType,
-			
-			&VideoInfo.AddedAt,
-			&VideoInfo.UpdatedAt,
-			&VideoInfo.RefreshState,
+			&TinyVideoInfo.Status,
 		)
 		if err != nil {
 			return nil, err
@@ -566,13 +546,13 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			IsWhatWeAreLookingFor := true
 			
 			// Simple search!
-			TitleLowercase := strings.ToLower(VideoInfo.Title)
+			TitleLowercase := strings.ToLower(TinyVideoInfo.Title)
 			
 			for _, Word := range(SearchWords) {
 				if !strings.Contains(TitleLowercase, Word) &&
-				   !strings.Contains(strings.ToLower(VideoInfo.Availability), Word) &&
-				   !strings.Contains(strings.ToLower(VideoInfo.Id), Word) &&
-				   !strings.Contains(strings.ToLower(VideoInfo.UploaderName), Word) {
+				   !strings.Contains(strings.ToLower(TinyVideoInfo.Availability), Word) &&
+				   !strings.Contains(strings.ToLower(TinyVideoInfo.Id), Word) &&
+				   !strings.Contains(strings.ToLower(TinyVideoInfo.UploaderName), Word) {
 					// This video is NOT what we are looking for...
 					IsWhatWeAreLookingFor = false
 					break
@@ -589,10 +569,20 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			}
 		}
 		
-		VideosList = append(VideosList, VideoInfo)
+		VideosList = append(VideosList, TinyVideoInfo)
 		if IsSearching {
 			if Limit != -1 && len(VideosList) >= Limit {
 				break
+			}
+		}
+	}
+	
+	if !Query.IgnoreFullInformation {
+		// We found the videos we want! 
+		for _, VideoInfo := range(VideosList) {
+			FullVideoInfo, err := DB_GetVideo(VideoInfo.Id)
+			if err == nil {
+				*VideoInfo = *FullVideoInfo
 			}
 		}
 	}
@@ -614,6 +604,8 @@ var DB_VideoStatsCache = NewCache(time.Second * 4)
 
 func DB_GetVideoStatsFromQuery(Query ListVideosQuery) (*DB_VideoListStats, error) {
 	CacheKey := fmt.Sprintf("%s %s %d", Query.FromChannelId, Query.SearchQuery, Query.Status)
+	
+	Query.IgnoreFullInformation = true
 	
 	DB_VideoStatsCache.CleanUp()
 	Stats := &DB_VideoListStats{}
