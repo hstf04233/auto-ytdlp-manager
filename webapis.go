@@ -1118,7 +1118,7 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 
 func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 	Path := r.URL.Path
-	Path = strings.TrimPrefix(Path, "/streamed-live/")
+	Path = strings.TrimPrefix(Path, "/video-stream/")
 	PathArgs := strings.Split(Path, "/")
 	if len(PathArgs) < 2 {
 		http.Error(w, "Invalid request path.", http.StatusBadRequest)

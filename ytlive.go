@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"autoytdlpmanager/os_tings"
+
 	"github.com/natefinch/npipe" // Only used on Windows
 )
 
@@ -239,7 +241,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	Pipe1Name := GetPipeName(fmt.Sprintf("video_pipe_%s", VideoId))
 	Pipe2Name := GetPipeName(fmt.Sprintf("audio_pipe_%s", VideoId))
 	
-	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("TEMP_WILL_DELETE_streamed_live-%s-*", VideoId))
+	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("temp_streamed_live-%s-*", VideoId))
 	if err != nil {
 		return fmt.Errorf("Failed to create temporary directory, error: %v", err)
 	}
@@ -251,7 +253,10 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	}()
 	DB_UpdateVideoStreamedDirectory(Video, TempDirectory)
 	
-	FFmpegCmd := exec.Command(Get_FFmpegPath(G_Config),
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	
+	FFmpegCmd := exec.CommandContext(ctx, Get_FFmpegPath(G_Config),
 		"-i", Pipe1Name,
 		"-i", Pipe2Name,
 		"-loglevel", "error", "-stats",
@@ -260,7 +265,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		"-c", "copy",
 		"-f", "hls",
 		"-hls_time", "1",
-		"-hls_list_size", "60",
+		"-hls_list_size", "1800",		// 30 minutes to 5 hours.
 		"-hls_delete_threshold", "10",
 		"-hls_flags", "delete_segments+append_list+omit_endlist",
 		
@@ -288,12 +293,14 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	go ReadFileAndWriteToPipe(Pipe2Name, AudioFile, DownloadTask, Task)
 	
 	go func() {
-		if err := FFmpegCmd.Wait(); err != nil {
+		err := FFmpegCmd.Wait()
+		if err != nil {
 			L_Printf("Vid stream failed, error: %v\n", err)
 		}
 	}()
 	
 	for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
+		/*
 		// Check if the video and audio are still being downloaded.
 		if !DoesFileExist(VideoAndAudio.VideoPath) {
 			break
@@ -301,8 +308,15 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		if !DoesFileExist(VideoAndAudio.AudioPath) {
 			break
 		}
+		*/
 		
 		time.Sleep(50 * time.Millisecond)
+	}
+	
+	cancel()
+	
+	if Task.Status == TASK_STATUS_RUNNING {
+		CL_FinishTask(Task, TASK_STATUS_FINISHED)
 	}
 	
 	return nil
