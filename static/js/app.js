@@ -835,15 +835,53 @@ async function refreshVideoInfo(id,) {
   }
 }
 
+let currentVideoDetails = null;
+
 function videoPreviewClick(videoId) {
   let modalVideoPreview = document.getElementById('modal-video-preview');
-  if (modalVideoPreview) {
+  if (!modalVideoPreview) return;
+  
+  if (!currentVideoDetails) return;
+  if (currentVideoDetails.id !== videoId) return;
+  
+  if (!currentVideoDetails.video_stream_url) {
     modalVideoPreview.innerHTML = `
     <video controls autoplay>
       <source src="/video-file/${escHtml(videoId)}" type="video/mp4">
       Your browser does not support the video tag.
     </video>
     `
+  } else {
+    modalVideoPreview.innerHTML = '';
+    const video_stream_url = currentVideoDetails.video_stream_url;
+    let videoEl = document.createElement("video");
+    videoEl.controls = true;
+    videoEl = modalVideoPreview.appendChild(videoEl);
+    
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 10
+      });
+      
+      hls.loadSource(video_stream_url);
+      hls.attachMedia(videoEl);
+      
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          videoEl.play();
+      });
+      
+      hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error('HLS error:', data);
+      });
+    } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari (native HLS support)
+      videoEl.src = video_stream_url;
+      
+      videoEl.addEventListener('loadedmetadata', () => {
+          videoEl.play();
+      });
+    }
   }
 }
 
@@ -863,6 +901,8 @@ function getThumbnail(videoInfo) {
 function openVideoDetailsModal(videoId) {
   const v = allVideos.find(x => x.id === videoId);
   if (!v) return;
+  
+  currentVideoDetails = v;
 
   const channel = getChannelFromId(v.from_channel);
   const channelName = channel ? escHtml(channel.name) : 'Unknown Channel';

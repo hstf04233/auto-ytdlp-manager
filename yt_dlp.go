@@ -36,7 +36,9 @@ type VideoInfo struct {
 	DownloadedFilename string `json:"filename"` // Where the video is stored on device (This is only the file name, not the file path...)
 	VideoFileExists    bool  `json:"videofile_exists"`
 	FileSize           int64 `json:"filesize"` // Size (in bytes) of video file on device.
+	
 	StreamedDirectory  string `json:"-"`
+	VideoStreamUrl     string `json:"video_stream_url"`  // For webui.
 	
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`

@@ -241,6 +241,15 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	Pipe1Name := GetPipeName(fmt.Sprintf("video_pipe_%s", VideoId))
 	Pipe2Name := GetPipeName(fmt.Sprintf("audio_pipe_%s", VideoId))
 	
+	VideoInDB, err := DB_GetVideo(VideoId)
+	if VideoInDB != nil && err == nil && VideoInDB.StreamedDirectory != "" {
+		// Remove old temp directory.
+		err := os.RemoveAll(VideoInDB.StreamedDirectory)
+		if err != nil {
+			L_Printf("Failed to os.RemoveAll, error: %v\n", err)
+		}
+	}
+	
 	TempDirectory, err := os.MkdirTemp(DownloadDir, fmt.Sprintf("temp_streamed_live-%s-*", VideoId))
 	if err != nil {
 		return fmt.Errorf("Failed to create temporary directory, error: %v", err)
