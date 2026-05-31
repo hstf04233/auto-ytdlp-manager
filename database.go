@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -67,6 +68,8 @@ CREATE TABLE IF NOT EXISTS Videos (
 	AddedAt   DATETIME NOT NULL DEFAULT (datetime('now')),
 	UpdatedAt DATETIME
 );
+
+CREATE INDEX IF NOT EXISTS idx_videos_fromchannel ON Videos(FromChannel);
 
 CREATE TABLE IF NOT EXISTS CommandTasks (
 	Id     TEXT PRIMARY KEY,
@@ -505,14 +508,17 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	QOffset := Offset
 	
 	IsSearching := false
-	var SearchWords []string
+	SearchWords := []string{}
 	if Query.SearchQuery != "" {
 		QLimit = -1
 		QOffset = 0
 		IsSearching = true
-		SearchWords = strings.Split(Query.SearchQuery, " ")
-		for i := 0; i < len(SearchWords); i++ {
-			SearchWords[i] = strings.ToLower(SearchWords[i])
+		SplitSearchQuery := strings.Split(Query.SearchQuery, " ")
+		for i := 0; i < len(SplitSearchQuery); i++ {
+			SearchWord := strings.ToLower(SplitSearchQuery[i])
+			if !slices.Contains(SearchWords, SearchWord) {
+				SearchWords = append(SearchWords, SearchWord)
+			}
 		}
 	}
 	DB_ConstructQuery_ListVideos(QLimit, QOffset, Query, &Statement, &Args)
@@ -546,13 +552,18 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 			IsWhatWeAreLookingFor := true
 			
 			// Simple search!
-			TitleLowercase := strings.ToLower(TinyVideoInfo.Title)
+			TitleLowercase        := strings.ToLower(TinyVideoInfo.Title)
+			AvailabilityLowercase := strings.ToLower(TinyVideoInfo.Availability)
+			IdLowercase           := strings.ToLower(TinyVideoInfo.Id)
+			UploaderNameLowercase := strings.ToLower(TinyVideoInfo.UploaderName)
 			
-			for _, Word := range(SearchWords) {
+			//for _, Word := range(SearchWords) {
+			for i := 0; i < len(SearchWords); i++ {
+				Word := SearchWords[i]
 				if !strings.Contains(TitleLowercase, Word) &&
-				   !strings.Contains(strings.ToLower(TinyVideoInfo.Availability), Word) &&
-				   !strings.Contains(strings.ToLower(TinyVideoInfo.Id), Word) &&
-				   !strings.Contains(strings.ToLower(TinyVideoInfo.UploaderName), Word) {
+				   !strings.Contains(AvailabilityLowercase, Word) &&
+				   !strings.Contains(IdLowercase, Word) &&
+				   !strings.Contains(UploaderNameLowercase, Word) {
 					// This video is NOT what we are looking for...
 					IsWhatWeAreLookingFor = false
 					break
