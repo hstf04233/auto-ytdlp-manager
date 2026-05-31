@@ -836,6 +836,7 @@ async function refreshVideoInfo(id,) {
 }
 
 let currentVideoDetails = null;
+let currentHls = null;
 
 function videoPreviewClick(videoId) {
   let modalVideoPreview = document.getElementById('modal-video-preview');
@@ -843,6 +844,12 @@ function videoPreviewClick(videoId) {
   
   if (!currentVideoDetails) return;
   if (currentVideoDetails.id !== videoId) return;
+  
+  if (currentHls) {
+    currentHls.detachMedia();
+    currentHls.destroy();
+    currentHls = null;
+  }
   
   if (!currentVideoDetails.video_stream_url) {
     modalVideoPreview.innerHTML = `
@@ -863,6 +870,7 @@ function videoPreviewClick(videoId) {
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 9999
       });
+      currentHls = hls;
       
       hls.loadSource(video_stream_url);
       hls.attachMedia(videoEl);
@@ -978,6 +986,12 @@ function openVideoDetailsModal(videoId) {
 }
 
 function closeVideoDetailsModal() {
+  if (currentHls) {
+    currentHls.detachMedia();
+    currentHls.destroy();
+    currentHls = null;
+  }
+  
   let modalVideoPreview = document.getElementById('modal-video-preview');
   if (modalVideoPreview) {
     // Remove any video playing
