@@ -355,7 +355,7 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 		}
 	}
 	
-	if !Video.VideoFileExists && Video.StreamedDirectory != "" {
+	if !Video.VideoFileExists && Video.StreamedDirectory != "" && Video.Status == VIDEO_STATUS_DOWNLOADING {
 		// Share m3u8 stream instead.
 		Video.VideoStreamUrl = fmt.Sprintf("/video-stream/%s/playlist.m3u8", Video.Id)
 	}
