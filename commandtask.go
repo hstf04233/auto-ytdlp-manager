@@ -381,6 +381,10 @@ func CL_CancelTask(Task *CommandTask) error {
 	ARCT_Lock.Lock()
 	ActiveTask := AllRunningCommandTasks[Task.Id]
 	ARCT_Lock.Unlock()
+	if ActiveTask == nil {
+		// This task is not active.
+		return nil
+	}
 	if Task != ActiveTask {
 		Task = ActiveTask
 	}
