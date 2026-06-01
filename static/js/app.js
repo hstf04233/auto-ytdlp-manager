@@ -504,6 +504,8 @@ function areThereConfigChanges() {
   if (TaskLogAutoDeleteSecondsEl && TaskLogAutoDeleteSecondsEl.value != programConfig.TaskLog_AutoDelete_Seconds) return true
   const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds")
   if (TaskLogListAutoDeleteSecondsEl && TaskLogListAutoDeleteSecondsEl.value != programConfig.TaskLog_List_AutoDelete_Seconds) return true
+  const AutoRefreshVideosSecondsEl = document.getElementById("config-AutoRefreshVideosSeconds")
+  if (AutoRefreshVideosSecondsEl && AutoRefreshVideosSecondsEl.value != programConfig.TaskLog_List_AutoDelete_Seconds) return true
   
   return false
 }
@@ -525,6 +527,7 @@ async function saveConfig(e) {
   
   const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds");
   const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds");
+  const AutoRefreshVideosSecondsEl = document.getElementById("config-AutoRefreshVideosSeconds");
   
   const body = {
     YtDlp_Path:     YtDlpPathEl.value.trim(),
@@ -541,6 +544,7 @@ async function saveConfig(e) {
     
     TaskLog_AutoDelete_Seconds: TaskLogAutoDeleteSecondsEl.value ? parseInt(TaskLogAutoDeleteSecondsEl.value) : programConfig.TaskLog_AutoDelete_Seconds,
     TaskLog_List_AutoDelete_Seconds: TaskLogListAutoDeleteSecondsEl.value ? parseInt(TaskLogListAutoDeleteSecondsEl.value) : programConfig.TaskLog_List_AutoDelete_Seconds,
+    AutoRefresh_Videos_Seconds: AutoRefreshVideosSecondsEl.value ? parseInt(AutoRefreshVideosSecondsEl.value) : programConfig.AutoRefresh_Videos_Seconds,
   };
   
   try {
@@ -588,6 +592,7 @@ function renderConfig(config) {
   
   const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds");
   const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds");
+  const AutoRefreshVideosSecondsEl = document.getElementById("config-AutoRefreshVideosSeconds");
   
   const configSubmitBtn = document.getElementById("configSubmitBtn");
   if (configSubmitBtn) {
@@ -636,6 +641,9 @@ function renderConfig(config) {
   }
   if (TaskLogListAutoDeleteSecondsEl) {
     setInputPV(TaskLogListAutoDeleteSecondsEl, programConfig.TaskLog_List_AutoDelete_Seconds);
+  }
+  if (AutoRefreshVideosSecondsEl) {
+    setInputPV(AutoRefreshVideosSecondsEl, programConfig.AutoRefresh_Videos_Seconds);
   }
 }
 

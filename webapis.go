@@ -896,10 +896,13 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 		TaskLog_AutoDelete_Seconds      int `json:"TaskLog_AutoDelete_Seconds"`
 		TaskLog_List_AutoDelete_Seconds int `json:"TaskLog_List_AutoDelete_Seconds"`
 		
+		AutoRefresh_Videos_Seconds int `json:"AutoRefresh_Videos_Seconds"`
+		
 		Download_Video_Thumbnails *bool `json:"Download_Video_Thumbnails"`
 	}
 	Body.TaskLog_AutoDelete_Seconds = -1
 	Body.TaskLog_List_AutoDelete_Seconds = -1
+	Body.AutoRefresh_Videos_Seconds = -1
 	
 	dec := json.NewDecoder(r.Body)
 	if err := dec.Decode(&Body); err != nil {
@@ -991,6 +994,9 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if Body.TaskLog_List_AutoDelete_Seconds != -1 {
 		G_Config.TaskLog_List_AutoDelete_Seconds = Body.TaskLog_List_AutoDelete_Seconds
+	}
+	if Body.AutoRefresh_Videos_Seconds != -1 {
+		G_Config.AutoRefresh_Videos_Seconds = Body.AutoRefresh_Videos_Seconds
 	}
 	
 	err := UpdateConfig(G_Config)

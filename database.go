@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS CommandTasks (
 	UpdatedAt DATETIME NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_commandtasks_fromchannel ON CommandTasks(FromChannel);
+CREATE INDEX IF NOT EXISTS idx_commandtasks_fromvideo ON CommandTasks(FromVideo);
+
 CREATE TABLE IF NOT EXISTS Images (
 	Id        TEXT PRIMARY KEY,  /* Should a hashed value of ImageData */
 	Filename  TEXT,
@@ -589,7 +592,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 	}
 	
 	if !Query.IgnoreFullInformation {
-		// We found the videos we want! 
+		// We found the videos we want!
 		for _, VideoInfo := range(VideosList) {
 			FullVideoInfo, err := DB_GetVideo(VideoInfo.Id)
 			if err == nil {

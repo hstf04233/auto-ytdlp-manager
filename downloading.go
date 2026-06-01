@@ -915,6 +915,71 @@ func CheckChannels(WD *WatchingBundle) {
 	}
 }
 
+var IsOldRefreshing = false
+func RefreshOldUpdatedVideos() {
+	if IsOldRefreshing {
+		return
+	}
+	IsOldRefreshing = true
+	defer func() {
+		IsOldRefreshing = false
+	}()
+	
+	RefreshableVideos, err := DB_ListVideos(100, 0, ListVideosQuery{
+		Status: -1,
+		VideoType: -1,
+		RefreshState: 0,
+		QueuedAction: -1,
+		
+		OrderBy: DB_VIDEO_ORDERBY_UpdatedAt,
+		OrderDirection: 1,
+	})
+	if err != nil {
+		L_Printf("Failed to RefreshOldUpdatedVideos, DB_ListVideos error: %v\n", err)
+		return
+	}
+	
+	AutoRefresh_Videos_Seconds := G_Config.AutoRefresh_Videos_Seconds
+	
+	Task := CL_NewGenericTask()
+	defer func() {
+		if Task.Status == TASK_STATUS_RUNNING {
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
+		}
+	}()
+	Task.Type = TASK_TYPE_LISTING
+	Task.Title = fmt.Sprintf("Auto refreshing videos older than %d seconds", AutoRefresh_Videos_Seconds)
+	DB_UpdateCommandTaskInfo(Task)
+	
+	RefreshTime := time.Now().UTC().Add(time.Second * -time.Duration(AutoRefresh_Videos_Seconds))
+	
+	VideosRefreshed := 0
+	
+	for _, Video := range(RefreshableVideos) {
+		if RefreshTime.Unix() > Video.UpdatedAt.Unix() {
+			if Task.Status != TASK_STATUS_RUNNING { return }
+			if G_Config.AutoRefresh_Videos_Seconds <= 0 { return }
+			
+			AChannel := GetArchiveChannelFromId(&WatchedDownloading, Video.FromChannel)
+			if AChannel == nil {
+				continue
+			}
+			VideosRefreshed += 1;
+			
+			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
+			DB_UpdateCommandTaskInfo(Task)
+			RefreshVideoInfo(AChannel, Video, Task)
+		}
+	}
+	
+	if VideosRefreshed == 0 {
+		CL_Logf(Task, "Found no videos to refresh!")
+	}
+	if Task.Status == TASK_STATUS_RUNNING {
+		CL_FinishTask(Task, TASK_STATUS_FINISHED)
+	}
+}
+
 func InitDownloading() {
 	err := DB_LoadChannels(&WatchedDownloading)
 	if err != nil {
@@ -924,6 +989,7 @@ func InitDownloading() {
 	GetManualArchiveChannel(&WatchedDownloading)
 	
 	NextTasksDatabaseCleanUp := time.Now().UTC().Unix()+10
+	NextVideosRefreshUpdate  := time.Now().UTC().Unix()+10
 	
 	for true {
 		time.Sleep(1 * time.Second)
@@ -937,6 +1003,10 @@ func InitDownloading() {
 			}
 			NextTasksDatabaseCleanUp = time.Now().UTC().Unix() + int64(NextCleanUp)
 			CleanUpTasksInDatabase()
+		}
+		if G_Config.AutoRefresh_Videos_Seconds > 0 && time.Now().UTC().Unix() > NextVideosRefreshUpdate {
+			NextVideosRefreshUpdate = time.Now().UTC().Unix() + (60*30)
+			go RefreshOldUpdatedVideos()
 		}
 		
 		CheckChannels(&WatchedDownloading)

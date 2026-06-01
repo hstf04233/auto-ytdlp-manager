@@ -271,10 +271,12 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		
 		"-c", "copy",
 		"-f", "hls",
+		"-hls_init_time", "1",
 		"-hls_time", "1",
 		"-hls_list_size", "1800",		// 30 minutes to 5 hours.
 		"-hls_delete_threshold", "10",
-		"-hls_flags", "delete_segments+append_list+omit_endlist",
+		//"-hls_flags", "delete_segments+append_list+omit_endlist",
+		"-hls_flags", "split_by_time+independent_segments+delete_segments+append_list+omit_endlist",
 		
 		"-hls_segment_filename", "segment_%03d.ts",
 		
@@ -372,7 +374,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo, QualityS
 		"-o", FilenameWithoutExt,
 	}
 	
-	if QualitySelect != 0 && QualitySelect <= 1080 {
+	if (QualitySelect != 0 && QualitySelect <= 1080) || true {
 		Args = append(Args, "--h264")
 	}
 	

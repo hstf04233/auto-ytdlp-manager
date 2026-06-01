@@ -44,6 +44,7 @@ type ProgramConfig struct {
 	YtArchive_Path string
 	FFmpeg_Path    string
 	Deno_Path      string `json:"-"`
+	
 	YtDlp_Path_Real     string `json:"-"`
 	YtArchive_Path_Real string `json:"-"`
 	FFmpeg_Path_Real    string `json:"-"`
@@ -58,6 +59,8 @@ type ProgramConfig struct {
 	TaskLog_AutoDelete_Enabled      bool
 	TaskLog_AutoDelete_Seconds      int
 	TaskLog_List_AutoDelete_Seconds int
+	
+	AutoRefresh_Videos_Seconds int
 	
 	//
 	
@@ -84,6 +87,8 @@ var G_Config = &ProgramConfig{
 	TaskLog_AutoDelete_Enabled:      true,
 	TaskLog_AutoDelete_Seconds:      MAX_TASK_LOG_LIFETIME,
 	TaskLog_List_AutoDelete_Seconds: MAX_CHANNEL_LISTING_LIFETIME,
+	
+	AutoRefresh_Videos_Seconds: (60*60*24 * 30), // 1 Month
 	
 	Download_Video_Thumbnails: true,
 	
