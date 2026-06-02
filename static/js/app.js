@@ -1192,6 +1192,7 @@ async function saveChannel(e) {
       
       closeChannelModal();
     } else {
+      // Create
       newChannelData = await API.post('/api/channels', body);
       showToast('Channel added!', 'success');
       

@@ -1013,6 +1013,52 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	Path := r.URL.Path
 	Method := r.Method
 	
+	// Unauthorized endpoints
+	
+	if Path == "login" && Method == "POST" {
+		AuthLoginRequest(w, r)
+		return
+	} else if Path == "create-admin" && Method == "POST" {
+		AdminExists, err := DoesAdminAccountExist()
+		if err != nil {
+			L_Printf("Error checking if admin account exists: %v", err)
+			http.Error(w, "Error checking if admin account exists...", http.StatusInternalServerError)
+			return
+		}
+		if AdminExists {
+			http.Error(w, "Admin account already exists!", http.StatusForbidden)
+			return
+		}
+		
+		AuthCreateUserRequest(w, r, AUTH_ROLE_ADMIN)
+		return
+	} else if Path == "admin-account-exists" && Method == "GET" {
+		Exists, err := DoesAdminAccountExist()
+		if err != nil {
+			L_Printf("Error checking if admin account exists: %v", err)
+			http.Error(w, "Error checking if admin account exists...", http.StatusInternalServerError)
+			return
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"exists": Exists,
+		})
+		return
+	}
+	
+	IsAuthorized, err := IsRequestAuthorized(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if !IsAuthorized {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	
+	// Authorized endpoints
+	
 	if Path == "channels" && Method == "POST" {
 		// POSTing to api/channels will create a new channel.
 		API_NewChannel(w, r)

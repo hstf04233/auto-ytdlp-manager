@@ -118,6 +118,17 @@ hr {
 .page { display: none; }
 .page.active { display: block; }
 
+.login-status {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 20px;
+  
+  display: none;
+}
+.login-status.active { display: block; }
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -481,6 +492,10 @@ form hr {
   display: flex;
   margin-bottom: 10px;
   white-space: nowrap;
+}
+
+.group-break {
+  display: block;
 }
 
 .form-group label {

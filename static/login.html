@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log in - Auto yt-dlp Manager</title>
+  <link rel="icon" href="/favicon.ico" type="image/png">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+	<div class="modal-overlay active" id="loginModal">
+		<div class="modal" onclick="event.stopPropagation();">
+	      <h2>Log in</h2>
+	      <form id="loginForm" onsubmit="login(event)" autocomplete="off">
+			<div class="form-group group-break">
+	          <label for="loginUsername">Username</label>
+	          <input type="text" id="loginUsername" maxlength="64" required>
+	        </div>
+			<div class="form-group group-break">
+	          <label for="loginPassword">Password</label>
+	          <input type="password" id="loginPassword" maxlength="256" required>
+	        </div>
+			
+	        <hr>
+			
+			<div class="login-status" id="login-StatusContainer">
+	          <span id="login-Status">Error!!!</span>
+	        </div>
+			
+			<div class="modal-actions">
+	          <button type="submit" class="btn btn-primary" id="loginSubmitBtn">Log in</button>
+	        </div>
+		  </form>
+		</div>
+	</div>
+	
+	<div class="modal-overlay" id="createUserModal">
+		<div class="modal" onclick="event.stopPropagation();">
+	      <h2 id="createUserTitle">Create user</h2>
+	      <label id="createUserLabel">.</label>
+		  
+		  <hr>
+		  
+	      <form id="createUserForm" onsubmit="createUser(event)" autocomplete="off">
+			<div class="form-group group-break">
+	          <label for="createUser-Username">Username</label>
+	          <input type="text" id="createUser-Username" maxlength="64" required>
+	        </div>
+			<div class="form-group group-break">
+	          <label for="createUser-Password">Password</label>
+	          <input type="password" id="createUser-Password" maxlength="256" required>
+	        </div>
+			<div class="form-group group-break">
+	          <label for="createUser-PasswordRetype">Retype Password</label>
+	          <input type="password" id="createUser-PasswordRetype" maxlength="256" required>
+	        </div>
+			
+	        <hr>
+			
+			<div class="login-status" id="createUser-StatusContainer">
+	          <span id="createUser-Status">Error!!!</span>
+	        </div>
+			
+			<div class="modal-actions">
+	          <button type="submit" class="btn btn-primary" id="createUser-SubmitBtn">Create user</button>
+	        </div>
+		  </form>
+		</div>
+	</div>
+	
+	<script src="/static/js/login_app.js"></script>
+	
+	<noscript>
+    <div class="modal-overlay active">
+      <div class="modal modal-video-details">
+        <h2>
+          This app requires JavaScript to be enabled!
+          Please enable JavaScript to use this app.
+        </h2>
+      </div>
+    </div>
+  </noscript>
+</body>

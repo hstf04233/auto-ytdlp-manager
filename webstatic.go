@@ -13,12 +13,16 @@ import (
 //go:embed static/*
 var WebStaticContent embed.FS
 
-// TODO: ! this could be set at build time but I'm lazy rn
-var ETag string
 var ProgramStartTime = time.Now().UTC()
 
 func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
+	NeedsLogin := false
+	
 	path := strings.TrimPrefix(r.URL.Path, "/")
+	if path == "logout" {
+		AuthLogoutRequest(w, r)
+		return
+	}
 	if path == "favicon.ico" {
 		path = "favicon.png"
 		if APPLICATION_VERSION_TYPE == "debug" {
@@ -26,12 +30,31 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if path == "" || path == "/" {
 		path = "index.html"
+		NeedsLogin = true
+		
+	} else if path == "logout" {
+		AuthLogoutRequest(w, r)
+		return
+	} else if strings.HasPrefix(path, "login") {
+		path = "login.html"
 	} else {
 		if strings.HasPrefix(path, "static/") {
 			path = strings.TrimPrefix(path, "static/")
 		} else {
+			NeedsLogin = true
 			path = "index.html"
 		}
+	}
+	
+	IsAuthorized, err := IsRequestAuthorized(r)
+	if err != nil {
+		L_Printf("Auth error: %v\n", err)
+		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	if !IsAuthorized && NeedsLogin {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
 	}
 	
 	File, err := WebStaticContent.Open(fmt.Sprintf("static/%s", path))
@@ -50,8 +73,4 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	
 	http.ServeContent(w, r, filepath.Base(path), ProgramStartTime, FileSeeker)
 	//w.Write(FileContent)
-}
-
-func init() {
-	ETag = time.Now().String()
 }

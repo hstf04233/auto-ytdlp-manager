@@ -28,13 +28,11 @@ var HttpServer *http.Server
 func StartServer(ServerPort int) {
 	Mux := http.NewServeMux()
 	
+	// Static handlers
 	Mux.HandleFunc("/static/", webstatic_ServeStaticContent)
+	Mux.HandleFunc("/", webstatic_ServeStaticContent)            // This should serve index.html
+	Mux.HandleFunc("/favicon.ico", webstatic_ServeStaticContent) // This should serve favicon.png
 	
-	// This should serve index.html
-	Mux.HandleFunc("/", webstatic_ServeStaticContent)
-	
-	// This should serve favicon.png
-	Mux.HandleFunc("/favicon.ico", webstatic_ServeStaticContent)
 	Mux.HandleFunc("/api/", ServeApi)
 	Mux.HandleFunc("/video-file/", ServeVideoDownload)
 	Mux.HandleFunc("/video-stream/", ServeVideoStream)
@@ -116,8 +114,15 @@ func main() {
 	
 	err = OpenDB()
 	if err != nil {
-		L_Printf("Database failed to open because: %v\n", err)
+		L_Printf("Database failed to open | %v\n", err)
 		panic(err)
+		return
+	}
+	err = OpenAuthDB()
+	if err != nil {
+		L_Printf("Auth database failed to open | %v\n", err)
+		panic(err)
+		return
 	}
 	
 	go InitDownloading()
