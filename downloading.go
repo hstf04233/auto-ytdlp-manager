@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
+	"golang.org/x/crypto/sha3"
 	"errors"
 	"fmt"
 	"io"
@@ -379,7 +379,7 @@ func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, e
 		return "", fmt.Errorf("The downloaded thumbnail is larger than 10MB...")
 	}
 	
-	ImageHash := fmt.Sprintf("%x", sha256.Sum256(ImageContent))
+	ImageHash := fmt.Sprintf("%x", sha3.Sum256(ImageContent))
 	
 	if ImageContainer != "jpg" && ImageContainer != "png" {
 		// Auto convert webp and avif to jpeg (We don't want none of that yucky shit 🤣)
