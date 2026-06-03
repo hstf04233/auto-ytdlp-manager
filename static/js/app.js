@@ -17,6 +17,14 @@ const API = {
     }
     return res.json();
   },
+  async getRaw(url) {
+    const res = await fetch(url);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API GET ${truncateString(url, 128)}: ${res.status} - ${text}`);
+    }
+    return res.text();
+  },
   async post(url, body) {
     const res = await fetch(url, {
       method: 'POST',
@@ -914,6 +922,23 @@ function getThumbnail(videoInfo) {
   return `https://img.youtube.com/vi/${videoInfo.id}/mqdefault.jpg`
 }
 
+async function copySharedVideoFile(videoId) {
+  try {
+    const sharedLink = await API.getRaw(`/api/share-video-file/${videoId}`);
+    
+    const fullLocation = window.location.origin + sharedLink;
+    
+    navigator.clipboard.writeText(fullLocation);
+    if (isLocalhost) {
+      showToast(`Copied to clipboard while in localhost... Please edit the shared link to your public website.`, "success");
+    } else {
+      showToast(`Copied to clipboard: ${sharedLink}`, "success");
+    }
+  } catch (err) {
+    showToast(`Failed to copy shared video file, error: ${err.message}`, "error");
+  }
+}
+
 function openVideoDetailsModal(videoId) {
   const v = allVideos.find(x => x.id === videoId);
   if (!v) return;
@@ -983,6 +1008,11 @@ function openVideoDetailsModal(videoId) {
     ${
       v.videofile_exists ?
     `<a href="/video-file/${escHtml(v.id)}?download=true" target="_blank" class="btn btn-secondary btn-sm" title="Download video file">Download Video</a>` :
+    ''
+    }
+    ${
+      v.videofile_exists ?
+    `<button type="button" class="btn btn-secondary btn-sm" class="btn btn-secondary btn-sm" onclick="copySharedVideoFile('${v.id}')" title="Copy shared video file link to clipboard">Share video file link</a>` :
     ''
     }
     <button type="button" class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}');closeVideoDetailsModal();" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
