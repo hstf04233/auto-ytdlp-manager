@@ -46,9 +46,6 @@ func StartServer(ServerPort int) {
 	
 	L_Printf("Starting server at http://localhost:%d\n", ServerPort)
 	
-	// TODO: I'm planning on adding an auth system.
-	L_Printf("!!! THIS PROGRAM IS IN TESTING PHASE AND IS UNSAFE OUTSIDE OF THE LOCAL NETWORK!!! PLEASE DO NOT HOST THIS ON A WEBSITE !!!\n")
-	
 	if err := HttpServer.ListenAndServe(); err != nil {
 		if errors.Is(err, http.ErrServerClosed) {
 			L_Printf("The http server has closed.\n")
