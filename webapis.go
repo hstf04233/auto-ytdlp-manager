@@ -692,6 +692,23 @@ func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("{\"Success\":true}"))
 }
 
+func API_ShareVideoFile(w http.ResponseWriter, r *http.Request) {
+	// This is an authenticated request if called from ServeApi !
+	
+	RequestId := path.Base(r.URL.Path)
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid video id.", http.StatusBadRequest)
+		return
+	}
+	
+	ShareLink := GenerateSignedUserRequest(fmt.Sprintf("/video-file/%s", RequestId), []SQuery{
+		{"expires_ms", fmt.Sprintf("%d", time.Now().UTC().Add(time.Minute * 1).UnixMilli())},
+	})
+	
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(ShareLink))
+}
+
 func API_CancelTask(w http.ResponseWriter, r *http.Request) {
 	RequestId := path.Base(r.URL.Path)
 	if strings.HasPrefix(r.URL.Path, "cancel-task/") && RequestId != "" {
@@ -1108,6 +1125,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		
 		// This is to grab the video status without refreshing the entire list with the api/videos list api.
 		API_GetVideoStatus(w, r)
+	} else if (strings.HasPrefix(Path, "share-video-file/")) && Method == "GET" {
+		API_ShareVideoFile(w, r)
 	} else if (Path == "tasks" || strings.HasPrefix(Path, "tasks/")) && Method == "GET" {
 		/*
 		  api/tasks?limit={int}&offset={int}&status={int}&type={int}&from_channel={channel_id}&from_video={video_id}&order_by={order}&order_direction={1, -1}
