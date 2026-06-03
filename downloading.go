@@ -347,7 +347,11 @@ func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, e
 		return "", nil
 	}
 	
-	Response, err := http.Get(ThumbnailUrl)
+	Client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	
+	Response, err := Client.Get(ThumbnailUrl)
 	if err != nil {
 		return "", fmt.Errorf("Failed because http.Get error: %v", err)
 	}
@@ -372,11 +376,16 @@ func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, e
 		return "", fmt.Errorf("Unknown Content-Type: '%s'", ContentType)
 	}
 	
-	ImageContent, err := io.ReadAll(Response.Body)
+	LimitedBodyStream := io.LimitReader(Response.Body, DB_IMAGE_MAX_FILESIZE)
+	
+	ImageContent, err := io.ReadAll(LimitedBodyStream)
 	if err != nil {
 		return "", fmt.Errorf("Could not read response body because: %v", err)
 	}
-	if len(ImageContent) > DB_IMAGE_MAX_FILESIZE {
+	
+	tmp := make([]byte, 1)
+	n, _ := Response.Body.Read(tmp)
+	if n > 0 {
 		// Image file is too big!!!
 		return "", fmt.Errorf("The downloaded thumbnail is larger than 10MB...")
 	}
