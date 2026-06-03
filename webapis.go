@@ -701,8 +701,11 @@ func API_ShareVideoFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Expire in a week.
+	ExpireTime := time.Now().UTC().Add(time.Second*60*60*24 * 7)
+	
 	ShareLink := GenerateSignedUserRequest(fmt.Sprintf("/video-file/%s", RequestId), []SQuery{
-		{"expires_ms", fmt.Sprintf("%d", time.Now().UTC().Add(time.Minute * 1).UnixMilli())},
+		{"expires_ms", fmt.Sprintf("%d", ExpireTime.UnixMilli())},
 	})
 	
 	w.Header().Set("Content-Type", "text/plain")
