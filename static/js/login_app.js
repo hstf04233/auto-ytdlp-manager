@@ -147,11 +147,19 @@ async function createUser(e) {
 	}
 }
 
+let attemptingLoginRequest = false;
+
 async function login(e) {
 	e.preventDefault();
 	
+	if (attemptingLoginRequest) return
+	
 	const username = document.getElementById("loginUsername").value.trim();
 	const password = document.getElementById("loginPassword").value;
+	const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+	
+	attemptingLoginRequest = true;
+	if (loginSubmitBtn) loginSubmitBtn.disabled = true;
 	
 	try {
 		const body = {
@@ -160,6 +168,7 @@ async function login(e) {
 		};
 		
 		//await API.post('/api/login', body);
+		loginStatus("Logging in...")
 		const res = await fetch('/api/login', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -177,6 +186,9 @@ async function login(e) {
 	} catch (err) {
 		loginStatus(`Failed to log in: ${err.message}`);
 	}
+	
+	attemptingLoginRequest = false;
+	if (loginSubmitBtn) loginSubmitBtn.disabled = false;
 }
 
 async function doesAdminAccountExist() {

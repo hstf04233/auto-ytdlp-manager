@@ -46,6 +46,20 @@ CREATE TABLE IF NOT EXISTS Sessions (
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_userid ON Sessions(UserId);
 
+CREATE TABLE IF NOT EXISTS Sessions (
+	TokenId TEXT PRIMARY KEY UNIQUE,
+	UserId  INTEGER NOT NULL,
+	
+	ExpireAt  DATETIME NOT NULL,
+	CreatedAt DATETIME NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS Settings (
+	Id TEXT PRIMARY KEY,
+	
+	SecretSaltHash TEXT
+);
+
 `
 
 const (
@@ -53,6 +67,7 @@ const (
 	AUTH_PASSWORD_MAX_LENGTH = 256
 	
 	AUTH_DB_FILENAME = "auth.db"
+	AUTH_REQUEST_SIGN_QUERYNAME = "ss"
 	
 	AUTH_SESSION_TOKEN_COOKIE_NAME = "AYDM_SESSION_AUTH_TOKEN"
 )
@@ -65,15 +80,15 @@ const (
 var G_AUTHDB *sql.DB
 
 type AuthUser struct {
-	UserId   uint64
-	Username string
-	UsernameDisplay string
-	SecuredPassword string
+	UserId   uint64 `json:"userid"`
+	Username string        `json:"raw_username"`
+	UsernameDisplay string `json:"username"`
+	SecuredPassword string `json:"-"`
 	
-	Role int
+	Role int `json:"role"`
 	
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 type AuthSession struct {
 	TokenId string
@@ -95,6 +110,37 @@ func GenerateRandomString(length int) []byte {
 	}
 	
 	return result
+}
+
+func SRNG(Min int, Max int) int {
+	numMax := big.NewInt(int64(Max-Min))
+	num, _ := rand.Int(rand.Reader, numMax)
+	return (int(num.Int64()) + Min)
+}
+
+var G_SecretSaltHash string
+
+func GetAuthSecretSaltHash() string {
+	if G_SecretSaltHash != "" {
+		return G_SecretSaltHash
+	}
+	
+	Row := G_AUTHDB.QueryRow(`
+	SELECT SecretSaltHash FROM Settings WHERE Id = "Global"
+	`)
+	var SecretSaltHash string
+	err := Row.Scan(&SecretSaltHash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ""
+		}
+		L_Printf("Error when getting SecretSaltHash from global table, %v\n.\n", err)
+		return ""
+	}
+	
+	G_SecretSaltHash = SecretSaltHash
+	
+	return SecretSaltHash
 }
 
 func GetAuthUserFromUserId(UserId uint64) (*AuthUser, error) {
@@ -202,50 +248,119 @@ func CreateAuthSession(AUser *AuthUser) (*AuthSession, error) {
 	return Session, nil
 }
 
-func IsRequestAuthorized(r *http.Request) (bool, error) {
-	AuthorizationToken := r.Header.Get("authorization")
-	if AuthorizationToken != "" {
-		// TODO:
-	}
-	
+func GetAuthUserFromRequest(r *http.Request) (*AuthUser, error) {
 	AuthorizationCookie, err := r.Cookie(AUTH_SESSION_TOKEN_COOKIE_NAME)
 	if err != nil {
 		if errors.Is(err, http.ErrNoCookie) {
-			return false, nil
+			return nil, nil
 		}
 		
-		return false, fmt.Errorf("Failed to get auth cookie, error %v", err)
+		return nil, fmt.Errorf("Failed to get auth cookie, error %v", err)
 	}
 	if AuthorizationCookie != nil {
 		SessionToken := AuthorizationCookie.Value
 		
 		AUser, err := GetAuthUserFromSessionToken(SessionToken)
 		if err != nil {
-			return false, fmt.Errorf("Error when getting auth user from session token: %v", err)
+			return nil, fmt.Errorf("Error when getting auth user from session token: %v", err)
 		}
 		
-		if AUser == nil {
-			// Could not find user?
-			return false, nil
-		}
 		if AUser != nil {
-			if AUser.Role == AUTH_ROLE_ADMIN {
-				return true, nil
-			}
+			// Auth user was found!
+			return AUser, nil
 		}
+	}
+	
+	return nil, nil
+}
+
+func IsRequestAuthorized(r *http.Request) (bool, error) {
+	AuthorizationToken := r.Header.Get("authorization")
+	if AuthorizationToken != "" {
+		// TODO:
+	}
+	
+	AUser, err := GetAuthUserFromRequest(r)
+	if err != nil {
+		return false, fmt.Errorf("Could not get auth user, error %v", err)
+	}
+	
+	if AUser == nil {
+		return false, nil
+	}
+	if AUser.Role == AUTH_ROLE_ADMIN {
+		return true, nil
 	}
 	
 	return false, nil
 }
 
+type SQuery struct {
+	Name  string
+	Value string
+}
+
+func GenerateSignUserRequest(LocalUrl string, Queries []SQuery) string {
+	SecretSaltHash := GetAuthSecretSaltHash()
+	
+	Path := LocalUrl
+	
+	Hash := sha3.New256()
+	Hash.Write([]byte(LocalUrl))
+	Hash.Write([]byte(SecretSaltHash))
+	
+	QueryId := 0
+	for _, Query := range(Queries) {
+		Hash.Write([]byte(Query.Value))
+		if Query.Value != "" {
+			if QueryId == 0 {
+				Path += fmt.Sprintf("?%s=%s", Query.Name, Query.Value)
+			} else {
+				Path += fmt.Sprintf("&%s=%s", Query.Name, Query.Value)
+			}
+			
+			QueryId += 1
+		}
+	}
+	
+	ComputedHash := fmt.Sprintf("%x", Hash.Sum(nil))
+	if QueryId == 0 {
+		Path += fmt.Sprintf("?%s=%s", AUTH_REQUEST_SIGN_QUERYNAME, ComputedHash)
+	} else {
+		Path += fmt.Sprintf("&%s=%s", AUTH_REQUEST_SIGN_QUERYNAME, ComputedHash)
+	}
+	QueryId += 1
+	
+	return Path
+}
 
 func IsUserRequestSignedByServer(r *http.Request, Queries []string) bool {
-	// TODO:
+	SignedHash := r.URL.Query().Get(AUTH_REQUEST_SIGN_QUERYNAME)
+	if SignedHash == "" {
+		return false
+	}
+	
+	SecretSaltHash := GetAuthSecretSaltHash()
+	
+	Hash := sha3.New256()
+	Hash.Write([]byte(r.URL.Path))
+	Hash.Write([]byte(SecretSaltHash))
+	for _, Query := range(Queries) {
+		Value := r.URL.Query().Get(Query)
+		Hash.Write([]byte(Value))
+	}
+	
+	ComputedHash := fmt.Sprintf("%x", Hash.Sum(nil))
+	if SignedHash == ComputedHash {
+		return true
+	}
+	
+	L_Printf("ss: %s, ComputedHash: %s\n", SignedHash, ComputedHash)
 	
 	return false
 }
 
-// This returns the raw bytes of a sha512 hash. Used for bcrypt because it is limited to 72 characters...
+// This returns the raw bytes of a sha512 hash. Used for bcrypt because it's limited to 72 characters...
 func HashRawPassword(RawPassword string) string {
 	Sum := sha3.Sum512([]byte(RawPassword))
 	return string(fmt.Sprintf("%s", Sum))
@@ -253,6 +368,13 @@ func HashRawPassword(RawPassword string) string {
 
 func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
 	// TODO: IP based rate limiting
+	
+	// :Login_time_attack
+	// This is to prevent timing attacks!
+	// If the username is found then it will spend around ~50ms comparing the raw password and the bcrypt password.
+	// Forcefully sleeping a random amount of time before responding should stop people from reverse engineering the admin username.
+	TimeWait := time.Now().UTC().Add(time.Millisecond * (80))
+	TimeWait = TimeWait.Add(time.Microsecond * time.Duration(SRNG(0, 100_000)))
 	
 	var Body struct{
 		Username    string `json:"username"`
@@ -287,10 +409,13 @@ func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal error when fetching user from database...", http.StatusInternalServerError)
 		return
 	}
-	const UsernamePasswordMismatch_Message = "Username or password do not match."
+	const UsernamePasswordMismatch_Message = "Username and password do not match."
 	
 	if AuthUser == nil {
 		// This user does not exist.
+		
+		time.Sleep(TimeWait.Sub(time.Now().UTC()))  // Sleep for a small amount before returning, see :Login_time_attack
+		
 		http.Error(w, UsernamePasswordMismatch_Message, http.StatusUnauthorized)
 		return
 	}
@@ -320,6 +445,8 @@ func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("{\"LoggedIn\":true}"))
 		return
 	}
+	
+	time.Sleep(TimeWait.Sub(time.Now().UTC()))  // Sleep for a small amount before returning, see :Login_time_attack
 	
 	http.Error(w, UsernamePasswordMismatch_Message, http.StatusBadRequest)
 	return
@@ -474,10 +601,25 @@ func OpenAuthDB() error {
 		return fmt.Errorf("Failed run auth database header '%s' Error: %v\n", AUTH_DB_FILENAME, err)
 	}
 	
+	SecretSaltHash := GetAuthSecretSaltHash()
+	if SecretSaltHash == "" {
+		// Create the secret salt!
+		
+		Key2Length := SRNG(64, 256)
+		NewSaltHash := fmt.Sprintf("TIME_CREATED:%d|%s,%s", time.Now().UnixMicro(), GenerateRandomString(512), GenerateRandomString(Key2Length))
+		G_SecretSaltHash = NewSaltHash
+		
+		_, err := G_AUTHDB.Exec(`
+		INSERT OR REPLACE INTO Settings(Id, SecretSaltHash)
+		VALUES ("Global", ?)
+		`, NewSaltHash)
+		if err != nil {
+			return fmt.Errorf("Could not set SecretSaltHash in auth database? error: %v", err)
+		}
+	}
+	
 	AuthDatabaseUpgrades := []string{
-		// TODO: TEMP!
-		"ALTER TABLE Users ADD COLUMN UsernameDisplay TEXT NOT NULL",
-		"ALTER TABLE Users ADD COLUMN SecuredPassword TEXT NOT NULL",
+		// Empty for the time being.
 	}
 	
 	for i, Upgrade := range(AuthDatabaseUpgrades) {

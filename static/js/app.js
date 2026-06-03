@@ -1417,8 +1417,8 @@ function renderVideoPagination() {
     cbsId: cbsId,
   });
   
-  if (videoPage > totalPages) {
-    videoPage = totalPages;
+  if (videoPage >= totalPages) {
+    videoPage = totalPages-1;
   }
   
   if (container_top)    container_top.innerHTML = paginationHtml;
@@ -2033,11 +2033,41 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+async function logout() {
+  try {
+    const res = await fetch("/logout", {
+      method: 'POST',
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text);
+    }
+    
+    window.location.href = "/";
+  } catch (err) {
+    showToast(`Failed to log out... error: ${err.message}`, "error")
+  }
+}
+
+async function loadUser() {
+  try {
+    const loggedInUser = await API.get('/api/whoami');
+    
+    const userAccountEl = document.getElementById("side-bar-user-account")
+    if (userAccountEl) {
+      userAccountEl.textContent = loggedInUser.username
+    }
+  } catch (err) {
+    showToast(`Failed to get logged in user... error: ${err.message}`, "error")
+  }
+}
+
 async function init() {
   videoSearchFilterUpdate();
   
-  await loadConfig();
-  await loadChannels();
+  loadUser();
+  loadConfig();
+  loadChannels();
   
   const lastTab = window.location.pathname.replace(/^\//, '') || 'channels';
   showPage(lastTab + window.location.search, true)

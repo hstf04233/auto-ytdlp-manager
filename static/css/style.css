@@ -58,6 +58,7 @@ a:hover {
   margin-top: auto;
 }
 .sidebar-bottom label {
+  word-break: break-all;
   margin-left: 20px;
   color: var(--text-secondary);
 }
@@ -182,6 +183,10 @@ hr {
 
 .btn-sm {
   padding: 5px 12px;
+  font-size: 0.8rem;
+}
+.btn-tiny {
+  padding: 2px 8px;
   font-size: 0.8rem;
 }
 

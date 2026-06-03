@@ -1018,6 +1018,17 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	if Path == "login" && Method == "POST" {
 		AuthLoginRequest(w, r)
 		return
+	} else if Path == "whoami" && Method == "GET" {
+		AUser, err := GetAuthUserFromRequest(r)
+		if err != nil {
+			L_Printf("/whoami/ Error when getting auth user from request, error: %v\n", err)
+			http.Error(w, "Internal server error.", http.StatusInternalServerError)
+			return
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(AUser)
+		return
 	} else if Path == "create-admin" && Method == "POST" {
 		AdminExists, err := DoesAdminAccountExist()
 		if err != nil {
@@ -1119,6 +1130,33 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 }
 
 func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
+	IsAuthorized, err := IsRequestAuthorized(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	if r.URL.Query().Get(AUTH_REQUEST_SIGN_QUERYNAME) != "" {
+		IsSigned := IsUserRequestSignedByServer(r, []string{"expires_ms", "time_ms"})
+		if !IsSigned {
+			http.Error(w, "Forbidden - Unsigned or expired request", http.StatusForbidden)
+			return
+		}
+	} else if !IsAuthorized {
+		// TODO: Check if it's local host accessing this file.
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	
+	if ExpiresStr := r.URL.Query().Get("expires_ms"); ExpiresStr != "" {
+		ExpiresMs, _ := strconv.Atoi(ExpiresStr)
+		
+		if ExpiresMs != -1 && time.Now().UTC().UnixMilli() > int64(ExpiresMs) {
+			http.Error(w, "Expired request", http.StatusForbidden)
+			return
+		}
+	}
+	
 	RequestId := path.Base(r.URL.Path)
 	if RequestId == "" {
 		http.Error(w, "Video id required.", http.StatusBadRequest)
@@ -1174,6 +1212,33 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 }
 
 func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
+	IsAuthorized, err := IsRequestAuthorized(r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	
+	if r.URL.Query().Get(AUTH_REQUEST_SIGN_QUERYNAME) != "" {
+		IsSigned := IsUserRequestSignedByServer(r, []string{"expires_ms", "time_ms"})
+		if !IsSigned {
+			http.Error(w, "Forbidden - Unsigned or expired request", http.StatusForbidden)
+			return
+		}
+	} else if !IsAuthorized {
+		// TODO: Check if it's local host accessing this file.
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	
+	if ExpiresStr := r.URL.Query().Get("expires_ms"); ExpiresStr != "" {
+		ExpiresMs, _ := strconv.Atoi(ExpiresStr)
+		
+		if ExpiresMs != -1 && time.Now().UTC().UnixMilli() > int64(ExpiresMs) {
+			http.Error(w, "Expired request", http.StatusForbidden)
+			return
+		}
+	}
+	
 	Path := r.URL.Path
 	Path = strings.TrimPrefix(Path, "/video-stream/")
 	PathArgs := strings.Split(Path, "/")

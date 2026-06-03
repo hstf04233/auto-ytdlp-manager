@@ -38,6 +38,7 @@ func StartServer(ServerPort int) {
 	Mux.HandleFunc("/video-stream/", ServeVideoStream)
 	Mux.HandleFunc("/db-image/", ServeDBImage)
 	
+	
 	HttpServer = &http.Server{
 		Addr: fmt.Sprintf(":%d", ServerPort),
 		Handler: Mux,

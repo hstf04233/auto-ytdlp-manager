@@ -19,7 +19,7 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	NeedsLogin := false
 	
 	path := strings.TrimPrefix(r.URL.Path, "/")
-	if path == "logout" {
+	if path == "logout" && r.Method == "POST" {
 		AuthLogoutRequest(w, r)
 		return
 	}
