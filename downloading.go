@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"golang.org/x/crypto/sha3"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/sha3"
 
 	"github.com/google/uuid"
 	//"os/exec"
@@ -379,7 +381,8 @@ func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, e
 		return "", fmt.Errorf("The downloaded thumbnail is larger than 10MB...")
 	}
 	
-	ImageHash := fmt.Sprintf("%x", sha3.Sum256(ImageContent))
+	RawHash := sha3.Sum256(ImageContent)
+	ImageHash := base64.RawURLEncoding.EncodeToString(RawHash[0:32])
 	
 	if ImageContainer != "jpg" && ImageContainer != "png" {
 		// Auto convert webp and avif to jpeg (We don't want none of that yucky shit 🤣)

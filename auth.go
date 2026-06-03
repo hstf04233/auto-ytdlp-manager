@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/big"
@@ -327,7 +328,7 @@ func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
 		}
 	}
 	
-	ComputedHash := fmt.Sprintf("%x", Hash.Sum(nil))
+	ComputedHash := base64.RawURLEncoding.EncodeToString([]byte(Hash.Sum(nil)))
 	if QueryId == 0 {
 		Path += fmt.Sprintf("?%s=%s", AUTH_REQUEST_SIGN_QUERYNAME, ComputedHash)
 	} else {
@@ -356,8 +357,11 @@ func IsUserRequestSignedByServer(r *http.Request, Queries []string) bool {
 	Sr := r.URL.Query().Get("sr")
 	Hash.Write([]byte(Sr))
 	
-	ComputedHash := fmt.Sprintf("%x", Hash.Sum(nil))
-	if SignedHash == ComputedHash {
+	RawHash := Hash.Sum(nil)
+	
+	ComputedHash := base64.RawURLEncoding.EncodeToString(RawHash)
+	// TODO: TEMP!!!!!!!!! the `SignedHash == fmt.Sprintf("%x", RawHash)` is TEMPORARY!!! Please remove it.
+	if SignedHash == ComputedHash || SignedHash == fmt.Sprintf("%x", RawHash) {
 		return true
 	}
 	
