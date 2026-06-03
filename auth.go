@@ -300,14 +300,18 @@ type SQuery struct {
 	Value string
 }
 
-func GenerateSignUserRequest(LocalUrl string, Queries []SQuery) string {
+func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
 	SecretSaltHash := GetAuthSecretSaltHash()
 	
 	Path := LocalUrl
 	
-	Hash := sha3.New256()
+	Hash := sha3.New224()
 	Hash.Write([]byte(LocalUrl))
 	Hash.Write([]byte(SecretSaltHash))
+	
+	Queries = append(Queries, SQuery{
+		"sr", fmt.Sprintf("%04d", SRNG(0, 9999)),
+	})
 	
 	QueryId := 0
 	for _, Query := range(Queries) {
@@ -342,13 +346,15 @@ func IsUserRequestSignedByServer(r *http.Request, Queries []string) bool {
 	
 	SecretSaltHash := GetAuthSecretSaltHash()
 	
-	Hash := sha3.New256()
+	Hash := sha3.New224()
 	Hash.Write([]byte(r.URL.Path))
 	Hash.Write([]byte(SecretSaltHash))
 	for _, Query := range(Queries) {
 		Value := r.URL.Query().Get(Query)
 		Hash.Write([]byte(Value))
 	}
+	Sr := r.URL.Query().Get("sr")
+	Hash.Write([]byte(Sr))
 	
 	ComputedHash := fmt.Sprintf("%x", Hash.Sum(nil))
 	if SignedHash == ComputedHash {
