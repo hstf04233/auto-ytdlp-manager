@@ -1232,7 +1232,7 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
 	}
 	
-	ThrottledWriter := NewThrottledResponseWriter(w, 5_000)
+	ThrottledWriter := NewDynamicThrottledResponseWriter(w, r)
 	
 	http.ServeFile(ThrottledWriter, r, FilePath)
 	ThrottledWriter.Close()
@@ -1313,7 +1313,7 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	FilePath := filepath.Join(StreamedDirectory, RequestFile)
+	FilePath := filepath.Join(StreamedDirectory, filepath.Clean(RequestFile))
 	
 	if !DoesFileExist(FilePath) {
 		http.Error(w, fmt.Sprintf("Could not find file '%s'...", VideoInfo.DownloadedFilename), http.StatusNotFound)
@@ -1322,7 +1322,7 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 	Filename := filepath.Base(FilePath)
 	
 	if DownloadVal := r.URL.Query().Get("download"); DownloadVal != "" {
-		// User wants to download this video
+		// User wants to download this file
 		DownloadVal = strings.ToLower(DownloadVal)
 		if DownloadVal == "true" || DownloadVal == "1" || DownloadVal == "yes" {
 			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", Filename))
@@ -1333,7 +1333,10 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
 	}
 	
-	http.ServeFile(w, r, FilePath)
+	ThrottledWriter := NewDynamicThrottledResponseWriter(w, r)
+	
+	http.ServeFile(ThrottledWriter, r, FilePath)
+	ThrottledWriter.Close()
 }
 
 func ServeDBImage(w http.ResponseWriter, r *http.Request) {

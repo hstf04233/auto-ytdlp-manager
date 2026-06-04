@@ -19,6 +19,10 @@ const (
 	MAX_API_REQUESTS_PER_MINUTE    = 1_000
 )
 
+const (
+	RATE_LIMIT_KBPS_PER_IP = 10_000
+)
+
 type RateLimitInfo struct {
 	mutex sync.Mutex
 	
@@ -29,8 +33,16 @@ type RateLimitInfo struct {
 	LoginRequests int
 }
 
-var NETWORKING_RATELIMIT_INFOS = NewCache(time.Second * 60)
+type DynamicThrottledWriterInfo struct {
+	mutex sync.Mutex
+	
+	ActiveCount int
+	Writers []*ThrottledResponseWriter
+}
 
+var NETWORKING_RATELIMIT_INFOS = NewCache(time.Second * 60)
+var NETWORKING_DYNTHROTTLED_WRITERS = make(map[string]*DynamicThrottledWriterInfo)
+var N_DT_W_MUTEX = sync.RWMutex{}
 
 func GetRateLimitInfoFromRequest(r *http.Request) *RateLimitInfo {
 	IpAddress := GetIpAddressFromRequest(r)
@@ -99,7 +111,10 @@ type ThrottledResponseWriter struct {
 	http.ResponseWriter
 	kbps   int64
 	bytesUntilSleep int64
-	mu     sync.Mutex
+	mu      sync.Mutex
+	kbps_mu sync.Mutex
+	
+	DTWInfo *DynamicThrottledWriterInfo
 	
 	ticker *time.Ticker
 }
@@ -116,16 +131,61 @@ func NewThrottledResponseWriter(w http.ResponseWriter, kbps int) *ThrottledRespo
 	}
 }
 
+func GetDynThrottledWriterInfo(r *http.Request) *DynamicThrottledWriterInfo {
+	Ip := GetIpAddressFromRequest(r)
+	
+	N_DT_W_MUTEX.Lock()
+	defer N_DT_W_MUTEX.Unlock()
+	
+	Info, Exists := NETWORKING_DYNTHROTTLED_WRITERS[Ip]
+	if Exists {
+		return Info
+	}
+	
+	NewInfo := &DynamicThrottledWriterInfo{
+		
+	}
+	NETWORKING_DYNTHROTTLED_WRITERS[Ip] = NewInfo
+	
+	return NewInfo
+}
+func NewDynamicThrottledResponseWriter(w http.ResponseWriter, r *http.Request) *ThrottledResponseWriter {
+	NewThrottleWriter := &ThrottledResponseWriter{
+		ResponseWriter: w,
+		kbps: 1000,
+		
+		ticker: time.NewTicker(50 * time.Millisecond),
+	}
+	
+	DTWInfo := GetDynThrottledWriterInfo(r)
+	DTWInfo.mutex.Lock()
+	DTWInfo.ActiveCount += 1
+	DTWInfo.Writers = append(DTWInfo.Writers, NewThrottleWriter)
+	
+	NewThrottleWriter.DTWInfo = DTWInfo
+	
+	KBPS := RATE_LIMIT_KBPS_PER_IP
+	if DTWInfo.ActiveCount > 1 {
+		KBPS = KBPS / DTWInfo.ActiveCount
+	}
+	NewThrottleWriter.kbps = int64(KBPS)
+	
+	DTWInfo.mutex.Unlock()
+	
+	return NewThrottleWriter
+}
+
 // Write applies bandwidth throttling
 func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	
-	// bytes allowed per 50ms
-	bytesPerTick := (t.kbps * 1024 * 50) / 1000
 	totalWritten := 0
 	
 	for len(ToWrite) > 0 {
+		// bytes allowed per 50ms
+		t.mu.Lock()
+		t.kbps_mu.Lock()
+		bytesPerTick := (t.kbps * 1024 * 50) / 1000
+		t.kbps_mu.Unlock()
+		
 		AllowedCount := bytesPerTick
 		if int64(len(ToWrite)) < AllowedCount {
 			AllowedCount = int64(len(ToWrite))
@@ -136,11 +196,17 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 		ToWrite = ToWrite[n:]
 		
 		if err != nil {
+			t.mu.Unlock()
 			return totalWritten, err
+		}
+		
+		if t.bytesUntilSleep > bytesPerTick {  // kbps could have changed!
+			t.bytesUntilSleep = bytesPerTick
 		}
 		
 		t.bytesUntilSleep -= int64(n)
 		
+		t.mu.Unlock()
 		if t.bytesUntilSleep <= 0 {
 			t.bytesUntilSleep = bytesPerTick
 			//time.Sleep(time.Millisecond * 50)
@@ -154,6 +220,17 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 
 func (t *ThrottledResponseWriter) Close() {
 	t.ticker.Stop()
+	if t.DTWInfo != nil {
+		t.DTWInfo.mutex.Lock()
+		t.DTWInfo.ActiveCount -= 1
+		for index, Writer := range(t.DTWInfo.Writers) {
+			if Writer == t {
+				t.DTWInfo.Writers = append(t.DTWInfo.Writers[:index], t.DTWInfo.Writers[index+1:]...)
+				break
+			}
+		}
+		t.DTWInfo.mutex.Unlock()
+	}
 }
 
 func (t *ThrottledResponseWriter) Header() http.Header {
@@ -189,11 +266,61 @@ func GetIpAddressFromRequest(r *http.Request) string {
 		L_Printf("Unknown IpStrategy: %s\n", G_Config.IpStrategy)
 	}
 	
-	// IP_STRATEGY_DIRECT:
+	// Localhost or IP_STRATEGY_DIRECT:
 	
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
 	}
+	
+	if host == "::1" {
+		host = "127.0.0.1"
+	}
+	
 	return host
+}
+
+func init() {
+	go func() {
+		DeleteTick := 0
+		for {
+			time.Sleep(time.Second * 1)
+			DeleteTick -= 1
+			
+			N_DT_W_MUTEX.Lock()
+			
+			for Ip, DTWInfo := range(NETWORKING_DYNTHROTTLED_WRITERS) {
+				DTWInfo.mutex.Lock()
+				if DTWInfo.ActiveCount <= 0 && DeleteTick <= 0 {
+					DTWInfo.mutex.Unlock()
+					// Delete this info.
+					delete(NETWORKING_DYNTHROTTLED_WRITERS, Ip)
+					continue
+				}
+				
+				KBPS := RATE_LIMIT_KBPS_PER_IP
+				if DTWInfo.ActiveCount > 1 {
+					KBPS = KBPS / DTWInfo.ActiveCount
+					if KBPS <= 100 {
+						KBPS = 100
+					}
+				}
+				
+				L_Printf("Set kbps: %d, Active: %d\n", KBPS, DTWInfo.ActiveCount)
+				
+				for _, DynWriter := range(DTWInfo.Writers) {
+					DynWriter.kbps_mu.Lock()
+					DynWriter.kbps = int64(KBPS)
+					DynWriter.kbps_mu.Unlock()
+				}
+				
+				DTWInfo.mutex.Unlock()
+			}
+			N_DT_W_MUTEX.Unlock()
+			
+			if DeleteTick < 0 {
+				DeleteTick = 60
+			}
+		}
+	}()
 }
