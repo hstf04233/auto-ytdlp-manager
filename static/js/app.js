@@ -1371,6 +1371,7 @@ function clearVideoFilters(dontLoadVideos) {
   //document.getElementById('videoChannelFilter').value = '';
   document.getElementById('videoOrderBy').value = 'release_date';
   document.getElementById('videoOrderDirection').value = '-1';
+  videoSearchFilterUpdate(true);
   videoPage = 0;
   if (!areVideosLoading && !dontLoadVideos) {
     loadVideos();
@@ -1378,8 +1379,10 @@ function clearVideoFilters(dontLoadVideos) {
 }
 
 let videoSearchDidUpdate = false;
-function videoSearchFilterUpdate() {
-  videoSearchDidUpdate = true;
+function videoSearchFilterUpdate(brurhburh) {
+  if (!brurhburh) {
+    videoSearchDidUpdate = true;
+  }
   const videoSearchClearEl = document.getElementById("video-search-clear-btn");
   if (videoSearchClearEl) {
     let searchText = document.getElementById('videoSearch').value;
@@ -2093,7 +2096,7 @@ async function loadUser() {
 }
 
 async function init() {
-  videoSearchFilterUpdate();
+  videoSearchFilterUpdate(true);
   
   loadUser();
   loadConfig();
@@ -2133,19 +2136,6 @@ async function init() {
     }
   }, 10_000);
   
-  // Auto refresh tasks every 7.5s
-  setInterval(() => {
-    if (areTasksLoading || document.hidden) {
-      return;
-    }
-    
-    const tasksPage = document.getElementById('page-tasks');
-    if (tasksPage.classList.contains('active')) {
-      loadTasks();
-    }
-  }, 5_000);
-  
-  
   // Check search updates every 300ms (at best)
   setInterval(() => {
     if (areVideosLoading) {
@@ -2158,6 +2148,18 @@ async function init() {
       loadVideos();
     }
   }, 300);
+  
+  // Auto refresh tasks every 7.5s
+  setInterval(() => {
+    if (areTasksLoading || document.hidden) {
+      return;
+    }
+    
+    const tasksPage = document.getElementById('page-tasks');
+    if (tasksPage.classList.contains('active')) {
+      loadTasks();
+    }
+  }, 5_000);
 }
 
 async function quickToggleDisableAllChannels(cb) {
