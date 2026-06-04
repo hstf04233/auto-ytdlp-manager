@@ -1033,6 +1033,18 @@ function closeVideoDetailsModal() {
   let modalVideoPreview = document.getElementById('modal-video-preview');
   if (modalVideoPreview) {
     // Remove any video playing
+    
+    const videoElement = modalVideoPreview.querySelector("video");
+    if (videoElement) {
+      videoElement.pause();
+      
+      videoElement.removeAttribute('src');
+      videoElement.src = '';
+      while (videoElement.firstChild) {
+        videoElement.removeChild(videoElement.firstChild);
+      }
+    }
+    
     modalVideoPreview.innerHTML = "";
   }
   
@@ -1371,10 +1383,12 @@ function clearVideoFilters(dontLoadVideos) {
   //document.getElementById('videoChannelFilter').value = '';
   document.getElementById('videoOrderBy').value = 'release_date';
   document.getElementById('videoOrderDirection').value = '-1';
-  videoSearchFilterUpdate(true);
+  videoSearchFilterUpdate();
   videoPage = 0;
   if (!areVideosLoading && !dontLoadVideos) {
     loadVideos();
+  } else if (!dontLoadVideos) {
+    videoSearchDidUpdate = true;
   }
 }
 
