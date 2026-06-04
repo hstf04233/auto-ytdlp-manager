@@ -25,6 +25,17 @@ var (
 
 var HttpServer *http.Server
 
+func RateLimitMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if RateLimitRequest(w, r, RATE_LIMIT_BUCKET_GLOBAL) {
+			// This request was rate limited.
+			return
+		}
+		
+		next.ServeHTTP(w, r)
+	})
+}
+
 func StartServer(ServerPort int) {
 	Mux := http.NewServeMux()
 	
@@ -41,7 +52,7 @@ func StartServer(ServerPort int) {
 	
 	HttpServer = &http.Server{
 		Addr: fmt.Sprintf(":%d", ServerPort),
-		Handler: Mux,
+		Handler: RateLimitMiddleware(Mux),
 	}
 	
 	L_Printf("Starting server at http://localhost:%d\n", ServerPort)

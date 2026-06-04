@@ -30,6 +30,9 @@ func (c *Cache) Set(Key string, Value interface{}) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	
+	c.SetNoMutex(Key, Value)
+}
+func (c *Cache) SetNoMutex(Key string, Value interface{}) {
 	c.items[Key] = cacheItem{
 		value: Value,
 		expireMS: time.Now().Add(c.duration).UnixMilli(),
@@ -50,6 +53,9 @@ func (c *Cache) Get(Key string) (interface{}, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	
+	return c.GetNoMutex(Key)
+}
+func (c *Cache) GetNoMutex(Key string) (interface{}, bool) {
 	item, ok := c.items[Key]
 	if !ok || time.Now().UnixMilli() > item.expireMS {
 		// Item doesn't exist or has expired.

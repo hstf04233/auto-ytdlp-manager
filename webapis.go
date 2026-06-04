@@ -1029,6 +1029,8 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func ServeApi(w http.ResponseWriter, r *http.Request) {
+	if RateLimitRequest(w, r, RATE_LIMIT_BUCKET_API) { return }
+	
 	r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/")
 	Path := r.URL.Path
 	Method := r.Method
@@ -1230,7 +1232,10 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
 	}
 	
-	http.ServeFile(w, r, FilePath)
+	ThrottledWriter := NewThrottledResponseWriter(w, 5_000)
+	
+	http.ServeFile(ThrottledWriter, r, FilePath)
+	ThrottledWriter.Close()
 }
 
 func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
@@ -1332,6 +1337,8 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 }
 
 func ServeDBImage(w http.ResponseWriter, r *http.Request) {
+	if RateLimitRequest(w, r, RATE_LIMIT_BUCKET_GLOBAL) { return }
+	
 	ImageId := path.Base(r.URL.Path)
 	if len(ImageId) > API_MAX_REQUEST_ID {
 		http.Error(w, "Invalid image.", http.StatusBadRequest)

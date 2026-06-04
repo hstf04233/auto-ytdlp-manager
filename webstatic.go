@@ -16,6 +16,8 @@ var WebStaticContent embed.FS
 var ProgramStartTime = time.Now().UTC()
 
 func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
+	if RateLimitRequest(w, r, RATE_LIMIT_BUCKET_GLOBAL) { return }
+	
 	NeedsLogin := false
 	
 	path := strings.TrimPrefix(r.URL.Path, "/")

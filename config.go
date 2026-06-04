@@ -30,6 +30,13 @@ const (
 	MAX_CHANNEL_LISTING_LIFETIME = (60*60*24)      // 1 Day
 )
 
+const (
+	IP_STRATEGY_DIRECT     = "direct"
+	IP_STRATEGY_CLOUDFLARE = "cloudflare"
+	IP_STRATEGY_REALIP     = "real_ip"
+	IP_STRATEGY_FORWARDED  = "forwarded"
+)
+
 var (
 	GLOBAL_YT_DLP_CONFIG_PATH = ""
 )
@@ -39,6 +46,7 @@ type ProgramConfig struct {
 	ConfigFile *os.File `json:"-"`
 	
 	ServerPort uint16
+	IpStrategy string
 	
 	YtDlp_Path     string
 	YtArchive_Path string
@@ -72,6 +80,7 @@ type ProgramConfig struct {
 var G_Config = &ProgramConfig{
 	Mutex: &sync.RWMutex{},
 	ServerPort: DEFAULT_SERVER_PORT,
+	IpStrategy: IP_STRATEGY_DIRECT,
 	
 	YtDlp_Path:     "yt-dlp",
 	YtArchive_Path: "ytarchive",

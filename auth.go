@@ -377,7 +377,10 @@ func HashRawPassword(RawPassword string) string {
 }
 
 func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
-	// TODO: IP based rate limiting
+	if TestRateLimitForRequest(w, r, RATE_LIMIT_BUCKET_LOGIN) {
+		http.Error(w, "Too many log in attempts, try again in a few minutes.", http.StatusTooManyRequests)
+		return
+	}
 	
 	// :Login_time_attack
 	// This is to prevent timing attacks!
