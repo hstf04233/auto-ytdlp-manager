@@ -320,8 +320,6 @@ func init() {
 					}
 				}
 				
-				L_Printf("Set kbps: %d, Active: %d\n", KBPS, RealActiveCount)
-				
 				for _, DynWriter := range(DTWInfo.Writers) {
 					DynWriter.kbps_mu.Lock()
 					DynWriter.kbps = int64(KBPS)

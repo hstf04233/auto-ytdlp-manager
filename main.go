@@ -32,9 +32,6 @@ func RateLimitMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		
-		// TEMP!!!:
-		L_Printf("[%s] is requesting path: %s\n", GetIpAddressFromRequest(r), r.URL.Path)
-		
 		next.ServeHTTP(w, r)
 	})
 }
