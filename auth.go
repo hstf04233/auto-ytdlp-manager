@@ -647,6 +647,18 @@ func OpenAuthDB() error {
 	return nil
 }
 
+func AuthDB_Close() {
+	if G_AUTHDB != nil {
+		L_Printf("Closing auth database...\n")
+		err := G_AUTHDB.Close()
+		if err != nil {
+			L_Printf("Failed to Closing auth database... Error: %v\n", err)
+		} else {
+			L_Printf("Auth database closed successfully.\n")
+		}
+	}
+}
+
 
 func init() {
 	if APPLICATION_VERSION_TYPE == "debug" {

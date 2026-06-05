@@ -171,5 +171,6 @@ func main() {
 	}
 	*/
 	DB_Close()
+	AuthDB_Close()
 	
 }
