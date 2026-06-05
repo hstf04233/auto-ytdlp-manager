@@ -114,6 +114,8 @@ type ThrottledResponseWriter struct {
 	mu      sync.Mutex
 	kbps_mu sync.Mutex
 	
+	LastWriteTime time.Time
+	
 	DTWInfo *DynamicThrottledWriterInfo
 	
 	ticker *time.Ticker
@@ -132,19 +134,17 @@ func NewThrottledResponseWriter(w http.ResponseWriter, kbps int) *ThrottledRespo
 }
 
 func GetDynThrottledWriterInfo(r *http.Request) *DynamicThrottledWriterInfo {
-	Ip := GetIpAddressFromRequest(r)
-	
 	N_DT_W_MUTEX.Lock()
 	defer N_DT_W_MUTEX.Unlock()
+	
+	Ip := GetIpAddressFromRequest(r)
 	
 	Info, Exists := NETWORKING_DYNTHROTTLED_WRITERS[Ip]
 	if Exists {
 		return Info
 	}
 	
-	NewInfo := &DynamicThrottledWriterInfo{
-		
-	}
+	NewInfo := &DynamicThrottledWriterInfo{}
 	NETWORKING_DYNTHROTTLED_WRITERS[Ip] = NewInfo
 	
 	return NewInfo
@@ -182,6 +182,7 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 	for len(ToWrite) > 0 {
 		// bytes allowed per 50ms
 		t.mu.Lock()
+		
 		t.kbps_mu.Lock()
 		bytesPerTick := (t.kbps * 1024 * 50) / 1000
 		t.kbps_mu.Unlock()
@@ -191,14 +192,17 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 			AllowedCount = int64(len(ToWrite))
 		}
 		
+		t.LastWriteTime = time.Now()
+		
+		t.mu.Unlock()
 		n, err := t.ResponseWriter.Write(ToWrite[:AllowedCount])
 		totalWritten += n
 		ToWrite = ToWrite[n:]
 		
 		if err != nil {
-			t.mu.Unlock()
 			return totalWritten, err
 		}
+		t.mu.Lock()
 		
 		if t.bytesUntilSleep > bytesPerTick {  // kbps could have changed!
 			t.bytesUntilSleep = bytesPerTick
@@ -206,12 +210,13 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 		
 		t.bytesUntilSleep -= int64(n)
 		
-		t.mu.Unlock()
 		if t.bytesUntilSleep <= 0 {
+			t.mu.Unlock()
 			t.bytesUntilSleep = bytesPerTick
-			//time.Sleep(time.Millisecond * 50)
 			
 			<-t.ticker.C  // Wait for 50ms
+		} else {
+			t.mu.Unlock()
 		}
 	}
 	
@@ -284,7 +289,7 @@ func init() {
 	go func() {
 		DeleteTick := 0
 		for {
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Millisecond * 500)
 			DeleteTick -= 1
 			
 			N_DT_W_MUTEX.Lock()
@@ -299,14 +304,23 @@ func init() {
 				}
 				
 				KBPS := RATE_LIMIT_KBPS_PER_IP
+				RealActiveCount := 0
 				if DTWInfo.ActiveCount > 1 {
-					KBPS = KBPS / DTWInfo.ActiveCount
+					TimeNowMS := time.Now().UnixMilli()
+					for _, DynWriter := range(DTWInfo.Writers) {
+						DynWriter.mu.Lock()
+						if DynWriter.LastWriteTime.UnixMilli()+499 > TimeNowMS {
+							RealActiveCount += 1
+						}
+						DynWriter.mu.Unlock()
+					}
+					KBPS = KBPS / max(RealActiveCount, 1)
 					if KBPS <= 100 {
 						KBPS = 100
 					}
 				}
 				
-				L_Printf("Set kbps: %d, Active: %d\n", KBPS, DTWInfo.ActiveCount)
+				L_Printf("Set kbps: %d, Active: %d\n", KBPS, RealActiveCount)
 				
 				for _, DynWriter := range(DTWInfo.Writers) {
 					DynWriter.kbps_mu.Lock()
