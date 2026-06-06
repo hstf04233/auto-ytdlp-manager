@@ -1167,9 +1167,10 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if !IsAuthorized {
-		// TODO: Check if it's local host accessing this file.
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		if !IsIpAddressLocal(GetIpAddressFromRequest(r)) {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 	}
 	
 	if ExpiresStr := r.URL.Query().Get("expires_ms"); ExpiresStr != "" {
@@ -1252,9 +1253,10 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if !IsAuthorized {
-		// TODO: Check if it's local host accessing this file.
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+		if !IsIpAddressLocal(GetIpAddressFromRequest(r)) {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 	}
 	
 	if ExpiresStr := r.URL.Query().Get("expires_ms"); ExpiresStr != "" {
