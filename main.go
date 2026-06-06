@@ -25,11 +25,29 @@ var (
 
 var HttpServer *http.Server
 
-func RateLimitMiddleware(next http.Handler) http.Handler {
+func SecurityMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if RateLimitRequest(w, r, RATE_LIMIT_BUCKET_GLOBAL) {
 			// This request was rate limited.
 			return
+		}
+		
+		if false {
+			L_Printf("-------- %s | %s --------\n", GetIpAddressFromRequest(r), r.RequestURI)
+			
+			for Key, Value := range(r.Header) {
+				Pn := fmt.Sprintf(" Key: %s: ", Key)
+				for _, Str := range(Value) {
+					Pn += fmt.Sprintf("%s ", Str)
+				}
+				
+				L_Printf("%s\n", Pn)
+			}
+			L_Printf("\n")
+		}
+		
+		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		
 		next.ServeHTTP(w, r)
@@ -52,7 +70,7 @@ func StartServer(ServerPort int) {
 	
 	HttpServer = &http.Server{
 		Addr: fmt.Sprintf(":%d", ServerPort),
-		Handler: RateLimitMiddleware(Mux),
+		Handler: SecurityMiddleware(Mux),
 	}
 	
 	L_Printf("Starting server at http://localhost:%d\n", ServerPort)
