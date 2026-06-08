@@ -3,7 +3,11 @@
 package os_tings
 
 import (
+	"fmt"
+	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 )
 
 // This will open a file in read only mode and will not lock the file which means it can be deleted by another process
@@ -15,4 +19,25 @@ func OpenFileWithoutLocking(FilePath string) (*os.File, error) {
 	}
 	
 	return File, nil
+}
+
+func GetPipeName(PipeName string) string {
+	// It's a unix system
+	return filepath.Join("/tmp", PipeName)
+}
+
+func CreatePipe(PipeName string) (io.WriteCloser, error) {
+	// Remove old pipe if exists
+	os.Remove(PipeName)
+	
+	// Create FIFO on Unix
+	cmd := exec.Command("mkfifo", PipeName)
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to create fifo %s: %v", PipeName, err)
+	}
+	return os.OpenFile(PipeName, os.O_WRONLY, 0666)
+}
+
+func OpenPipe(PipeName string) (io.WriteCloser, error) {
+	return os.OpenFile(PipeName, os.O_WRONLY, 0666)
 }

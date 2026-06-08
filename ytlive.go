@@ -8,13 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
-
+	
 	"autoytdlpmanager/os_tings"
-
-	"github.com/natefinch/npipe" // Only used on Windows
 )
 
 type ytarchive_State struct {
@@ -136,45 +133,9 @@ func Get_ytarchive_VideoAndAudioDownloadFiles(State ytarchive_State) (ytarchive_
 	return VideoAndAudio, false
 }
 
-func GetPipeName(PipeName string) string {
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf(`\\.\pipe\%s`, PipeName)
-	}
-	
-	// It's a unix system
-	return filepath.Join("/tmp", PipeName)
-}
-
-func CreatePipe(PipeName string) (io.WriteCloser, error) {
-	if runtime.GOOS == "windows" {
-		listener, err := npipe.Listen(PipeName)
-		if err != nil {
-			return nil, err
-		}
-		// Accept one connection (FFmpeg will connect as client)
-		return listener.Accept()
-	}
-	
-	// Remove old pipe if exists
-	os.Remove(PipeName)
-	
-	// Create FIFO on Unix
-	cmd := exec.Command("mkfifo", PipeName)
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to create fifo %s: %v", PipeName, err)
-	}
-	return os.OpenFile(PipeName, os.O_WRONLY, 0666)
-}
-
-func OpenPipe(PipeName string) (io.WriteCloser, error) {
-	if runtime.GOOS == "windows" {
-		return npipe.DialTimeout(PipeName, time.Second * 5)
-	}
-	return os.OpenFile(PipeName, os.O_WRONLY, 0666)
-}
 
 func ReadFileAndWriteToPipe(PipeName string, InputFile *os.File, DownloadTask *CommandTask, Task *CommandTask) {
-	VideoPipe, err := CreatePipe(PipeName)
+	VideoPipe, err := os_tings.CreatePipe(PipeName)
 	if err != nil {
 		L_Printf("Failed to create pipe: '%s': %v", PipeName, err)
 		return
@@ -236,8 +197,8 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	}
 	defer AudioFile.Close()
 	
-	Pipe1Name := GetPipeName(fmt.Sprintf("video_pipe_%s", VideoId))
-	Pipe2Name := GetPipeName(fmt.Sprintf("audio_pipe_%s", VideoId))
+	Pipe1Name := os_tings.GetPipeName(fmt.Sprintf("video_pipe_%s", VideoId))
+	Pipe2Name := os_tings.GetPipeName(fmt.Sprintf("audio_pipe_%s", VideoId))
 	
 	VideoInDB, err := DB_GetVideo(VideoId)
 	if VideoInDB != nil && err == nil && VideoInDB.StreamedDirectory != "" {

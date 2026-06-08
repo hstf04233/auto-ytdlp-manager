@@ -3,7 +3,12 @@
 package os_tings
 
 import (
+	"fmt"
+	"io"
 	"os"
+	"time"
+
+	"github.com/natefinch/npipe" // Only used on Windows
 	"golang.org/x/sys/windows"
 )
 
@@ -32,4 +37,21 @@ func OpenFileWithoutLocking(FilePath string) (*os.File, error) {
 	File := os.NewFile(uintptr(handle), FilePath)
 	
 	return File, nil
+}
+
+func GetPipeName(PipeName string) string {
+	return fmt.Sprintf(`\\.\pipe\%s`, PipeName)
+}
+
+func CreatePipe(PipeName string) (io.WriteCloser, error) {
+	listener, err := npipe.Listen(PipeName)
+	if err != nil {
+		return nil, err
+	}
+	// Accept one connection (FFmpeg will connect as client)
+	return listener.Accept()
+}
+
+func OpenPipe(PipeName string) (io.WriteCloser, error) {
+	return npipe.DialTimeout(PipeName, time.Second * 5)
 }
