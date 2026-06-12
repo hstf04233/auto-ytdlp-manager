@@ -359,7 +359,7 @@ func init() {
 				
 				DTWInfo.TargetKBPS = KBPS
 				
-				L_Printf("Set kbps: %d, Active: %d\n", KBPS, RealActiveCount)
+				//L_Printf("Set kbps: %d, Active: %d\n", KBPS, RealActiveCount)
 				
 				for _, DynWriter := range(DTWInfo.Writers) {
 					DynWriter.kbps_mu.Lock()

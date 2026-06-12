@@ -233,6 +233,4 @@ func init() {
 		panic(err)
 		return
 	}
-	
-	L_Printf("Index.html is: %s\n", WebStatic_INDEX_HTML)
 }
