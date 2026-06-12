@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auto yt-dlp Manager</title>
   <link rel="icon" href="/favicon.ico" type="image/png">
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/{{ .StyleCssPath }}">
 </head>
 <body>
   <div class="sidebar">
@@ -526,8 +526,8 @@
   </div>
   
   <script src="/static/js/requires/hls.min.js"></script>
-  <script src="/static/js/app.js"></script>
-  <script src="/static/js/chat.js"></script>
+  <script src="/static/{{ .AppJsPath }}"></script>
+  <script src="/static/{{ .ChatJsPath }}"></script>
   
   <noscript>
     <div class="modal-overlay active">
