@@ -76,7 +76,7 @@ let areTasksLoading    = false;
 
 let programConfig = {};
 let allChannels = [];
-let allVideos = [];
+let currentVideos = [];
 let videoPage = 0;
 let videoTotalCount = 0;
 let videoStats = {};
@@ -143,7 +143,8 @@ function showPage(page, dontSaveHistory) {
     pageDoc.classList.add('active');
   }
   
-  const urlParams = new URLSearchParams(new URL(page, window.location.origin).search);
+  const url = new URL(page, window.location.origin)
+  const urlParams = new URLSearchParams(url.search);
   
   if (basePage === 'videos') {
     if (urlParams.has("channel")) {
@@ -159,6 +160,12 @@ function showPage(page, dontSaveHistory) {
     if (!areVideosLoading) {
       loadVideos();
     }
+  }
+  if (basePage.startsWith("video/")) {
+    const pathArgs = url.pathname.split("/").filter(Boolean);
+    const videoId = pathArgs[1];
+    
+    openVideoDetailsModal(videoId);
   }
   if (basePage === 'tasks') {
     if (urlParams.has("channel")) {
@@ -377,7 +384,7 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
     closeStatusDropdown();
     return;
   }
-  const videoData = allVideos.find(x => x.id === videoId);
+  const videoData = currentVideos.find(x => x.id === videoId);
   
   statusDropdownIsActive = true;
   const rect = buttonEl.getBoundingClientRect();
@@ -421,7 +428,7 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
 
 async function changeVideoStatus(videoId, newStatus) {
   try {
-    const videoData = allVideos.find(x => x.id === videoId);
+    const videoData = currentVideos.find(x => x.id === videoId);
     if (newStatus == -100) {
       // Download this video
       if (!videoData) return;
@@ -930,7 +937,7 @@ async function copySharedVideoFile(videoId) {
     
     navigator.clipboard.writeText(fullLocation);
     if (isLocalhost) {
-      showToast(`Copied to clipboard while in localhost... Please edit the shared link to your public website.`, "success");
+      showToast(`Copied to clipboard while in localhost... Please edit the shared link to your public website.`, "error");
     } else {
       showToast(`Copied to clipboard: ${sharedLink}`, "success");
     }
@@ -939,33 +946,55 @@ async function copySharedVideoFile(videoId) {
   }
 }
 
-function openVideoDetailsModal(videoId) {
-  const v = allVideos.find(x => x.id === videoId);
-  if (!v) return;
+async function openVideoDetailsModal(videoId) {
+  document.getElementById('videoDetailsContent').innerHTML = `Loading video...`
   
-  currentVideoDetails = v;
+  document.getElementById('videoDetailsModal').classList.add('active');
+  document.body.classList.add('modal-active');
+  
+  let videoInfo = currentVideos.find(x => x.id === videoId);
+  if (!videoInfo) {
+    try {
+      const returnedVideoInfo = await API.get(`/api/videos/${videoId}`);
+      
+      if (returnedVideoInfo) {
+        videoInfo = returnedVideoInfo;
+      }
+    } catch (err) {
+      showToast(`Failed to get video, error: ${err.message}`, "error");
+    }
+  };
+  if (!videoInfo) {
+    // showToast(`Failed to copy shared video file, error: ${err.message}`, "error");
+    
+    document.getElementById('videoDetailsModal').classList.remove('active');
+    document.body.classList.remove('modal-active');
+    return
+  }
+  
+  currentVideoDetails = videoInfo;
 
-  const channel = getChannelFromId(v.from_channel);
+  const channel = getChannelFromId(videoInfo.from_channel);
   const channelName = channel ? escHtml(channel.name) : 'Unknown Channel';
   const channelUrl = channel ? escHtml(channel.url) : '';
 
-  const resolutionParts = (v.resolution || '').split('x');
+  const resolutionParts = (videoInfo.resolution || '').split('x');
   const resolutionText = resolutionParts.length === 2
     ? `${resolutionParts[0].trim()} x ${resolutionParts[1].trim()}`
-    : (v.resolution || '\u2014');
+    : (videoInfo.resolution || '\u2014');
 
-  const descHtml = v.description
-    ? escHtml(v.description).replace(/\n/g, '<br>')
+  const descHtml = videoInfo.description
+    ? escHtml(videoInfo.description).replace(/\n/g, '<br>')
     : '\u2014';
   
-  const videoIsPlayable = (v.videofile_exists || (v.video_stream_url && v.video_stream_url !== ""))
+  const videoIsPlayable = (videoInfo.videofile_exists || (videoInfo.video_stream_url && videoInfo.video_stream_url !== ""))
   
   let videoPreviewOnClick = "";
   if (videoIsPlayable) {
     videoPreviewOnClick = `event.preventDefault(); videoPreviewClick('${videoId}');`;
   }
   
-  var thumbnailUrl = getThumbnail(v);
+  var thumbnailUrl = getThumbnail(videoInfo);
   
   document.getElementById('videoDetailsContent').innerHTML = `
     <div class="vd-preview" id="modal-video-preview">
@@ -975,23 +1004,23 @@ function openVideoDetailsModal(videoId) {
       </img>
       <div class="vd-preview-placeholder" style="display:none">No thumbnail</div>
     </div>
-    <h3 class="vd-title">${escHtml(v.title)}</h3>
-    ${v.uploader ? `<p class="vd-header">Uploader: <a href="${escHtml(v.uploader_url)}" target="_blank">${escHtml(v.uploader)}</a></p>` : ''}
-    <p class="vd-header">${escHtml(v.availability)}</p>
+    <h3 class="vd-title">${escHtml(videoInfo.title)}</h3>
+    ${videoInfo.uploader ? `<p class="vd-header">Uploader: <a href="${escHtml(videoInfo.uploader_url)}" target="_blank">${escHtml(videoInfo.uploader)}</a></p>` : ''}
+    <p class="vd-header">${escHtml(videoInfo.availability)}</p>
     <hr>
     <div class="vd-grid">
       <div class="vd-field"><span class="vd-field-label">Channel</span><span class="vd-field-value">${escHtml(channelName)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Video ID</span><span class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(v.id)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Video URL</span><a href="${escHtml(v.url)}" target="_blank" class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(v.url)}</a></div>
-      <div class="vd-field"><span class="vd-field-label">Duration</span><span class="vd-field-value">${formatDuration(v.duration)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Video Type</span><span class="vd-field-value">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : '\u2014'}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Status</span><span class="vd-field-value">${videoStatusBadge(v.id, v.status)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Filename ${(v.videofile_exists || !v.filename || v.status == 1) ? '' : '(Moved or deleted)'}</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(v.filename || '\u2014')}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Filesize</span><span class="vd-field-value">${formatBytesSize(v.filesize || 0)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Video ID</span><span class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(videoInfo.id)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Video URL</span><a href="${escHtml(videoInfo.url)}" target="_blank" class="vd-field-value" style="font-family:monospace;font-size:0.8rem">${escHtml(videoInfo.url)}</a></div>
+      <div class="vd-field"><span class="vd-field-label">Duration</span><span class="vd-field-value">${formatDuration(videoInfo.duration)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Video Type</span><span class="vd-field-value">${videoInfo.video_type !== undefined ? videoTypeBadge(videoInfo.video_type) : '\u2014'}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Status</span><span class="vd-field-value">${videoStatusBadge(videoInfo.id, videoInfo.status)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Filename ${(videoInfo.videofile_exists || !videoInfo.filename || videoInfo.status == 1) ? '' : '(Moved or deleted)'}</span><span class="vd-field-value" style="font-family:monospace;font-size:0.78rem;word-break:break-all">${escHtml(videoInfo.filename || '\u2014')}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Filesize</span><span class="vd-field-value">${formatBytesSize(videoInfo.filesize || 0)}</span></div>
       <div class="vd-field"><span class="vd-field-label">Resolution</span><span class="vd-field-value">${resolutionText}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Release Date</span><span class="vd-field-value">${formatDateAndTime(v.release_date)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Added</span><span class="vd-field-value">${formatDateAndTime(v.added_at)}</span></div>
-      <div class="vd-field"><span class="vd-field-label">Updated</span><span class="vd-field-value">${formatDateAndTime(v.updated_at)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Release Date</span><span class="vd-field-value">${formatDateAndTime(videoInfo.release_date)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Added</span><span class="vd-field-value">${formatDateAndTime(videoInfo.added_at)}</span></div>
+      <div class="vd-field"><span class="vd-field-label">Updated</span><span class="vd-field-value">${formatDateAndTime(videoInfo.updated_at)}</span></div>
     </div>
 
     
@@ -1001,26 +1030,23 @@ function openVideoDetailsModal(videoId) {
     </div>
   `;
 
-  const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
-  const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
+  const refreshDisabled = videoInfo.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
+  const refreshTitle = videoInfo.refresh_state ? 'Refreshing...' : 'Refresh metadata';
 
   document.getElementById('videoDetailsActions').innerHTML = `
     ${
-      v.videofile_exists ?
-    `<a href="/video-file/${escHtml(v.id)}?download=true" target="_blank" class="btn btn-secondary btn-sm" title="Download video file">Download Video</a>` :
+      videoInfo.videofile_exists ?
+    `<a href="/video-file/${escHtml(videoInfo.id)}?download=true" target="_blank" class="btn btn-secondary btn-sm" title="Download video file">Download Video</a>` :
     ''
     }
     ${
-      v.videofile_exists ?
-    `<button type="button" class="btn btn-secondary btn-sm" class="btn btn-secondary btn-sm" onclick="copySharedVideoFile('${v.id}')" title="Copy shared video file link to clipboard">Share video file link</a>` :
+      videoInfo.videofile_exists ?
+    `<button type="button" class="btn btn-secondary btn-sm" class="btn btn-secondary btn-sm" onclick="copySharedVideoFile('${videoInfo.id}')" title="Copy shared video file link to clipboard">Share video file link</a>` :
     ''
     }
-    <button type="button" class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}');closeVideoDetailsModal();" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
-    <button type="button" class="btn btn-danger btn-sm" onclick="deleteVideo('${v.id}');closeVideoDetailsModal();">Delete</button>
+    <button type="button" class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${videoInfo.id}');closeVideoDetailsModal();" title="${refreshTitle}">${videoInfo.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
+    <button type="button" class="btn btn-danger btn-sm" onclick="deleteVideo('${videoInfo.id}');closeVideoDetailsModal();">Delete</button>
   `;
-
-  document.getElementById('videoDetailsModal').classList.add('active');
-  document.body.classList.add('modal-active');
 }
 
 function closeVideoDetailsModal() {
@@ -1274,9 +1300,9 @@ async function loadVideos() {
     }
     
     const data = await API.get(url);
-    allVideos = data.videos || data;
+    currentVideos = data.videos || data;
     videoStats = data.stats || {};
-    videoTotalCount = videoStats.total || allVideos.length;
+    videoTotalCount = videoStats.total || currentVideos.length;
     renderVideos();
     renderVideoPagination();
     updateVideoStats();
@@ -1306,12 +1332,12 @@ function filterVideosTabByChannel(channelId) {
 function renderVideos() {
   const container = document.getElementById('videosList');
 
-  if (allVideos.length === 0) {
+  if (currentVideos.length === 0) {
     container.innerHTML = '<div class="loading">No videos found.</div>';
     return;
   }
 
-  container.innerHTML = allVideos.map(v => {
+  container.innerHTML = currentVideos.map(v => {
     var thumbnailUrl = getThumbnail(v);
     var durationText = formatDuration(v.duration)
     if (v.video_type == 2 && (v.duration <= 1)) {  // VIDEO_TYPE_ISLIVE
@@ -1459,7 +1485,7 @@ function renderVideoPagination() {
     currentPage: videoPage,
     totalPages: totalPages,
     totalCount: videoTotalCount,
-    currentItems: allVideos.length,
+    currentItems: currentVideos.length,
     label: 'videos',
     cbsId: cbsId,
   });
@@ -2114,7 +2140,7 @@ async function init() {
   
   loadUser();
   loadConfig();
-  loadChannels();
+  await loadChannels();
   
   const lastTab = window.location.pathname.replace(/^\//, '') || 'channels';
   showPage(lastTab + window.location.search, true)
