@@ -18,6 +18,7 @@ yt-stream-manager.exe
 yt-stream-manager-debug.exe
 autoytdlpmanager.exe
 autoytdlpmanager-debug.exe
+autoytdlpmanager
 
 # Debug stuff ignore
 test-chat-output - Copy.json
