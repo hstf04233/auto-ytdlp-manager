@@ -565,6 +565,9 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	Stats, err := DB_GetVideoStatsFromQuery(Query)
 	
 	for _, Video := range(VideosList) {
+		// Don't share description when listing... (Cut down on the amount of data sent)
+		Video.Description = ""
+		
 		API_SpiceUpVideoInfo(w, r, Video)
 	}
 	

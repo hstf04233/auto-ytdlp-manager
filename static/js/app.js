@@ -80,7 +80,7 @@ let currentVideos = [];
 let videoPage = 0;
 let videoTotalCount = 0;
 let videoStats = {};
-const VIDEO_PAGE_SIZE = 30;
+const VIDEO_PAGE_SIZE = 20;
 
 let lastPageOpen = ''
 let _pgCallbacks = {}
@@ -952,7 +952,8 @@ async function openVideoDetailsModal(videoId) {
   document.getElementById('videoDetailsModal').classList.add('active');
   document.body.classList.add('modal-active');
   
-  let videoInfo = currentVideos.find(x => x.id === videoId);
+  //let videoInfo = currentVideos.find(x => x.id === videoId);
+  let videoInfo = null;
   if (!videoInfo) {
     try {
       const returnedVideoInfo = await API.get(`/api/videos/${videoId}`);
@@ -1397,7 +1398,7 @@ function renderVideos() {
             ''
           }
           <button class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
-          <button class="btn btn-secondary btn-sm" onclick="openVideoDetailsModal('${v.id}')">Details</button>
+          <a class="btn btn-secondary btn-sm" href="/video/${v.id}" onclick="event.preventDefault(); openVideoDetailsModal('${v.id}');">Details</a>
           <button class="btn btn-danger btn-sm" title="Deleting a video does not remove the video file." onclick="deleteVideo('${v.id}')">Delete</button>
         </div>
       </div>
