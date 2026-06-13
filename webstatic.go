@@ -63,9 +63,9 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if path == "favicon.ico" {
-		path = "favicon.png"
+		path = "images/favicon.png"
 		if APPLICATION_VERSION_TYPE == "debug" {
-			path = "favicon_debog.png"
+			path = "images/favicon_debog.png"
 		}
 	} else if path == "" || path == "/" {
 		path = "index.html"
