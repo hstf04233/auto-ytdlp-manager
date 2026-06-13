@@ -1134,6 +1134,8 @@ function openEditChannelModal(id) {
   document.getElementById('channelCheckInterval').value = ch.check_interval || '';
   document.getElementById('channelPlaylistEnd').value = ch.playlist_end;
   document.getElementById('channelSubmitBtn').textContent = 'Save Changes';
+  
+  document.body.classList.add('modal-active');
   document.getElementById('channelModal').classList.add('active');
   
   updateChannelModalPlaceholders();
