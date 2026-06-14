@@ -1286,7 +1286,7 @@ async function loadVideos() {
     const orderBy = document.getElementById('videoOrderBy').value;
     const orderDir = document.getElementById('videoOrderDirection').value;
     
-    let url = `/api/videos?limit=${VIDEO_PAGE_SIZE}&offset=${videoPage * VIDEO_PAGE_SIZE}`;
+    let url = `/api/videos?limit=${VIDEO_PAGE_SIZE}&page=${videoPage}`;
     if (statusFilter !== '') {
       url += `&status=${statusFilter}`;
     }
@@ -1814,7 +1814,7 @@ async function loadTasks() {
     const orderBy  = document.getElementById('taskOrderBy').value;
     const orderDir = document.getElementById('taskOrderDirection').value;
     
-    let url = `/api/tasks?limit=${TASK_PAGE_SIZE}&offset=${taskPage * TASK_PAGE_SIZE}`;
+    let url = `/api/tasks?limit=${TASK_PAGE_SIZE}&page=${taskPage}`;
     if (statusFilter !== '') {
       url += `&status=${statusFilter}`;
     }

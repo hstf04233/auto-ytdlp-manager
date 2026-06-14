@@ -507,9 +507,14 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		} else if Limit < 0 {
 			Limit = 50
 		}
+		
+		if Limit == -1 || Limit > 100 {
+			Limit = 100
+		}
 	}
-	if o := r.URL.Query().Get("offset"); o != "" {
-		Offset, _ = strconv.Atoi(o)
+	if p := r.URL.Query().Get("page"); p != "" {
+		Page, _ := strconv.Atoi(p)
+		Offset = Limit*Page
 	}
 	if fc := r.URL.Query().Get("from_channel"); fc != "" {
 		FromChannelId = fc
@@ -539,9 +544,6 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	
 	if Offset < 0 {
 		Offset = 0
-	}
-	if Limit == -1 || Limit > 100 {
-		Limit = 100
 	}
 	
 	Query := ListVideosQuery{
@@ -777,9 +779,13 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		} else if Limit < 0 {
 			Limit = 20
 		}
+		if Limit == -1 || Limit > 50 {
+			Limit = 50
+		}
 	}
-	if o := r.URL.Query().Get("offset"); o != "" {
-		Offset, _ = strconv.Atoi(o)
+	if p := r.URL.Query().Get("page"); p != "" {
+		Page, _ := strconv.Atoi(p)
+		Offset = Limit*Page
 	}
 	
 	Query := ListCommandTasksQuery{
@@ -817,9 +823,6 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 	
 	if Offset < 0 {
 		Offset = 0
-	}
-	if Limit == -1 || Limit > 50 {
-		Limit = 50
 	}
 	
 	TasksList, err := CL_ListCommandTasks(Limit, Offset, Query)
