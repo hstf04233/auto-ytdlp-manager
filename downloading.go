@@ -937,20 +937,6 @@ func RefreshOldUpdatedVideos() {
 		IsOldRefreshing = false
 	}()
 	
-	RefreshableVideos, err := DB_ListVideos(100, 0, ListVideosQuery{
-		Status: -1,
-		VideoType: -1,
-		RefreshState: 0,
-		QueuedAction: -1,
-		
-		OrderBy: DB_VIDEO_ORDERBY_UpdatedAt,
-		OrderDirection: 1,
-	})
-	if err != nil {
-		L_Printf("Failed to RefreshOldUpdatedVideos, DB_ListVideos error: %v\n", err)
-		return
-	}
-	
 	AutoRefresh_Videos_Seconds := G_Config.AutoRefresh_Videos_Seconds
 	
 	Task := CL_NewGenericTask()
@@ -963,12 +949,31 @@ func RefreshOldUpdatedVideos() {
 	Task.Title = fmt.Sprintf("Auto refreshing videos older than %d seconds", AutoRefresh_Videos_Seconds)
 	DB_UpdateCommandTaskInfo(Task)
 	
-	RefreshTime := time.Now().UTC().Add(time.Second * -time.Duration(AutoRefresh_Videos_Seconds))
+	RefreshTimeUnix := time.Now().UTC().Add(time.Second * -time.Duration(AutoRefresh_Videos_Seconds)).Unix()
 	
 	VideosRefreshed := 0
-	
-	for _, Video := range(RefreshableVideos) {
-		if RefreshTime.Unix() > Video.UpdatedAt.Unix() {
+	THIS_MaxVideosToRefresh := 200
+	PageSize := 100
+	Page := 0
+	PageOffset := -0
+	for {
+		// Get videos oldest to newest!
+		RefreshableVideos, err := DB_ListVideos(PageSize, (Page*PageSize)+PageOffset, ListVideosQuery{
+			Status:       -1,
+			VideoType:    -1,
+			RefreshState: 0,
+			QueuedAction: -1,
+			
+			OrderBy: DB_VIDEO_ORDERBY_UpdatedAt,
+			OrderDirection: 1,
+		})
+		if err != nil {
+			L_Printf("Failed to RefreshOldUpdatedVideos, DB_ListVideos error: %v\n", err)
+			return
+		}
+		for _, Video := range(RefreshableVideos) {
+			if RefreshTimeUnix < Video.UpdatedAt.Unix() { continue }  // Check if video is old enough to be refreshed.
+			
 			if Task.Status != TASK_STATUS_RUNNING { return }
 			if G_Config.AutoRefresh_Videos_Seconds <= 0 { return }
 			
@@ -976,16 +981,33 @@ func RefreshOldUpdatedVideos() {
 			if AChannel == nil {
 				continue
 			}
-			VideosRefreshed += 1;
+			VideosRefreshed += 1
+			PageOffset -= 1
 			
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
 			RefreshVideoInfo(AChannel, Video, Task)
+			if VideosRefreshed >= THIS_MaxVideosToRefresh {
+				break
+			}
 		}
+		
+		if VideosRefreshed >= THIS_MaxVideosToRefresh {
+			break
+		}
+		if len(RefreshableVideos) < PageSize {
+			// We have reached the end.
+			break
+		}
+		
+		Page += 1
 	}
 	
 	if VideosRefreshed == 0 {
 		CL_Logf(Task, "Found no videos to refresh!")
+		// TODO: Delete this task as it is useless information...
+	} else {
+		CL_Logf(Task, "\nRefreshed %d videos.\n", VideosRefreshed)
 	}
 	if Task.Status == TASK_STATUS_RUNNING {
 		CL_FinishTask(Task, TASK_STATUS_FINISHED)
