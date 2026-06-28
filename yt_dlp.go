@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,7 +35,7 @@ type VideoInfo struct {
 	
 	Filename           string `json:"-"`
 	DownloadedFilename string `json:"filename"` // Where the video is stored on device (This is only the file name, not the file path...)
-	VideoFileExists    bool  `json:"videofile_exists"`
+	VideoFileExists    bool   `json:"videofile_exists"`
 	FileSize           uint64 `json:"filesize"` // Size (in bytes) of video file on device.
 	
 	StreamedDirectory  string `json:"-"`
@@ -43,7 +44,7 @@ type VideoInfo struct {
 	ReleaseDate  int64   `json:"release_date"`
 	Duration     float64 `json:"duration"`
 	Status       int     `json:"status"`
-	QueuedAction int     `json:"queued_action"`	// Currently unused...
+	QueuedAction int     `json:"queued_action"`
 	
 	TasksCount   int `json:"tasks_count"`
 	ActiveTaskId string `json:"active_task"`
@@ -56,6 +57,32 @@ type VideoInfo struct {
 	RefreshState int `json:"refresh_state"`
 }
 
+type VideoInfoHistory struct {
+	HId int    // Id in database.
+	RevisionNumber int `json:"revision_number"`
+	
+	Title        *string `json:"title"`
+	Description  *string `json:"description,omitempty"`
+	Url          string `json:"url"`
+	Id           string `json:"id"`
+	Availability *string `json:"availability"`
+	
+	OriginThumbnail *string `json:"origin_thumbnail_url"`
+	Thumbnail       *string `json:"stored_thumbnail"`    // Downloaded thumbnail image
+	
+	Duration     float64 `json:"duration"`
+	
+	UploaderUrl  string `json:"uploader_url"`
+	UploaderName string `json:"uploader"`
+	
+	ReleaseDate  int64  `json:"release_date"`
+	
+	VideoType int32 `json:"video_type"`
+	
+	AddedAt   time.Time `json:"added_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type YT_DLP_OUTVIDEO struct {
 	Title        string `json:"title"`
 	FullTitle    string `json:"fulltitle"`
@@ -63,9 +90,13 @@ type YT_DLP_OUTVIDEO struct {
 	Url          string `json:"webpage_url"`
 	Id           string `json:"id"`
 	Availability string `json:"availability"`
-	Resolution   string `json:"resolution"`
 	Thumbnail    string `json:"thumbnail"`
 	Filename     string `json:"filename"`
+	
+	Resolution   string `json:"resolution"`
+	VidHeight    int `json:"height"`
+	VidWidth     int `json:"width"`
+	AspectRatio  float64 `json:"aspect_ratio"`
 	
 	Extractor string `json:"extractor"`
 	
@@ -118,7 +149,32 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	}
 	
 	if OutVideo.Resolution != "" {
-		VideoInfo.Resolution = OutVideo.Resolution
+		ResolutionStr := OutVideo.Resolution
+		if strings.HasSuffix(ResolutionStr, "p") {
+			// Width/ Height of video isn't known? guess from the aspect ratio...
+			AspectRatio := float64(16)/float64(9)
+			if OutVideo.AspectRatio > 0 {
+				AspectRatio = OutVideo.AspectRatio
+			}
+			if AspectRatio >= 1.769 && AspectRatio <= 1.781 {
+				// Assume the aspect ratio has been quantized and it's 1.7777777...etc
+				AspectRatio = float64(16)/float64(9)
+			}
+			
+			var Width  int
+			var Height int
+			
+			if OutVideo.VidHeight > 0 {
+				Height = OutVideo.VidHeight
+				Width  = int(math.Round(float64(Height)*AspectRatio))
+			} else if OutVideo.VidWidth > 0 {
+				Width  = OutVideo.VidWidth
+				Height = int(math.Round(float64(Width)/AspectRatio))
+			}
+			
+			ResolutionStr = fmt.Sprintf("%dx%d", Width, Height)
+		}
+		VideoInfo.Resolution = ResolutionStr
 	}
 	if OutVideo.Thumbnail != "" {
 		VideoInfo.OriginThumbnail = OutVideo.Thumbnail
@@ -316,6 +372,7 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 			}
 		}
 		
+		// Have no idea if YouTube serves up different error messages for seperate languages...
 		if strings.Contains(ErrOutput, "Private video.") {
 			Video.Availability = "private"
 			return fmt.Errorf("%s", ErrOutput)
@@ -330,6 +387,9 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 			return fmt.Errorf("%s", ErrOutput)
 		} else if strings.Contains(ErrOutput, "This live event will begin in a few moments.") ||
 				  strings.Contains(ErrOutput, "This live event will begin in") {
+			return fmt.Errorf("%s", ErrOutput)
+		} else if strings.Contains(ErrOutput, "Join this channel to get access to members-only content like this video") {
+			Video.Availability = "members-only"
 			return fmt.Errorf("%s", ErrOutput)
 		}
 		

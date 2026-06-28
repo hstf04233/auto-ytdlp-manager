@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	
+
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -55,8 +55,8 @@ CREATE TABLE IF NOT EXISTS Videos (
 	StoredThumbnail TEXT DEFAULT '',   /* Downloaded thumbnail id */
 	Duration     FLOAT DEFAULT 0,
 	
-	UploaderName TEXT DEFAULT '',
 	UploaderUrl  TEXT DEFAULT '',
+	UploaderName TEXT DEFAULT '',
 	
 	RefreshState INTEGER NOT NULL DEFAULT 0,
 	Status       INTEGER NOT NULL DEFAULT 0,
@@ -66,10 +66,38 @@ CREATE TABLE IF NOT EXISTS Videos (
 	ReleaseDate BIGINT NOT NULL,
 	
 	AddedAt   DATETIME NOT NULL DEFAULT (datetime('now')),
-	UpdatedAt DATETIME
+	UpdatedAt DATETIME,
+	
+	HistoryRevisionCount INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_videos_fromchannel ON Videos(FromChannel);
+
+CREATE TABLE IF NOT EXISTS VideoHistory (
+	HId INTEGER PRIMARY KEY AUTOINCREMENT,
+	Revision INTEGER,
+	
+	Id           TEXT,
+	Title        TEXT,
+	Description  TEXT,
+	Availability TEXT,
+	Url          TEXT,
+	
+	Thumbnail       TEXT,   /* Origin thumbnail */
+	StoredThumbnail TEXT,   /* Downloaded thumbnail id */
+	Duration        FLOAT DEFAULT 0,
+	
+	UploaderUrl  TEXT,
+	UploaderName TEXT,
+	
+	VideoType INTEGER,
+	
+	AddedAt   DATETIME NOT NULL DEFAULT (datetime('now')),
+	UpdatedAt DATETIME
+);
+
+CREATE INDEX IF NOT EXISTS idx_videohistory_revision ON VideoHistory(Revision);
+CREATE INDEX IF NOT EXISTS idx_videohistory_id ON VideoHistory(Id);
 
 CREATE TABLE IF NOT EXISTS CommandTasks (
 	Id     TEXT PRIMARY KEY,
@@ -301,7 +329,7 @@ func DB_UpdateVideoQueuedAction(Video *VideoInfo, NewQueuedAction int) error {
 	return err
 }
 
-func DB_UpdateVideoAvalibility(Video *VideoInfo, Availability string) error {
+func DB_UpdateVideoAvailability(Video *VideoInfo, Availability string) error {
 	VideoDBLock.Lock()
 	defer VideoDBLock.Unlock()
 	Video.Availability = Availability
@@ -651,6 +679,50 @@ func DB_GetVideoStatsFromQuery(Query ListVideosQuery) (*DB_VideoListStats, error
 	return Stats, nil
 }
 
+func DB_IncrementVideoRevisionNumber(VideoId string) (int, error) {
+	var RevisionNumber int
+	
+	Row := GDB.QueryRow(`
+	UPDATE Videos
+	SET HistoryRevisionCount = HistoryRevisionCount + 1
+	WHERE Id = ?
+	RETURNING HistoryRevisionCount;
+	`, VideoId)
+	
+	err := Row.Scan(&RevisionNumber)
+	if err != nil {
+		return 0, fmt.Errorf("Failed to increment HistoryRevisionCount for video: %s error: %v", VideoId, err)
+	}
+	
+	return RevisionNumber-1, nil
+}
+
+func DB_AddVideoHistoryPoint(HistoryPoint *VideoInfoHistory) error {
+	VideoId := HistoryPoint.Id
+	RevisionNumber, err := DB_IncrementVideoRevisionNumber(VideoId)
+	if err != nil {
+		return err
+	}
+	HistoryPoint.RevisionNumber = RevisionNumber
+	
+	Result, err := GDB.Exec(`
+	INSERT INTO VideoHistory(Revision, Id, Title, Description, Availability, Url, Thumbnail, StoredThumbnail, Duration, UploaderUrl, UploaderName, VideoType, AddedAt, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, HistoryPoint.RevisionNumber, HistoryPoint.Id, HistoryPoint.Title, HistoryPoint.Description, HistoryPoint.Availability, HistoryPoint.Url, HistoryPoint.OriginThumbnail, HistoryPoint.Thumbnail, HistoryPoint.Duration, HistoryPoint.UploaderUrl, HistoryPoint.UploaderName, HistoryPoint.VideoType, HistoryPoint.AddedAt, HistoryPoint.UpdatedAt)
+	if err != nil {
+		return err
+	}
+	
+	HId, err := Result.LastInsertId()
+	if err != nil {
+		return fmt.Errorf("Could not get LastInsertId wat, error: %v", err)
+	}
+	HistoryPoint.HId = int(HId)
+	
+	return nil
+}
+
+
 func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	Task.Lock.Lock()
 	defer Task.Lock.Unlock()
@@ -996,7 +1068,7 @@ func OpenDB() error {
 	
 	DatabaseUpgrades := []string{
 		"ALTER TABLE Videos ADD COLUMN QueuedAction INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE ArchiveChannels ADD COLUMN PlaylistEnd  INTEGER NOT NULL default 20",
+		"ALTER TABLE ArchiveChannels ADD COLUMN PlaylistEnd INTEGER NOT NULL default 20",
 		
 		"ALTER TABLE Videos ADD COLUMN PlaylistEnd INTEGER NOT NULL default 20",
 		
@@ -1010,6 +1082,7 @@ func OpenDB() error {
 		
 		// v0.15
 		"ALTER TABLE Videos ADD COLUMN StreamedDirectory TEXT DEFAULT ''",
+		"ALTER TABLE Videos ADD COLUMN HistoryRevisionCount INTEGER DEFAULT 0",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

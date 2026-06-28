@@ -254,19 +254,20 @@ func (t *ThrottledResponseWriter) WriteHeader(statusCode int) {
 }
 
 func GetIpAddressFromRequest(r *http.Request) string {
-	switch G_Config.IpStrategy {
+	IpStrategy := G_Config.IpStrategy
+	switch IpStrategy {
 	case IP_STRATEGY_CLOUDFLARE:
-		if cfIP := r.Header.Get("CF-Connecting-IP"); cfIP != "" {
-			return strings.TrimSpace(cfIP)
+		if CloudflareIp := r.Header.Get("CF-Connecting-IP"); CloudflareIp != "" {
+			return strings.TrimSpace(CloudflareIp)
 		}
 	case IP_STRATEGY_REALIP:
-		if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
-			return strings.TrimSpace(realIP)
+		if RealIP := r.Header.Get("X-Real-IP"); RealIP != "" {
+			return strings.TrimSpace(RealIP)
 		}
 	case IP_STRATEGY_FORWARDED:
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			// Split header and get the ip
-			if parts := strings.Split(forwarded, ","); len(parts) > 0 {
+		if Forwarded := r.Header.Get("X-Forwarded-For"); Forwarded != "" {
+			// Split header and get the first ip
+			if parts := strings.Split(Forwarded, ","); len(parts) > 0 {
 				clientIP := strings.TrimSpace(parts[0])
 				if clientIP != "" {
 					return clientIP
@@ -276,7 +277,13 @@ func GetIpAddressFromRequest(r *http.Request) string {
 	case IP_STRATEGY_DIRECT:
 		break
 	default:
-		L_Printf("Unknown IpStrategy: %s\n", G_Config.IpStrategy)
+		if strings.HasPrefix(IpStrategy, "HEADER:") {
+			CustomHeaderName := strings.TrimPrefix(IpStrategy, "HEADER:")
+			if CustomHeaderIp := r.Header.Get(CustomHeaderName); CustomHeaderIp != "" {
+				return strings.TrimSpace(CustomHeaderIp)
+			}
+		}
+		L_Printf("Unknown IpStrategy: %s\n", IpStrategy)
 	}
 	
 	// Localhost or IP_STRATEGY_DIRECT:

@@ -230,11 +230,96 @@ func CheckIsVideoDownloaded(Video *VideoInfo) bool {
 	return false
 }
 
+func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) *VideoInfoHistory {
+	if OldVideoInfo.Id == "" {
+		// Wat??? Video might not have existed before?
+		return nil
+	}
+	
+	ChangesWereMade := false
+	HistoryInfo := &VideoInfoHistory{
+		HId: -1,
+		RevisionNumber: -1,
+		
+		Url: OldVideoInfo.Url,
+		Id:  OldVideoInfo.Id,
+		
+		Duration:  -1,
+		VideoType: -1,
+		
+		AddedAt:   OldVideoInfo.UpdatedAt,
+		UpdatedAt: time.Now().UTC(),
+	}
+	
+	if OldVideoInfo.Title != NewVideoInfo.Title {
+		ChangesWereMade = true
+		HistoryInfo.Title = &OldVideoInfo.Title
+	}
+	if OldVideoInfo.Description != NewVideoInfo.Description {
+		ChangesWereMade = true
+		HistoryInfo.Description = &OldVideoInfo.Description
+	}
+	if OldVideoInfo.Availability != NewVideoInfo.Availability {
+		ChangesWereMade = true
+		HistoryInfo.Availability = &OldVideoInfo.Availability
+	}
+	
+	if OldVideoInfo.Thumbnail != NewVideoInfo.Thumbnail || OldVideoInfo.OriginThumbnail != NewVideoInfo.OriginThumbnail {
+		ChangesWereMade = true
+		HistoryInfo.Thumbnail = &OldVideoInfo.Thumbnail
+		HistoryInfo.OriginThumbnail = &OldVideoInfo.OriginThumbnail
+	}
+	if OldVideoInfo.Duration != NewVideoInfo.Duration {
+		ChangesWereMade = true
+		HistoryInfo.Duration = OldVideoInfo.Duration
+	}
+	
+	if OldVideoInfo.VideoType != NewVideoInfo.VideoType {
+		ChangesWereMade = true
+		HistoryInfo.VideoType = OldVideoInfo.VideoType
+	}
+	
+	if ChangesWereMade {
+		return HistoryInfo
+	}
+	
+	// No changes were made
+	return nil
+}
+
+func AddVideoHistoryPoint(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) bool {
+	HistoryDifference := GetHistoryDifference(OldVideoInfo, NewVideoInfo)
+	if HistoryDifference == nil {
+		L_Printf("No history changes found for video: %s !!!\n", NewVideoInfo.Id)
+		// No changes...
+		return false
+	}
+	
+	//L_Printf("Adding history point %+v !!!\n", HistoryDifference)
+	
+	err := DB_AddVideoHistoryPoint(HistoryDifference)
+	if err != nil {
+		L_Printf("Failed to add video history point to database!!! Error: %v\n", err)
+		return false
+	}
+	
+	// History point successfully added to database!
+	return true
+}
+
 func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandTask) {
 	UpdateVideoFileSize(Video, AChannel)
 	
+	// Hopefully the current video info is from the database!!!
+	OldVideoInfo := *Video
+	
 	err := RequestVideoInfo(AChannel, Video.Url, -1, Video, Task)
-	DB_UpdateVideoAvalibility(Video, Video.Availability)   // RequestVideoInfo() might have updated the Availability tag.
+	
+	AddVideoHistoryPoint(&OldVideoInfo, Video)
+	
+	if OldVideoInfo.Availability != Video.Availability {
+		DB_UpdateVideoAvailability(Video, Video.Availability)
+	}
 	if err != nil {
 		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoInfo(Video)
@@ -275,17 +360,25 @@ func UpdateVideoFileSize(Video *VideoInfo, AChannel *ArchiveChannel) {
 		
 		var TotalSize uint64
 		
-		if ok {
+		if ok && ytaState != nil {
 			Files, err := os.ReadDir(ytaState.TempDir)
 			if err == nil {
 				for _, File := range(Files) {
+					if File.IsDir() { continue }
+					
 					Info, err := File.Info()
 					if err == nil {
 						TotalSize += uint64(Info.Size())
+					} else {
+						L_Printf("[UpdateVideoFileSize] Failed to read file info '%s', error: %v\n", filepath.Join(ytaState.TempDir, File.Name()), err)
 					}
 				}
+			} else {
+				L_Printf("[UpdateVideoFileSize] Failed to read directory '%s', error: %v\n", ytaState.TempDir, err)
 			}
 		}
+		
+		L_Printf("TotalSize: %d\n", TotalSize)
 		
 		DB_UpdateVideoFileSize(Video, TotalSize)
 		
@@ -296,6 +389,8 @@ func UpdateVideoFileSize(Video *VideoInfo, AChannel *ArchiveChannel) {
 		FileSize, err := GetFileSize(FilePath)
 		if err == nil {
 			DB_UpdateVideoFileSize(Video, uint64(FileSize))
+		} else {
+			L_Printf("[UpdateVideoFileSize] Failed to get file size for '%s', error: %v\n", FilePath, err)
 		}
 	} else if FilePath == "" {
 		// File doesn't exist.
@@ -486,16 +581,29 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		QualitySelect = CheckSettings.QualitySelect
 	}
 	
-	err := RequestVideoInfo(AChannel, Video.Url, QualitySelect, Video, Task)
+	OldDBVideoInfo, err := DB_GetVideo(Video.Id)
+	if err != nil {
+		L_Printf("Failed to get database video info for video: %s error: %v", Video.Id, err)
+	}
+	
+	err = RequestVideoInfo(AChannel, Video.Url, QualitySelect, Video, Task)
 	if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
 		// This task was canceled!! Don't do anything else.
 		return false
 	}
 	if err != nil {
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
-		DB_UpdateVideoAvalibility(Video, Video.Availability)
+		if OldDBVideoInfo == nil || OldDBVideoInfo.Availability != Video.Availability {
+			// TODO: Create a history point because the availability changed!!!
+			// I can't do that rn because the video info that we have might not be from the database and have no title, description, duration, etc...
+			DB_UpdateVideoAvailability(Video, Video.Availability)
+		}
 		CL_Logf(Task, "Failed to grab video info for \"%s\"... Error: %v\n", Video.Title, err)
 		return false
+	}
+	
+	if OldDBVideoInfo != nil {
+		AddVideoHistoryPoint(OldDBVideoInfo, Video)
 	}
 	
 	if Video.OriginThumbnail != "" && Video.Thumbnail == "" {
@@ -670,10 +778,21 @@ func ManuallyAddVideos(AChannel *ArchiveChannel, Url string, Type int, QualitySe
 	CL_FinishTask(Task, TASK_STATUS_FINISHED)
 }
 
+func IsVideoIdInVideosList(List []*VideoInfo, VideoId string) bool {
+	for _, Vid := range(List) {
+		if Vid.Id == VideoId {
+			return true
+		}
+	}
+	
+	return false
+}
+
 var MaxVideosToRefresh = 20
 func GetRefreshableVideos(AChannel *ArchiveChannel) ([]*VideoInfo) {
 	RefreshableVideos := []*VideoInfo{}
 	
+	// Get videos with RefreshState = 1
 	List1, err := DB_ListVideos(MaxVideosToRefresh, 0, ListVideosQuery{
 		FromChannelId: AChannel.Id,
 		RefreshState: 1,
@@ -687,6 +806,8 @@ func GetRefreshableVideos(AChannel *ArchiveChannel) ([]*VideoInfo) {
 		L_Printf("Failed to get refreshable videos from DB_ListVideos, err: %v\n", err)
 	}
 	
+	
+	// Get videos that are currently 'live' and check if they are still being downloaded.
 	List2, err := DB_ListVideos(-1, 0, ListVideosQuery{
 		FromChannelId: AChannel.Id,
 		VideoType: VIDEO_TYPE_ISLIVE,
@@ -694,10 +815,18 @@ func GetRefreshableVideos(AChannel *ArchiveChannel) ([]*VideoInfo) {
 		Status: -1,
 		QueuedAction: -1,
 	})
-	for _, Vid := range(List2) {
-		if Vid.Status != VIDEO_STATUS_DOWNLOADING && Vid.Status != VIDEO_STATUS_QUEUED {
-			RefreshableVideos = append(RefreshableVideos, Vid)
+	if err == nil {
+		for _, Vid := range(List2) {
+			// Is this 'live' video still downloading? or queued even?? if not then add it to the list.
+			if Vid.Status != VIDEO_STATUS_DOWNLOADING && Vid.Status != VIDEO_STATUS_QUEUED && !IsVideoIdInVideosList(RefreshableVideos, Vid.Id) {
+				RefreshableVideos = append(RefreshableVideos, Vid)
+			}
+			if len(RefreshableVideos) > MaxVideosToRefresh {
+				continue
+			}
 		}
+	} else {
+		L_Printf("[GetRefreshableVideos]: Failed to get 'live' videos from DB_ListVideos, err: %v\n", err)
 	}
 	
 	return RefreshableVideos
@@ -928,7 +1057,7 @@ func CheckChannels(WD *WatchingBundle) {
 }
 
 var IsOldRefreshing = false
-func RefreshOldUpdatedVideos() {
+func AutoRefreshOldUpdatedVideos() {
 	if IsOldRefreshing {
 		return
 	}
@@ -974,6 +1103,10 @@ func RefreshOldUpdatedVideos() {
 		for _, Video := range(RefreshableVideos) {
 			if RefreshTimeUnix < Video.UpdatedAt.Unix() { continue }  // Check if video is old enough to be refreshed.
 			
+			if Video.Availability == "removed" {
+				// This video is removed. Don't auto refresh it 
+			}
+			
 			if Task.Status != TASK_STATUS_RUNNING { return }
 			if G_Config.AutoRefresh_Videos_Seconds <= 0 { return }
 			
@@ -982,7 +1115,7 @@ func RefreshOldUpdatedVideos() {
 				continue
 			}
 			VideosRefreshed += 1
-			PageOffset -= 1
+			PageOffset -= 1  // Updating a video reorders the video list in the database. If we don't move backwards we can miss some videos!
 			
 			CL_Logf(Task, "Refreshing video info: \"%s\" %s\n", Video.Title, Video.Url)
 			DB_UpdateCommandTaskInfo(Task)
@@ -1040,7 +1173,7 @@ func InitDownloading() {
 		}
 		if G_Config.AutoRefresh_Videos_Seconds > 0 && time.Now().UTC().Unix() > NextVideosRefreshUpdate {
 			NextVideosRefreshUpdate = time.Now().UTC().Unix() + (60*30)
-			go RefreshOldUpdatedVideos()
+			go AutoRefreshOldUpdatedVideos()
 		}
 		
 		CheckChannels(&WatchedDownloading)

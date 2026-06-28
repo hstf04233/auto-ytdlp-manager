@@ -348,16 +348,18 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 		if Filepath == "" {
 			// Video file was not found... Deleted?
 			Video.VideoFileExists = false
-			
-			Video.FileSize = 0   // This is for the web ui, this doesn't save into the database.
 		} else {
 			Video.VideoFileExists = true
 		}
 	}
 	
 	if !Video.VideoFileExists && Video.StreamedDirectory != "" && Video.Status == VIDEO_STATUS_DOWNLOADING {
-		// Share m3u8 stream instead.
+		// Video file doesn't exist... Share the m3u8 stream instead!
 		Video.VideoStreamUrl = fmt.Sprintf("/video-stream/%s/playlist.m3u8", Video.Id)
+	}
+	
+	if !Video.VideoFileExists && Video.VideoStreamUrl == "" {
+		Video.FileSize = 0   // This is for the web ui, this doesn't save into the database.
 	}
 	
 	TasksList, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
