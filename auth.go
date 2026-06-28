@@ -1,10 +1,11 @@
 package main
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"database/sql"
-	"encoding/json"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -383,8 +384,7 @@ func IsUserRequestSignedByServer(r *http.Request, Queries []string) bool {
 	RawHash := Hash.Sum(nil)
 	
 	ComputedHash := base64.RawURLEncoding.EncodeToString(RawHash)
-	// TODO: TEMP!!!!!!!!! the `SignedHash == fmt.Sprintf("%x", RawHash)` is TEMPORARY!!! Please remove it.
-	if SignedHash == ComputedHash || SignedHash == fmt.Sprintf("%x", RawHash) {
+	if hmac.Equal([]byte(SignedHash), []byte(ComputedHash)) {
 		return true
 	}
 	
