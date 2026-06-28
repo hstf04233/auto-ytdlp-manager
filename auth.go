@@ -1,8 +1,8 @@
 package main
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS Settings (
 `
 
 const (
-	SAVE_IP_ADDRESS_TO_AUTH_DATABASE = false
-	SAVE_USER_AGENT_TO_AUTH_DATABASE = false
+	SAVE_IP_ADDRESS_TO_AUTH_DATABASE = true
+	SAVE_USER_AGENT_TO_AUTH_DATABASE = true
 )
 
 const (
@@ -273,6 +273,19 @@ func CreateAuthSessionFromRequest(AUser *AuthUser, r *http.Request) (*AuthSessio
 	return Session, nil
 }
 
+func DeleteSessionTokenIfExists(TokenId string) bool {
+	_, err := G_AUTHDB.Exec(`DELETE FROM Sessions WHERE TokenId = ?`, TokenId)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		L_Printf("DeleteSessionTokenIfExists ERR: %v\n", err)
+		return false
+	}
+	
+	// TODO: Temp print
+	L_Printf("Deleted auth session TokenId: '%s[...]'\n", TokenId[0:16])
+	
+	return true
+}
+
 func GetAuthUserFromRequest(r *http.Request) (*AuthUser, error) {
 	AuthorizationCookie, err := r.Cookie(AUTH_SESSION_TOKEN_COOKIE_NAME)
 	if err != nil {
@@ -384,11 +397,9 @@ func IsUserRequestSignedByServer(r *http.Request, Queries []string) bool {
 	RawHash := Hash.Sum(nil)
 	
 	ComputedHash := base64.RawURLEncoding.EncodeToString(RawHash)
-	if hmac.Equal([]byte(SignedHash), []byte(ComputedHash)) {
+	if subtle.ConstantTimeCompare([]byte(SignedHash), []byte(ComputedHash)) != 0 {
 		return true
 	}
-	
-	L_Printf("ss: %s, ComputedHash: %s\n", SignedHash, ComputedHash)
 	
 	return false
 }
@@ -488,6 +499,11 @@ func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
 	return
 }
 func AuthLogoutRequest(w http.ResponseWriter, r *http.Request) {
+	AuthorizationCookie, err := r.Cookie(AUTH_SESSION_TOKEN_COOKIE_NAME)
+	if err == nil && AuthorizationCookie != nil {
+		DeleteSessionTokenIfExists(AuthorizationCookie.Value)
+	}
+	
 	http.SetCookie(w, &http.Cookie{
 		Name:    AUTH_SESSION_TOKEN_COOKIE_NAME,
 		Value:    "",
@@ -588,6 +604,9 @@ func AuthCreateUserRequest(w http.ResponseWriter, r *http.Request, UserRole int)
 	VALUES (?, ?, ?, ?, ?, ?)
 	`, NewUser.Username, NewUser.UsernameDisplay, NewUser.SecuredPassword, NewUser.Role, NewUser.CreatedAt, NewUser.UpdatedAt)
 	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			http.Error(w, "Username already taken.", http.StatusConflict)
+		}
 		L_Printf("Could not create new user, database error: %v\n", err)
 		
 		http.Error(w, "Internal error when creating user...", http.StatusInternalServerError)
