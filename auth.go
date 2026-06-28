@@ -348,7 +348,6 @@ func SanitizeQueryValueForSign(Value string) string {
 		StrBuf.WriteByte(Char)
 	}
 	
-	L_Printf("%s\n", StrBuf.String())
 	return StrBuf.String()
 }
 
