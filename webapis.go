@@ -1164,7 +1164,7 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 func IsRequestExpired(w http.ResponseWriter, r *http.Request) bool {
 	ParseDidError := false
 	
-	var ExpireTime time.Time
+	var ExpireTime time.Time = time.Unix(0, 0)
 	if ExpiresMsStr := r.URL.Query().Get("expires_ms"); ExpiresMsStr != "" {
 		ExpiresMs, err := strconv.Atoi(ExpiresMsStr)
 		if err != nil { ParseDidError = true}
@@ -1183,7 +1183,7 @@ func IsRequestExpired(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	
-	if ExpireTime.UnixMilli() != 0 && time.Now().UTC().UnixMilli() > ExpireTime.UnixMilli() {
+	if ExpireTime.UnixMilli() > 0 && time.Now().UTC().UnixMilli() > ExpireTime.UnixMilli() {
 		http.Error(w, "Expired request", http.StatusForbidden)
 		return true
 	}
