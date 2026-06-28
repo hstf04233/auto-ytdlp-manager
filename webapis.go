@@ -712,7 +712,7 @@ func API_ShareVideoFile(w http.ResponseWriter, r *http.Request) {
 	ExpireTime := time.Now().UTC().Add(time.Second*60*60*24 * 7)
 	
 	ShareLink := GenerateSignedUserRequest(fmt.Sprintf("/video-file/%s", RequestId), []SQuery{
-		{"expires_ms", fmt.Sprintf("%d", ExpireTime.UnixMilli())},
+		{"expires", fmt.Sprintf("%d", ExpireTime.Unix())},
 	})
 	
 	w.Header().Set("Content-Type", "text/plain")
@@ -1162,16 +1162,30 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 }
 
 func IsRequestExpired(w http.ResponseWriter, r *http.Request) bool {
-	if ExpiresStr := r.URL.Query().Get("expires_ms"); ExpiresStr != "" {
-		ExpiresMs, _ := strconv.Atoi(ExpiresStr)
+	ParseDidError := false
+	
+	var ExpireTime time.Time
+	if ExpiresMsStr := r.URL.Query().Get("expires_ms"); ExpiresMsStr != "" {
+		ExpiresMs, err := strconv.Atoi(ExpiresMsStr)
+		if err != nil { ParseDidError = true}
 		
-		if ExpiresMs != -1 && time.Now().UTC().UnixMilli() > int64(ExpiresMs) {
-			http.Error(w, "Expired request", http.StatusForbidden)
-			return true
-		}
+		ExpireTime = time.UnixMilli(int64(ExpiresMs)).UTC()
+	}
+	if ExpiresStr := r.URL.Query().Get("expires"); ExpiresStr != "" {
+		ExpiresUnix, err := strconv.Atoi(ExpiresStr)
+		if err != nil { ParseDidError = true}
 		
-		// Not expired!
-		return false
+		ExpireTime = time.Unix(int64(ExpiresUnix), 0).UTC()
+	}
+	
+	if ParseDidError {
+		http.Error(w, "Bad Request - Could not parse expire query.", http.StatusBadRequest)
+		return true
+	}
+	
+	if ExpireTime.UnixMilli() != 0 && time.Now().UTC().UnixMilli() > ExpireTime.UnixMilli() {
+		http.Error(w, "Expired request", http.StatusForbidden)
+		return true
 	}
 	
 	return false
@@ -1185,7 +1199,7 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if r.URL.Query().Get(AUTH_REQUEST_SIGN_QUERYNAME) != "" {
-		IsSigned := IsUserRequestSignedByServer(r, []string{"expires_ms", "time_ms"})
+		IsSigned := IsUserRequestSignedByServer(r, []string{"expires_ms", "expires", "time_ms"})
 		if !IsSigned {
 			http.Error(w, "Forbidden - Unsigned or expired request", http.StatusForbidden)
 			return
@@ -1266,7 +1280,7 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if r.URL.Query().Get(AUTH_REQUEST_SIGN_QUERYNAME) != "" {
-		IsSigned := IsUserRequestSignedByServer(r, []string{"expires_ms", "time_ms"})
+		IsSigned := IsUserRequestSignedByServer(r, []string{"expires_ms", "expires", "time_ms"})
 		if !IsSigned {
 			http.Error(w, "Forbidden - Unsigned or expired request", http.StatusForbidden)
 			return

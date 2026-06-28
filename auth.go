@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/subtle"
 	"database/sql"
@@ -13,8 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"crypto/sha3"
+
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/crypto/sha3"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -118,6 +120,8 @@ func GenerateRandomString(length int) []byte {
 }
 
 func SRNG(Min int, Max int) int {
+	if Min >= Max { return Min }
+	
 	numMax := big.NewInt(int64(Max-Min))
 	num, _ := rand.Int(rand.Reader, numMax)
 	return (int(num.Int64()) + Min)
@@ -336,6 +340,21 @@ type SQuery struct {
 	Value string
 }
 
+func SanitizeQueryValueForSign(Value string) string {
+	var StrBuf bytes.Buffer
+	for _, Char := range([]byte(Value)) {
+		if Char == byte('&') {
+			StrBuf.Write([]byte("&amp;"))
+			continue
+		}
+		
+		StrBuf.WriteByte(Char)
+	}
+	
+	L_Printf("%s\n", StrBuf.String())
+	return StrBuf.String()
+}
+
 func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
 	// Generate a signed url to share to other people!
 	// This generated link can be used how ever many times, forever!! (Unless the url is expirable with '&expires_ms={unix_time}'...)
@@ -348,14 +367,24 @@ func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
 	Hash.Write([]byte(LocalUrl))
 	Hash.Write([]byte(SecretSaltHash))
 	
+	if true {
+		// Random number
+		Queries = append(Queries, SQuery{
+			"sr", fmt.Sprintf("%04d", SRNG(0, 9999)),
+		})
+	}
+	/*
+	// Version
 	Queries = append(Queries, SQuery{
-		"sr", fmt.Sprintf("%04d", SRNG(0, 9999)),
+		"sv", "0",
 	})
+	*/
 	
 	QueryId := 0
 	for _, Query := range(Queries) {
-		Hash.Write([]byte(Query.Value))
 		if Query.Value != "" {
+			Hash.Write([]byte(fmt.Sprintf("&%s=", Query.Name)))
+			Hash.Write([]byte(SanitizeQueryValueForSign(Query.Value)))
 			Format := "?%s=%s"
 			if QueryId != 0 {
 				Format = "&%s=%s"
@@ -385,15 +414,18 @@ func IsUserRequestSignedByServer(r *http.Request, Queries []string) bool {
 	
 	SecretSaltHash := GetAuthSecretSaltHash()
 	
+	Queries = append(Queries, "sr", "sv")
+	
 	Hash := sha3.New224()
 	Hash.Write([]byte(r.URL.Path))
 	Hash.Write([]byte(SecretSaltHash))
-	for _, Query := range(Queries) {
-		Value := r.URL.Query().Get(Query)
-		Hash.Write([]byte(Value))
+	for _, QueryName := range(Queries) {
+		Value := r.URL.Query().Get(QueryName)
+		if Value != "" {
+			Hash.Write([]byte(fmt.Sprintf("&%s=", QueryName)))
+			Hash.Write([]byte(SanitizeQueryValueForSign(Value)))
+		}
 	}
-	Sr := r.URL.Query().Get("sr")
-	Hash.Write([]byte(Sr))
 	
 	RawHash := Hash.Sum(nil)
 	
@@ -496,7 +528,7 @@ func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
 	
 	time.Sleep(TimeWait.Sub(time.Now().UTC()))  // Sleep for a small amount before returning, see :Login_time_attack
 	
-	http.Error(w, UsernamePasswordMismatch_Message, http.StatusBadRequest)
+	http.Error(w, UsernamePasswordMismatch_Message, http.StatusUnauthorized)
 	return
 }
 func AuthLogoutRequest(w http.ResponseWriter, r *http.Request) {
