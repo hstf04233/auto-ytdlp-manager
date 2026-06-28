@@ -27,6 +27,12 @@ var HttpServer *http.Server
 
 func SecurityMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		UserAgent := r.Header.Get("User-Agent")
+		if len(UserAgent) > 512 {
+			L_Printf("Request[%s] Path: %s | Invalid User-Agent.\n", GetIpAddressFromRequest(r), r.URL.Path)
+			http.Error(w, "Invalid User-Agent.", http.StatusBadRequest)
+			return
+		}
 		if RateLimitRequest(w, r, RATE_LIMIT_BUCKET_GLOBAL) {
 			// This request was rate limited.
 			return

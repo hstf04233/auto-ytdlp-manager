@@ -42,18 +42,13 @@ CREATE TABLE IF NOT EXISTS Sessions (
 	TokenId TEXT PRIMARY KEY UNIQUE,
 	UserId  INTEGER NOT NULL,
 	
-	ExpireAt  DATETIME NOT NULL,
-	CreatedAt DATETIME NOT NULL DEFAULT (datetime('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_sessions_userid ON Sessions(UserId);
-
-CREATE TABLE IF NOT EXISTS Sessions (
-	TokenId TEXT PRIMARY KEY UNIQUE,
-	UserId  INTEGER NOT NULL,
+	IpAddress TEXT NOT NULL,
+	UserAgent TEXT NOT NULL,
 	
 	ExpireAt  DATETIME NOT NULL,
 	CreatedAt DATETIME NOT NULL DEFAULT (datetime('now'))
 );
+CREATE INDEX IF NOT EXISTS idx_sessions_userid ON Sessions(UserId);
 
 CREATE TABLE IF NOT EXISTS Settings (
 	Id TEXT PRIMARY KEY,
@@ -62,6 +57,11 @@ CREATE TABLE IF NOT EXISTS Settings (
 );
 
 `
+
+const (
+	SAVE_IP_ADDRESS_TO_AUTH_DATABASE = false
+	SAVE_USER_AGENT_TO_AUTH_DATABASE = false
+)
 
 const (
 	AUTH_USERNAME_MAX_LENGTH = 64
@@ -94,6 +94,9 @@ type AuthUser struct {
 type AuthSession struct {
 	TokenId string
 	UserId  uint64
+	
+	IpAddress string
+	UserAgent string
 	
 	ExpireAt  time.Time
 	CreatedAt time.Time
@@ -230,18 +233,38 @@ func GetAuthUserFromSessionToken(Token string) (*AuthUser, error) {
 	return AUser, nil
 }
 
-func CreateAuthSession(AUser *AuthUser) (*AuthSession, error) {
+func CreateAuthSessionFromRequest(AUser *AuthUser, r *http.Request) (*AuthSession, error) {
+	IpAddress := GetIpAddressFromRequest(r)
+	
 	Session := &AuthSession{}
 	Session.UserId = AUser.UserId
 	Session.TokenId = fmt.Sprintf("%012d|%s", AUser.UserId, GenerateRandomString(128))
+	
+	if SAVE_IP_ADDRESS_TO_AUTH_DATABASE {
+		Session.IpAddress = IpAddress
+	} else {
+		Session.IpAddress = "-NOT-SAVED-"
+	}
+	
+	if SAVE_USER_AGENT_TO_AUTH_DATABASE {
+		Session.UserAgent = r.Header.Get("User-Agent")
+		if len(Session.UserAgent) > 512 {
+			Session.UserAgent = Session.UserAgent[:512]
+		}
+		if strings.HasPrefix(strings.ToLower(Session.UserAgent), "-not-saved-") {
+			Session.UserAgent = fmt.Sprintf(":%s", Session.UserAgent)
+		}
+	} else {
+		Session.UserAgent = "-NOT-SAVED-"
+	}
 	
 	Session.CreatedAt = time.Now().UTC()
 	Session.ExpireAt = time.Now().UTC().Add(time.Second*60*60*24*365)  // Expire in 1 year
 	
 	_, err := G_AUTHDB.Exec(`
-	INSERT INTO Sessions(TokenId, UserId, ExpireAt, CreatedAt)
-	VALUES (?, ?, ?, ?)
-	`, Session.TokenId, Session.UserId, Session.ExpireAt, Session.CreatedAt)
+	INSERT INTO Sessions(TokenId, UserId, IpAddress, UserAgent, ExpireAt, CreatedAt)
+	VALUES (?, ?, ?, ?, ?, ?)
+	`, Session.TokenId, Session.UserId, Session.IpAddress, Session.UserAgent, Session.ExpireAt, Session.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to insert session into database, error: %v", err)
 	}
@@ -437,7 +460,7 @@ func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
 	if PasswordErr == nil {
 		// This is the same password!
 		// Create a new session token.
-		NewSession, err := CreateAuthSession(AuthUser)
+		NewSession, err := CreateAuthSessionFromRequest(AuthUser, r)
 		if err != nil {
 			// Could not create session cookie...
 			L_Printf("Could not create auth session token, error: %v\n", err)
@@ -632,13 +655,15 @@ func OpenAuthDB() error {
 	}
 	
 	AuthDatabaseUpgrades := []string{
-		// Empty for the time being.
+		// V0.15
+		"ALTER TABLE Sessions ADD COLUMN IpAddress TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE Sessions ADD COLUMN UserAgent TEXT NOT NULL DEFAULT ''",
 	}
 	
 	for i, Upgrade := range(AuthDatabaseUpgrades) {
 		_, err = db.Exec(Upgrade)
 		if err != nil && !strings.Contains(err.Error(), "duplicate column name") {
-			L_Printf("Upgrade[%d] failed, error: %v\n", i, err)
+			L_Printf("Upgrade[%d] failed, error: %v\nUpgrade[%d] Exec: %s\n\n", i, err, i, Upgrade)
 		}
 	}
 	
