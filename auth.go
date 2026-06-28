@@ -143,8 +143,6 @@ func GetAuthSecretSaltHash() string {
 		return ""
 	}
 	
-	G_SecretSaltHash = SecretSaltHash
-	
 	return SecretSaltHash
 }
 
@@ -339,6 +337,9 @@ type SQuery struct {
 }
 
 func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
+	// Generate a signed url to share to other people!
+	// This generated link can be used how ever many times, forever!! (Unless the url is expirable with '&expires_ms={unix_time}'...)
+	
 	SecretSaltHash := GetAuthSecretSaltHash()
 	
 	Path := LocalUrl
@@ -355,22 +356,22 @@ func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
 	for _, Query := range(Queries) {
 		Hash.Write([]byte(Query.Value))
 		if Query.Value != "" {
-			if QueryId == 0 {
-				Path += fmt.Sprintf("?%s=%s", Query.Name, Query.Value)
-			} else {
-				Path += fmt.Sprintf("&%s=%s", Query.Name, Query.Value)
+			Format := "?%s=%s"
+			if QueryId != 0 {
+				Format = "&%s=%s"
 			}
+			Path += fmt.Sprintf(Format, Query.Name, Query.Value)
 			
 			QueryId += 1
 		}
 	}
 	
 	ComputedHash := base64.RawURLEncoding.EncodeToString([]byte(Hash.Sum(nil)))
-	if QueryId == 0 {
-		Path += fmt.Sprintf("?%s=%s", AUTH_REQUEST_SIGN_QUERYNAME, ComputedHash)
-	} else {
-		Path += fmt.Sprintf("&%s=%s", AUTH_REQUEST_SIGN_QUERYNAME, ComputedHash)
+	Format := "?%s=%s"
+	if QueryId != 0 {
+		Format = "&%s=%s"
 	}
+	Path += fmt.Sprintf(Format, AUTH_REQUEST_SIGN_QUERYNAME, ComputedHash)
 	QueryId += 1
 	
 	return Path
@@ -671,6 +672,8 @@ func OpenAuthDB() error {
 		if err != nil {
 			return fmt.Errorf("Could not set SecretSaltHash in auth database? error: %v", err)
 		}
+	} else {
+		G_SecretSaltHash = SecretSaltHash
 	}
 	
 	AuthDatabaseUpgrades := []string{

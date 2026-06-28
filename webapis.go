@@ -1161,6 +1161,22 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func IsRequestExpired(w http.ResponseWriter, r *http.Request) bool {
+	if ExpiresStr := r.URL.Query().Get("expires_ms"); ExpiresStr != "" {
+		ExpiresMs, _ := strconv.Atoi(ExpiresStr)
+		
+		if ExpiresMs != -1 && time.Now().UTC().UnixMilli() > int64(ExpiresMs) {
+			http.Error(w, "Expired request", http.StatusForbidden)
+			return true
+		}
+		
+		// Not expired!
+		return false
+	}
+	
+	return false
+}
+
 func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 	IsAuthorized, err := IsRequestAuthorized(r)
 	if err != nil {
@@ -1181,13 +1197,8 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
-	if ExpiresStr := r.URL.Query().Get("expires_ms"); ExpiresStr != "" {
-		ExpiresMs, _ := strconv.Atoi(ExpiresStr)
-		
-		if ExpiresMs != -1 && time.Now().UTC().UnixMilli() > int64(ExpiresMs) {
-			http.Error(w, "Expired request", http.StatusForbidden)
-			return
-		}
+	if IsRequestExpired(w, r) {
+		return
 	}
 	
 	RequestId := path.Base(r.URL.Path)
@@ -1267,13 +1278,8 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
-	if ExpiresStr := r.URL.Query().Get("expires_ms"); ExpiresStr != "" {
-		ExpiresMs, _ := strconv.Atoi(ExpiresStr)
-		
-		if ExpiresMs != -1 && time.Now().UTC().UnixMilli() > int64(ExpiresMs) {
-			http.Error(w, "Expired request", http.StatusForbidden)
-			return
-		}
+	if IsRequestExpired(w, r) {
+		return
 	}
 	
 	Path := r.URL.Path
