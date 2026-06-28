@@ -282,9 +282,6 @@ func DeleteSessionTokenIfExists(TokenId string) bool {
 		return false
 	}
 	
-	// TODO: Temp print
-	L_Printf("Deleted auth session TokenId: '%s[...]'\n", TokenId[0:16])
-	
 	return true
 }
 
