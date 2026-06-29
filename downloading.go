@@ -235,6 +235,11 @@ func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) *Vid
 		// Wat??? Video might not have existed before?
 		return nil
 	}
+	if OldVideoInfo.Availability == "public?" { // TODO: This is really hacky... do the thing better
+		// This video was scraped from a quick minimal playlist check...
+		// Don't save a history point.
+		return nil
+	}
 	
 	ChangesWereMade := false
 	HistoryInfo := &VideoInfoHistory{
