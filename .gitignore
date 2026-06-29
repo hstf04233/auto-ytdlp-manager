@@ -13,6 +13,7 @@ yt_download_manager_DEBUG.db
 yt_download_manager_DEBUG.db-wal
 yt_download_manager_DEBUG.db-shm
 auth.db
+*.db
 
 yt-stream-manager.exe
 yt-stream-manager-debug.exe
