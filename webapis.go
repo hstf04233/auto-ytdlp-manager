@@ -19,29 +19,40 @@ type API_RequestChannelBody struct{
 	Name string `json:"name"`
 	Url  string `json:"url"`
 	
-	DownloadDir    string `json:"download_dir"`
-	OutputTemplate string `json:"output_template"`
-	QualitySelect  int    `json:"quality_select"`
+	DownloadDir    *string `json:"download_dir"`
+	OutputTemplate *string `json:"output_template"`
 	Type           int32  `json:"type"`
-	CheckInterval  int64  `json:"check_interval"`
+	
+	QualitySelect int `json:"quality_select"`
+	PreferredVideoFormat *string `json:"preferred_video_format"`
+	PreferredAudioFormat *string `json:"preferred_audio_format"`
+	
+	CheckInterval     int64  `json:"check_interval"`
 	FullCheckInterval int64 `json:"full_check_interval"`
 	PlaylistEnd       int   `json:"playlist_end"`
 	
 	Enabled *bool `json:"enabled"`
 }
 
-func Verify_API_RequestChannelBody(body API_RequestChannelBody) (bool, string) {
-	if len(body.Name) > 128 {
+func Verify_API_RequestChannelBody(Body API_RequestChannelBody) (bool, string) {
+	if len(Body.Name) > 128 {
 		return false, "Name must be shorter than 128 characters."
 	}
-	if len(body.Url) > API_MAX_URL_LENGTH {
+	if len(Body.Url) > API_MAX_URL_LENGTH {
 		return false, fmt.Sprintf("Url must be shorter than %d characters.", API_MAX_URL_LENGTH)
 	}
-	if len(body.DownloadDir) > 1024 {
+	if Body.DownloadDir != nil && len(*Body.DownloadDir) > 1024 {
 		return false, "DownloadDir must be shorter than 1024 characters."
 	}
-	if len(body.OutputTemplate) > 1024 {
+	if Body.OutputTemplate != nil && len(*Body.OutputTemplate) > 1024 {
 		return false, "OutputTemplate must be shorter than 1024 characters."
+	}
+	
+	if Body.PreferredVideoFormat != nil && len(*Body.PreferredVideoFormat) > 512 {
+		return false, "PreferredVideoFormat must be shorter than 512 characters."
+	}
+	if Body.PreferredAudioFormat != nil && len(*Body.PreferredAudioFormat) > 512 {
+		return false, "PreferredAudioFormat must be shorter than 512 characters."
 	}
 	
 	return true, ""
@@ -72,17 +83,30 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 	
 	NewChannel := &ArchiveChannel{
 		Name: Body.Name,
-		Url: Body.Url,
+		Url:  Body.Url,
 		
-		DownloadDir: Body.DownloadDir,
-		OutputTemplate: Body.OutputTemplate,
-		QualitySelect: Body.QualitySelect,
 		Type: Body.Type,
+		
+		QualitySelect: Body.QualitySelect,
 		
 		CheckInterval: Body.CheckInterval,
 		FullCheckInterval: Body.FullCheckInterval,
 		PlaylistEnd: Body.PlaylistEnd,
 	}
+	if Body.DownloadDir != nil {
+		NewChannel.DownloadDir = *Body.DownloadDir
+	}
+	if Body.OutputTemplate != nil {
+		NewChannel.OutputTemplate = *Body.OutputTemplate
+	}
+	
+	if Body.PreferredVideoFormat != nil {
+		NewChannel.PreferredVideoFormat = *Body.PreferredVideoFormat
+	}
+	if Body.PreferredAudioFormat != nil {
+		NewChannel.PreferredAudioFormat = *Body.PreferredAudioFormat
+	}
+	
 	if NewChannel.CheckInterval < 0 {
 		NewChannel.CheckInterval = 0
 	}
@@ -146,12 +170,21 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	if Body.Url != "" {
 		AChannel.Url = Body.Url
 	}
-	if Body.DownloadDir != "" {
-		AChannel.DownloadDir = Body.DownloadDir
+	
+	if Body.DownloadDir != nil {
+		AChannel.DownloadDir = *Body.DownloadDir
 	}
-	if Body.OutputTemplate != "" {
-		AChannel.OutputTemplate = Body.OutputTemplate
+	if Body.OutputTemplate != nil {
+		AChannel.OutputTemplate = *Body.OutputTemplate
 	}
+	
+	if Body.PreferredVideoFormat != nil {
+		AChannel.PreferredVideoFormat = *Body.PreferredVideoFormat
+	}
+	if Body.PreferredAudioFormat != nil {
+		AChannel.PreferredAudioFormat = *Body.PreferredAudioFormat
+	}
+	
 	if Body.QualitySelect >= 0 {
 		AChannel.QualitySelect = Body.QualitySelect
 	}

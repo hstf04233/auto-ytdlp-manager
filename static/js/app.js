@@ -1102,9 +1102,13 @@ function openAddChannelModal() {
   document.getElementById('channelName').value = '';
   document.getElementById('channelUrl').value = '';
   document.getElementById('channelType').value = '0';
-  document.getElementById('channelQuality').value = '0';
   document.getElementById('channelDownloadDir').value = '';
   document.getElementById('channelOutputTemplate').value = '';
+  
+  document.getElementById('channelQuality').value = '0';
+  document.getElementById('channelPreferredVideoFormat').value = "h264,h265,av01";
+  document.getElementById('channelPreferredAudioFormat').value = "aac";
+  
   document.getElementById('channelCheckInterval').value = '';
   document.getElementById('channelPlaylistEnd').value = '20';
   document.getElementById('channelSubmitBtn').textContent = 'Add Channel';
@@ -1129,7 +1133,11 @@ function openEditChannelModal(id) {
   document.getElementById('channelName').value = ch.name;
   document.getElementById('channelUrl').value = ch.url;
   document.getElementById('channelType').value = ch.type;
+  
   document.getElementById('channelQuality').value = ch.quality_select;
+  document.getElementById('channelPreferredVideoFormat').value = ch.preferred_video_format;
+  document.getElementById('channelPreferredAudioFormat').value = ch.preferred_audio_format;
+  
   document.getElementById('channelDownloadDir').value = ch.download_dir || '';
   document.getElementById('channelOutputTemplate').value = ch.output_template || '';
   document.getElementById('channelCheckInterval').value = ch.check_interval || '';
@@ -1228,7 +1236,11 @@ async function saveChannel(e) {
   const name = document.getElementById('channelName').value.trim();
   const url  = document.getElementById('channelUrl').value.trim();
   const type = parseInt(document.getElementById('channelType').value);
+  
   const quality = parseInt(document.getElementById('channelQuality').value);
+  const preferredVideoFormat = document.getElementById('channelPreferredVideoFormat').value;
+  const preferredAudioFormat = document.getElementById('channelPreferredAudioFormat').value;
+  
   const downloadDir = document.getElementById('channelDownloadDir').value.trim();
   const outputTemplate = document.getElementById('channelOutputTemplate').value.trim();
   const checkInterval  = document.getElementById('channelCheckInterval').value ? parseInt(document.getElementById('channelCheckInterval').value) : 1800;
@@ -1237,10 +1249,14 @@ async function saveChannel(e) {
   const body = {
     name,
     url,
-    type,
-    quality_select: quality,
     download_dir: downloadDir,
     output_template: outputTemplate,
+    type,
+    
+    quality_select: quality,
+    preferred_video_format: preferredVideoFormat,
+    preferred_audio_format: preferredAudioFormat,
+    
     check_interval: checkInterval,
     playlist_end: playlistEnd,
   };
@@ -1251,11 +1267,15 @@ async function saveChannel(e) {
       // Edit
       const patch = {};
       if (name) patch.name = name;
-      if (url) patch.url = url;
-      if (downloadDir) patch.download_dir = downloadDir;
-      if (outputTemplate) patch.output_template = outputTemplate;
-      patch.quality_select = quality;
+      if (url)  patch.url = url;
+      patch.download_dir = downloadDir;
+      patch.output_template = outputTemplate;
       patch.type = type;
+      
+      patch.quality_select = quality;
+      patch.preferred_video_format = preferredVideoFormat;
+      patch.preferred_audio_format = preferredAudioFormat;
+      
       patch.check_interval = checkInterval;
       patch.playlist_end = playlistEnd;
       newChannelData = await API.patch(`/api/channels/${id}`, patch);

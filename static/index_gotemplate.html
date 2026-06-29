@@ -369,7 +369,7 @@
           <label for="channelUrl">Channel / Playlist URL</label>
           <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." maxlength="8192" required>
         </div>
-
+        
         <div class="form-row">
           <div class="form-group">
             <label for="channelType">Type</label>
@@ -395,7 +395,39 @@
             </select>
           </div>
         </div>
-
+        
+        
+        <div class="form-group">
+          <label>Video/ Audio formats.</label>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="channelPreferredVideoFormat">Preferred Video Format</label>
+            <select id="channelPreferredVideoFormat">
+              <option value="">Auto</option>
+              <hr>
+              <option value="h264,h265,av01" selected>mp4 - H264 > H265 > AV1</option>
+              <option value="av01,h265,h264">mp4 - AV1 > H265 > H264</option>
+              <option value="h264">mp4 - H264</option>
+              <hr>
+              <option value="vp9.2,vp9,av01,vp8">webm - VP9 > AV1 > VP8</option>
+              <option value="vp9.2,vp9,av01">webm - VP9 > AV1</option>
+              <option value="av01,vp9.2,vp9">webm - AV1 > VP9</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="channelPreferredAudioFormat">Preferred Audio Format</label>
+            <select id="channelPreferredAudioFormat">
+              <option value="">Auto</option>
+              <hr>
+              <option value="aac" selected>mp4 - AAC</option>
+              <hr>
+              <option value="opus">webm - Opus</option>
+            </select>
+          </div>
+        </div>
+        
         <div class="form-group">
           <label for="channelDownloadDir">Download Directory (Optional)</label>
           <input type="text" id="channelDownloadDir" placeholder="./downloads" maxlength="1024">
