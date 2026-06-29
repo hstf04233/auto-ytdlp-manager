@@ -27,10 +27,13 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 	Url               TEXT NOT NULL,
 	DownloadDir       TEXT NOT NULL,
 	OutputTemplate    TEXT NOT NULL,
-	QualitySelect     INTEGER NOT NULL,
 	CheckInterval     INTEGER NOT NULL,
 	FullCheckInterval INTEGER NOT NULL default 172800,
 	PlaylistEnd       INTEGER NOT NULL default 20,
+	
+	QualitySelect INTEGER NOT NULL,
+	PreferredVideoFormat TEXT NOT NULL,
+	PreferredAudioFormat TEXT NOT NULL,
 	
 	Type    INTEGER NOT NULL,
 	Enabled BOOLEAN,
@@ -71,6 +74,9 @@ CREATE TABLE IF NOT EXISTS Videos (
 	HistoryRevisionCount INTEGER DEFAULT 0
 );
 
+CREATE INDEX IF NOT EXISTS idx_videos_releasedate ON Videos(ReleaseDate);
+CREATE INDEX IF NOT EXISTS idx_videos_addedat     ON Videos(AddedAt);
+CREATE INDEX IF NOT EXISTS idx_videos_updatedat   ON Videos(UpdatedAt);
 CREATE INDEX IF NOT EXISTS idx_videos_fromchannel ON Videos(FromChannel);
 
 CREATE TABLE IF NOT EXISTS VideoHistory (
@@ -117,7 +123,7 @@ CREATE TABLE IF NOT EXISTS CommandTasks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_commandtasks_fromchannel ON CommandTasks(FromChannel);
-CREATE INDEX IF NOT EXISTS idx_commandtasks_fromvideo ON CommandTasks(FromVideo);
+CREATE INDEX IF NOT EXISTS idx_commandtasks_fromvideo   ON CommandTasks(FromVideo);
 
 CREATE TABLE IF NOT EXISTS Images (
 	Id        TEXT PRIMARY KEY,  /* Should a hashed value of ImageData */
@@ -222,7 +228,12 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 	Id,
 	Name,
 	Url,
-	DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval,
+	DownloadDir, OutputTemplate, CheckInterval, FullCheckInterval,
+	
+	QualitySelect,
+	PreferredVideoFormat,
+	PreferredAudioFormat,
+	
 	Type, PlaylistEnd,
 	Enabled FROM ArchiveChannels %s`, Condition))
 	if err != nil {
@@ -235,7 +246,12 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 			&Channel.Id,
 			&Channel.Name,
 			&Channel.Url,
-			&Channel.DownloadDir, &Channel.OutputTemplate, &Channel.QualitySelect, &Channel.CheckInterval, &Channel.FullCheckInterval,
+			&Channel.DownloadDir, &Channel.OutputTemplate, &Channel.CheckInterval, &Channel.FullCheckInterval,
+			
+			&Channel.QualitySelect,
+			&Channel.PreferredVideoFormat,
+			&Channel.PreferredAudioFormat,
+			
 			&Channel.Type,
 			&Channel.PlaylistEnd,
 			&Channel.Enabled)
@@ -1083,6 +1099,9 @@ func OpenDB() error {
 		// v0.15
 		"ALTER TABLE Videos ADD COLUMN StreamedDirectory TEXT DEFAULT ''",
 		"ALTER TABLE Videos ADD COLUMN HistoryRevisionCount INTEGER DEFAULT 0",
+		
+		"ALTER TABLE ArchiveChannels ADD COLUMN PreferredVideoFormat TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE ArchiveChannels ADD COLUMN PreferredAudioFormat TEXT NOT NULL DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

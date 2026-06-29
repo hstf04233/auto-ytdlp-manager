@@ -54,10 +54,13 @@ type ArchiveChannel struct {
 	
 	DownloadDir    string `json:"download_dir"`
 	OutputTemplate string `json:"output_template"`
-	QualitySelect  int    `json:"quality_select"`
 	Type           int32  `json:"type"`
 	CheckInterval  int64  `json:"check_interval"`
 	FullCheckInterval int64 `json:"full_check_interval"`
+	
+	QualitySelect  int    `json:"quality_select"`
+	PreferredVideoFormat string `json:"preferred_video_format"`
+	PreferredAudioFormat string `json:"preferred_audio_format"`
 	
 	NeedsRefreshing bool `json:"-"`
 	

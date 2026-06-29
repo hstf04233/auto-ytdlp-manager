@@ -308,6 +308,54 @@ func GetVideoFileInfo(filePath string) (*VideoFileInfo, error) {
 	return &Info, nil
 }
 
+func GetYtDlpFormatedSortForCodec(Formats string, Prefix string) string {
+	Sort := ""
+	
+	Split := strings.Split(Formats, ",")
+	i := 0
+	for _, Arg := range(Split) {
+		if Arg == "" { continue }
+		
+		if i != 0 {
+			Sort += ","
+		}
+		Sort += fmt.Sprintf("%s%s", Prefix, Arg)
+		i += 1
+	}
+	
+	return Sort
+}
+
+func GetYtDlpFormatSort(AChannel *ArchiveChannel, QualitySelect int) string {
+	AddComma := false
+	Args := ""
+	PreferredVideoFormat := AChannel.PreferredVideoFormat
+	PreferredAudioFormat := AChannel.PreferredAudioFormat
+	
+	if QualitySelect > 0 {
+		Args += fmt.Sprintf("res:%d", QualitySelect)
+		AddComma = true
+	} else {
+		Args += "res"
+		AddComma = true
+	}
+	
+	if PreferredVideoFormat != "" {
+		if AddComma { Args += "," }
+		Args += GetYtDlpFormatedSortForCodec(PreferredVideoFormat, "vcodec:")
+		
+		AddComma = true
+	}
+	if PreferredAudioFormat != "" {
+		if AddComma { Args += "," }
+		Args += GetYtDlpFormatedSortForCodec(PreferredAudioFormat, "acodec:")
+		
+		AddComma = true
+	}
+	
+	return Args
+}
+
 func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect int, Video *VideoInfo, Task *CommandTask) (error) {
 	DownloadDir    := GetDownloadDir(AChannel)
 	OutputTemplate := GetOutputTemplate(AChannel)
@@ -331,8 +379,11 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 		QualitySelect = AChannel.QualitySelect
 	}
 	
-	if QualitySelect > 0 {
-		Args = append(Args, "-S", fmt.Sprintf("res:%d", QualitySelect))
+	FormatSort := GetYtDlpFormatSort(AChannel, QualitySelect)
+	
+	if FormatSort != "" {
+		L_Printf("FormatSort: %s\n", FormatSort)
+		Args = append(Args, "-S", FormatSort)
 	}
 	if ShouldLiveFromStart(AChannel, VideoUrl) {
 		Args = append(Args, "--live-from-start")
@@ -566,8 +617,11 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySel
 		Args = append(Args, "--js-runtimes", fmt.Sprintf("deno:%s", DenoPath))
 	}
 	
-	if QualitySelect > 0 {
-		Args = append(Args, "-S", fmt.Sprintf("res:%d", QualitySelect))
+	FormatSort := GetYtDlpFormatSort(AChannel, QualitySelect)
+	
+	if FormatSort != "" {
+		L_Printf("FormatSort: %s\n", FormatSort)
+		Args = append(Args, "-S", FormatSort)
 	}
 	
 	Cmd := exec.Command(Get_YtDlpPath(G_Config), Args...)
