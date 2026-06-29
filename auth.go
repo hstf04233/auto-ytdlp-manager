@@ -338,10 +338,16 @@ type SQuery struct {
 }
 
 func SanitizeQueryValueForSign(Value string) string {
+	// Sanitize the user query value for security!!!
+	// I don't want the user to use the '&' symbol in the query because I use that for my work...
+	
 	var StrBuf bytes.Buffer
 	for _, Char := range([]byte(Value)) {
 		if Char == byte('&') {
-			StrBuf.Write([]byte("&amp;"))
+			StrBuf.Write([]byte("&;"))
+			continue
+		} else if Char == byte('=') {
+			StrBuf.Write([]byte("=;"))
 			continue
 		}
 		
@@ -359,6 +365,7 @@ func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
 	
 	Path := LocalUrl
 	
+	// I am using sha224 instead of sha256 because I want a short hash in the url
 	Hash := sha3.New224()
 	Hash.Write([]byte(LocalUrl))
 	Hash.Write([]byte(SecretSaltHash))
@@ -370,7 +377,7 @@ func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
 		})
 	}
 	/*
-	// Version
+	// Version (Unused currently...)
 	Queries = append(Queries, SQuery{
 		"sv", "0",
 	})
@@ -433,10 +440,11 @@ func IsUserRequestSignedByServer(r *http.Request, Queries []string) bool {
 	return false
 }
 
-// This returns the raw bytes of a sha512 hash. Used for bcrypt because it's limited to 72 characters...
 func HashRawPassword(RawPassword string) string {
+	// Bcrypt only accepts 72 characters in a password.
+	// To get around this issue just use a sha512 hash instead!!
 	Sum := sha3.Sum512([]byte(RawPassword))
-	return string(fmt.Sprintf("%s", Sum))
+	return base64.RawStdEncoding.EncodeToString(Sum[:64])[0:72]
 }
 
 func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
@@ -570,18 +578,11 @@ func ValidateUsername(Username string) error {
 		}
 	}
 	
-	// Username can be used
-	
+	// Username can be used!!!
 	return nil
 }
 
 func AuthCreateUserRequest(w http.ResponseWriter, r *http.Request, UserRole int) {
-	err := r.ParseForm()
-	if err != nil {
-		http.Error(w, "Cannot parse form.", http.StatusBadRequest)
-		return
-	}
-	
 	var Body struct{
 		Username    string `json:"username"`
 		RawPassword string `json:"password"`
