@@ -184,21 +184,25 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	defer AChannel.Lock.RUnlock()
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, PreferredVideoFormat, PreferredAudioFormat, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
 	Url=excluded.Url,
 	DownloadDir=excluded.DownloadDir,
 	OutputTemplate=excluded.OutputTemplate,
+	
 	QualitySelect=excluded.QualitySelect,
+	PreferredVideoFormat=excluded.PreferredVideoFormat,
+	PreferredAudioFormat=excluded.PreferredAudioFormat,
+	
 	CheckInterval=excluded.CheckInterval,
 	FullCheckInterval=excluded.FullCheckInterval,
 	Type=excluded.Type,
 	PlaylistEnd=excluded.PlaylistEnd,
 	Enabled=excluded.Enabled,
 	UpdatedAt=excluded.UpdatedAt
-	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.PlaylistEnd, AChannel.Enabled, TimeNow, TimeNow)
+	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.PreferredVideoFormat, AChannel.PreferredAudioFormat, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.PlaylistEnd, AChannel.Enabled, TimeNow, TimeNow)
 	
 	if err != nil {
 		L_Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
