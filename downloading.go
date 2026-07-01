@@ -272,7 +272,8 @@ func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) *Vid
 		HistoryInfo.Availability = &OldVideoInfo.Availability
 	}
 	
-	if OldVideoInfo.Thumbnail != NewVideoInfo.Thumbnail || OldVideoInfo.OriginThumbnail != NewVideoInfo.OriginThumbnail {
+	if OldVideoInfo.Thumbnail != NewVideoInfo.Thumbnail ||
+	   (G_Config.Download_Video_Thumbnails && OldVideoInfo.OriginThumbnail != NewVideoInfo.OriginThumbnail) {
 		ChangesWereMade = true
 		HistoryInfo.Thumbnail = &OldVideoInfo.Thumbnail
 		HistoryInfo.OriginThumbnail = &OldVideoInfo.OriginThumbnail
@@ -323,12 +324,12 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 	
 	err := RequestVideoInfo(AChannel, Video.Url, -1, Video, Task)
 	
-	AddVideoHistoryPoint(&OldVideoInfo, Video)
-	
 	if OldVideoInfo.Availability != Video.Availability {
 		DB_UpdateVideoAvailability(Video, Video.Availability)
 	}
 	if err != nil {
+		AddVideoHistoryPoint(&OldVideoInfo, Video)
+		
 		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoInfo(Video)
 		DB_UpdateVideoRefreshState(Video, 0)
@@ -343,6 +344,8 @@ func RefreshVideoInfo(AChannel *ArchiveChannel, Video *VideoInfo, Task *CommandT
 			CL_Logf(Task, "Failed to download thumbnail | %v\n", err)
 		}
 	}
+	
+	AddVideoHistoryPoint(&OldVideoInfo, Video)
 	
 	if Video.QueuedAction == VIDEO_QACTION_WILL_IGNORE {
 		// This video was queued to be ignored.
@@ -610,15 +613,14 @@ func CheckVideoAndDownload(AChannel *ArchiveChannel, Video *VideoInfo, Task *Com
 		return false
 	}
 	
-	if OldDBVideoInfo != nil {
-		AddVideoHistoryPoint(OldDBVideoInfo, Video)
-	}
-	
 	if Video.OriginThumbnail != "" && Video.Thumbnail == "" {
 		_, err := DownloadThumbnailForVideo(Video, Video.OriginThumbnail)
 		if err != nil {
 			CL_Logf(Task, "Failed to download thumbnail | %v\n", err)
 		}
+	}
+	if OldDBVideoInfo != nil {
+		AddVideoHistoryPoint(OldDBVideoInfo, Video)
 	}
 	
 	DB_UpdateVideoInfo(Video)
