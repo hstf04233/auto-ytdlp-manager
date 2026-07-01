@@ -380,9 +380,7 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 	}
 	
 	FormatSort := GetYtDlpFormatSort(AChannel, QualitySelect)
-	
 	if FormatSort != "" {
-		L_Printf("FormatSort: %s\n", FormatSort)
 		Args = append(Args, "-S", FormatSort)
 	}
 	if ShouldLiveFromStart(AChannel, VideoUrl) {
@@ -618,9 +616,7 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySel
 	}
 	
 	FormatSort := GetYtDlpFormatSort(AChannel, QualitySelect)
-	
 	if FormatSort != "" {
-		L_Printf("FormatSort: %s\n", FormatSort)
 		Args = append(Args, "-S", FormatSort)
 	}
 	

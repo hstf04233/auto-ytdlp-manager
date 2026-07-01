@@ -298,7 +298,7 @@ func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) *Vid
 func AddVideoHistoryPoint(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) bool {
 	HistoryDifference := GetHistoryDifference(OldVideoInfo, NewVideoInfo)
 	if HistoryDifference == nil {
-		L_Printf("No history changes found for video: %s !!!\n", NewVideoInfo.Id)
+		//L_Printf("No history changes found for video: %s !!!\n", NewVideoInfo.Id)
 		// No changes...
 		return false
 	}

@@ -263,10 +263,12 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	go ReadFileAndWriteToPipe(Pipe2Name, AudioFile, DownloadTask, Task)
 	
 	go func() {
-		err := FFmpegCmd.Wait()
+		_ = FFmpegCmd.Wait()
+		/*
 		if err != nil {
 			L_Printf("Vid stream failed, error: %v\n", err)
 		}
+		*/
 	}()
 	
 	for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
