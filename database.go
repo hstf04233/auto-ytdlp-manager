@@ -2,6 +2,9 @@ package main
 
 import (
 	"database/sql"
+	
+	"crypto/sha3"
+	"encoding/base64"
 	"fmt"
 	"slices"
 	"strings"
@@ -126,8 +129,10 @@ CREATE INDEX IF NOT EXISTS idx_commandtasks_fromchannel ON CommandTasks(FromChan
 CREATE INDEX IF NOT EXISTS idx_commandtasks_fromvideo   ON CommandTasks(FromVideo);
 
 CREATE TABLE IF NOT EXISTS Images (
-	Id        TEXT PRIMARY KEY,  /* Should a hashed value of ImageData */
-	Filename  TEXT,
+	Id         TEXT PRIMARY KEY,  /* Should a hashed value of ImageData */
+	Sha256Hash TEXT NOT NULL DEFAULT '',
+	Filename   TEXT NOT NULL DEFAULT '',
+	
 	ImageData BLOB,
 	
 	Type INTEGER NOT NULL DEFAULT 0,   /* Where did this image come from? */
@@ -166,8 +171,9 @@ const (
 )
 
 type DB_Image struct {
-	Id        string `json:"id"`  /* Should a hashed value of ImageData */
-	Filename  string `json:"filename"`
+	Id         string `json:"id"`  /* Should a hashed value of ImageData */
+	Sha256Hash string `json:"sha256_hash"`  /* Sha256 hash encoded to base64 */
+	Filename   string `json:"filename"`
 	
 	Type int `json:"type"`
 	OriginUrl string `json:"origin_url"`
@@ -1004,15 +1010,16 @@ func DB_DeleteCommandTask(TaskId string) error {
 
 func DB_UpdateImage(Image *DB_Image) error {
 	_, err := GDB.Exec(`
-	INSERT INTO Images(Id, Filename, Type, OriginUrl, AddedAt, UpdatedAt)
-	VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO Images(Id, Sha256Hash, Filename, Type, OriginUrl, AddedAt, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
+	Sha256Hash=excluded.Sha256Hash,
 	Filename=excluded.Filename,
 	Type=excluded.Type,
 	OriginUrl=excluded.OriginUrl,
 	
 	UpdatedAt=excluded.UpdatedAt
-	`, Image.Id, Image.Filename, Image.Type, Image.OriginUrl, time.Now().UTC(), time.Now().UTC())
+	`, Image.Id, Image.Sha256Hash, Image.Filename, Image.Type, Image.OriginUrl, time.Now().UTC(), time.Now().UTC())
 	
 	if err != nil {
 		L_Printf("DB_UpdateImage ERR: %v\n", err)
@@ -1025,10 +1032,11 @@ func DB_UpdateImage(Image *DB_Image) error {
 func DB_GetImageInfo(ImageId string) (*DB_Image, error) {
 	ImageInfo := &DB_Image{}
 	VideoRow := GDB.QueryRow(`
-	SELECT Id, Filename, Type, OriginUrl, AddedAt, UpdatedAt FROM Images WHERE Id = ?
+	SELECT Id, Sha256Hash, Filename, Type, OriginUrl, AddedAt, UpdatedAt FROM Images WHERE Id = ?
 	`, ImageId)
 	err := VideoRow.Scan(
 		&ImageInfo.Id,
+		&ImageInfo.Sha256Hash,
 		&ImageInfo.Filename,
 		
 		&ImageInfo.Type,
@@ -1063,9 +1071,14 @@ func DB_GetImageData(ImageId string) ([]byte, error) {
 }
 
 func DB_SetImageData(Image *DB_Image, ImageContent []byte) error {
+	RawHash := sha3.Sum256(ImageContent)
+	Sha256ImageHash := base64.RawURLEncoding.EncodeToString(RawHash[0:32])
+	
+	Image.Sha256Hash = Sha256ImageHash
+	
 	_, err := GDB.Exec(`
-	UPDATE Images SET ImageData = ?, UpdatedAt = ? WHERE Id = ?
-	`, ImageContent, time.Now().UTC(), Image.Id)
+	UPDATE Images SET ImageData = ?, Sha256Hash = ?, UpdatedAt = ? WHERE Id = ?
+	`, ImageContent, Sha256ImageHash, time.Now().UTC(), Image.Id)
 	
 	if err != nil {
 		L_Printf("DB_SetImageData ERR: %v\n", err)
@@ -1106,6 +1119,8 @@ func OpenDB() error {
 		
 		"ALTER TABLE ArchiveChannels ADD COLUMN PreferredVideoFormat TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE ArchiveChannels ADD COLUMN PreferredAudioFormat TEXT NOT NULL DEFAULT ''",
+		
+		"ALTER TABLE Images ADD COLUMN Sha256Hash TEXT NOT NULL DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)
