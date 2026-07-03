@@ -165,8 +165,6 @@ func _webstatic_AddToManifest(FilePath string) {
 		Hash256:      HashStr,
 	}
 	
-	L_Printf("Turned %s -> %s\n", FilePath, HashedName)
-	
 	WebStatic_HashPathAssetInfo[HashedName] = AssetInfo
 	WebStatic_OGPathAssetInfo[FilePath] = AssetInfo
 }
