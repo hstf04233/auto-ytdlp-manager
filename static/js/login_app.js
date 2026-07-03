@@ -139,7 +139,7 @@ async function createUser(e) {
 			await API.post('/api/create-admin', body);
 		}
 		
-		loginStatus("Account created successfully! Please log in to the account.")
+		loginStatus("Account created successfully! Please log in to the account you just created.")
 		
 		closeCreateUserPrompt();
 	} catch (err) {

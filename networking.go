@@ -282,8 +282,9 @@ func GetIpAddressFromRequest(r *http.Request) string {
 			if CustomHeaderIp := r.Header.Get(CustomHeaderName); CustomHeaderIp != "" {
 				return strings.TrimSpace(CustomHeaderIp)
 			}
+		} else {
+			L_Printf("Unknown IpStrategy: %s\n", IpStrategy)
 		}
-		L_Printf("Unknown IpStrategy: %s\n", IpStrategy)
 	}
 	
 	// Localhost or IP_STRATEGY_DIRECT:
