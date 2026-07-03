@@ -574,12 +574,74 @@ func ValidateUsername(Username string) error {
 	for i := 0; i < len(Username); i++ {
 		Character := Username[i]
 		if Character != '_' && Character != '-' && !IsByteAlpha(Character) && !IsByteNum(Character) {
-			return fmt.Errorf("Username contains invalid character! Only (a-Z, 0-9, _, -) are allowed!")
+			return fmt.Errorf("Username contains invalid character(s)! Only (a-Z 0-9 _ -) characters are allowed!")
 		}
 	}
 	
 	// Username can be used!!!
 	return nil
+}
+
+func AuthCreateUser(Username string, RawPassword string, UserRole int) (*AuthUser, error) {
+	UsernameErr := ValidateUsername(Username)
+	if UsernameErr != nil {
+		//http.Error(w, UsernameErr.Error(), http.StatusBadRequest)
+		return nil, UsernameErr
+	}
+	
+	if len(RawPassword) >= AUTH_PASSWORD_MAX_LENGTH {
+		//http.Error(w, "Password is too long.", http.StatusBadRequest)
+		return nil, fmt.Errorf("Password is too long.")
+	}
+	if len(RawPassword) < 8 {
+		//http.Error(w, "Password must be 8 characters or more.", http.StatusBadRequest)
+		return nil, fmt.Errorf("Password must be 8 characters or more.")
+	}
+	
+	SecuredPassword, err := bcrypt.GenerateFromPassword([]byte(HashRawPassword(RawPassword)), bcrypt.DefaultCost)
+	if err != nil {
+		//L_Printf("Could not generate new password, error: %v\n", err)
+		//http.Error(w, "Error when creating user???", http.StatusInternalServerError)
+		return nil, fmt.Errorf("Could not generate new password, error: %v\n", err)
+	}
+	NewUser := &AuthUser{
+		Username: strings.ToLower(Username),
+		UsernameDisplay: Username,
+		
+		SecuredPassword: string(SecuredPassword),
+		
+		Role: UserRole,
+		
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	
+	Result, err := G_AUTHDB.Exec(`
+	INSERT INTO Users(Username, UsernameDisplay, SecuredPassword, Role, CreatedAt, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?)
+	`, NewUser.Username, NewUser.UsernameDisplay, NewUser.SecuredPassword, NewUser.Role, NewUser.CreatedAt, NewUser.UpdatedAt)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			//http.Error(w, "Username already taken.", http.StatusConflict)
+			return nil, fmt.Errorf("Username already taken.")
+		}
+		//L_Printf("Could not create new user, database error: %v\n", err)
+		
+		return nil, fmt.Errorf("Could not create new user, database error: %v", err)
+	}
+	
+	UserId, err := Result.LastInsertId()
+	if err != nil {
+		//L_Printf("Could not create new user, database error: %v\n", err)
+		
+		//http.Error(w, "Internal error when creating user...", http.StatusInternalServerError)
+		return nil, fmt.Errorf("Could not create new user, database error: %v", err)
+	}
+	NewUser.UserId = uint64(UserId)
+	
+	L_Printf("Created new account, username: %s\n", NewUser.UsernameDisplay)
+	
+	return NewUser, nil
 }
 
 func AuthCreateUserRequest(w http.ResponseWriter, r *http.Request, UserRole int) {
@@ -596,61 +658,12 @@ func AuthCreateUserRequest(w http.ResponseWriter, r *http.Request, UserRole int)
 	RequestUsername := Body.Username
 	RequestPassword := Body.RawPassword
 	
-	UsernameErr := ValidateUsername(RequestUsername)
-	if UsernameErr != nil {
-		http.Error(w, UsernameErr.Error(), http.StatusBadRequest)
-		return
-	}
-	
-	if len(RequestPassword) >= AUTH_PASSWORD_MAX_LENGTH {
-		http.Error(w, "Password is too long.", http.StatusBadRequest)
-		return
-	}
-	if len(RequestPassword) < 8 {
-		http.Error(w, "Password must be 8 characters or more.", http.StatusBadRequest)
-		return
-	}
-	
-	SecuredPassword, err := bcrypt.GenerateFromPassword([]byte(HashRawPassword(RequestPassword)), bcrypt.DefaultCost)
+	NewUser, err := AuthCreateUser(RequestUsername, RequestPassword, UserRole)
 	if err != nil {
-		L_Printf("Could not generate new password, error: %v\n", err)
-		http.Error(w, "Error when creating user???", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	NewUser := &AuthUser{
-		Username: strings.ToLower(RequestUsername),
-		UsernameDisplay: RequestUsername,
-		
-		SecuredPassword: string(SecuredPassword),
-		
-		Role: UserRole,
-		
-		CreatedAt: time.Now().UTC(),
-		UpdatedAt: time.Now().UTC(),
-	}
-	
-	Result, err := G_AUTHDB.Exec(`
-	INSERT INTO Users(Username, UsernameDisplay, SecuredPassword, Role, CreatedAt, UpdatedAt)
-	VALUES (?, ?, ?, ?, ?, ?)
-	`, NewUser.Username, NewUser.UsernameDisplay, NewUser.SecuredPassword, NewUser.Role, NewUser.CreatedAt, NewUser.UpdatedAt)
-	if err != nil {
-		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
-			http.Error(w, "Username already taken.", http.StatusConflict)
-		}
-		L_Printf("Could not create new user, database error: %v\n", err)
-		
-		http.Error(w, "Internal error when creating user...", http.StatusInternalServerError)
-		return
-	}
-	
-	UserId, err := Result.LastInsertId()
-	if err != nil {
-		L_Printf("Could not create new user, database error: %v\n", err)
-		
-		http.Error(w, "Internal error when creating user...", http.StatusInternalServerError)
-		return
-	}
-	NewUser.UserId = uint64(UserId)
+	_ = NewUser
 	
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("{\"Success\":true}"))
@@ -725,12 +738,12 @@ func OpenAuthDB() error {
 
 func AuthDB_Close() {
 	if G_AUTHDB != nil {
-		L_Printf("Closing auth database...\n")
+		//L_Printf("Closing auth database...\n")
 		err := G_AUTHDB.Close()
 		if err != nil {
 			L_Printf("Failed to Closing auth database... Error: %v\n", err)
 		} else {
-			L_Printf("Auth database closed successfully.\n")
+			//L_Printf("Auth database closed successfully.\n")
 		}
 	}
 }

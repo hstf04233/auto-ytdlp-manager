@@ -1104,6 +1104,15 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		
+		Ip := GetIpAddressFromRequest(r)
+		if !IsIpAddressLocal(Ip) {
+			L_Printf("Attempt to create admin account on public ip address[%s]. Please connect via localhost!\nAlternatively, you can run the program with the arguments: './autoytdlpmanager --create-admin-user \"username\" --create-admin-password \"password\"'", Ip)
+			
+			
+			http.Error(w, "Attempt to create admin account on public ip address. Please connect via localhost!\nAlternatively, you can run the program with the arguments: './autoytdlpmanager --create-admin-user \"username\" --create-admin-password \"password\"'", http.StatusForbidden)
+			return
+		}
+		
 		AuthCreateUserRequest(w, r, AUTH_ROLE_ADMIN)
 		return
 	} else if Path == "admin-account-exists" && Method == "GET" {

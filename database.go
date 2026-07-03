@@ -1142,12 +1142,12 @@ func OpenDB() error {
 
 func DB_Close() {
 	if GDB != nil {
-		L_Printf("Closing database...\n")
+		//L_Printf("Closing database...\n")
 		err := GDB.Close()
 		if err != nil {
 			L_Printf("Failed to close database... Error: %v\n", err)
 		} else {
-			L_Printf("Database closed successfully.\n")
+			//L_Printf("Database closed successfully.\n")
 		}
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	//"context"
+	"flag"
 	"errors"
 	"os"
 	"os/signal"
@@ -92,6 +93,11 @@ func StartServer(ServerPort int) {
 	}
 }
 
+func ExitProgram() {
+	DB_Close()
+	AuthDB_Close()
+}
+
 func main() {
 	fmt.Printf("------- auto yt-dlp manager -------\n")
 	InitLogPrint()
@@ -158,6 +164,41 @@ func main() {
 		return
 	}
 	
+	defer ExitProgram()
+	
+	{
+		// Handle command arguments
+		CreateAdminUsername := flag.String("create-admin-username", "", "Create the admin account username, must be used with '--create-admin-password'")
+		CreateAdminPassword := flag.String("create-admin-password", "", "Create the admin account password, must be used with '--create-admin-username'")
+		
+		flag.Parse()
+		
+		if *CreateAdminUsername != "" && *CreateAdminPassword == "" {
+			L_Printf("Could not create admin account: '--create-admin-username' must be used along with '--create-admin-password'!\n")
+			return
+		} else if *CreateAdminUsername == "" && *CreateAdminPassword != "" {
+			L_Printf("Could not create admin account: '--create-admin-password' must be used along with '--create-admin-username'!\n")
+			return
+		}
+		if *CreateAdminUsername != "" && *CreateAdminPassword != "" {
+			AdminAccountExists, err := DoesAdminAccountExist()
+			if err != nil {
+				L_Printf("Failed to check if admin account already exists? error: %v\n", err)
+				return
+			}
+			if AdminAccountExists {
+				L_Printf("Admin account already exists!!! Please run the program normally without the '--create-admin-username' and '--create-admin-password' command arguments!\n")
+				return
+			}
+			NewUser, err := AuthCreateUser(*CreateAdminUsername, *CreateAdminPassword, AUTH_ROLE_ADMIN)
+			if err != nil {
+				L_Printf("\nFailed to create admin account! error: %v\n\n", err)
+				return
+			}
+			L_Printf("Admin account created! You can now log in on the webui. Username: %s\n", NewUser.UsernameDisplay)
+		}
+	}
+	
 	go InitDownloading()
 	
 	// TODO: THIS IS TEMP! go yt_chat_Run("https://www.youtube.com/watch?v=G5oz2dQLi00", "./test-chat-output.json", nil)
@@ -191,7 +232,5 @@ func main() {
 		L_Printf("Failed to shutdown http server. Error: %v\n", err)
 	}
 	*/
-	DB_Close()
-	AuthDB_Close()
-	
+	//ExitProgram()
 }
