@@ -1113,7 +1113,7 @@ func OpenDB() error {
 		"ALTER TABLE Videos ADD COLUMN FileSize     INTEGER DEFAULT 0",
 		"ALTER TABLE Videos ADD COLUMN StoredThumbnail TEXT DEFAULT ''",
 		
-		// v0.15
+		// v0.20
 		"ALTER TABLE Videos ADD COLUMN StreamedDirectory TEXT DEFAULT ''",
 		"ALTER TABLE Videos ADD COLUMN HistoryRevisionCount INTEGER DEFAULT 0",
 		

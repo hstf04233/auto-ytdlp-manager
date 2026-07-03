@@ -706,7 +706,7 @@ func OpenAuthDB() error {
 	}
 	
 	AuthDatabaseUpgrades := []string{
-		// V0.15
+		// V0.20
 		"ALTER TABLE Sessions ADD COLUMN IpAddress TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE Sessions ADD COLUMN UserAgent TEXT NOT NULL DEFAULT ''",
 	}
