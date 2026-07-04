@@ -1121,6 +1121,8 @@ func OpenDB() error {
 		"ALTER TABLE ArchiveChannels ADD COLUMN PreferredAudioFormat TEXT NOT NULL DEFAULT ''",
 		
 		"ALTER TABLE Images ADD COLUMN Sha256Hash TEXT NOT NULL DEFAULT ''",
+		
+		// v0.21
 	}
 	
 	_, err = db.Exec(db_SQL_Header)
