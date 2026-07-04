@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	
+
 	"autoytdlpmanager/os_tings"
 )
 
@@ -52,7 +53,7 @@ func Get_ytarchive_State(DownloadDir string, VideoId string) (*ytarchive_State, 
 		return nil, false
 	}
 	
-	L_Printf("Found state! StateFilePath: %s\n", StateFilePath)
+	//L_Printf("Found state! StateFilePath: %s\n", StateFilePath)
 	
 	FileContents, err := os.ReadFile(StateFilePath)
 	if err != nil {
@@ -124,7 +125,7 @@ func Get_ytarchive_VideoAndAudioDownloadFiles(State ytarchive_State) (ytarchive_
 		VideoAndAudio.VideoPath = VideoPath
 		VideoAndAudio.AudioPath = AudioPath
 		
-		return  VideoAndAudio, true
+		return VideoAndAudio, true
 	} else {
 		L_Printf("Could not ReadDir '%s', error: %v\n", State.TempDir, err)
 		return VideoAndAudio, false
@@ -142,17 +143,19 @@ func ReadFileAndWriteToPipe(PipeName string, InputFile *os.File, DownloadTask *C
 	}
 	defer VideoPipe.Close()
 	
-	VideoBuf := make([]byte, 16384)
+	Buf := make([]byte, 16384)
 	for CL_IsRunning(DownloadTask) && CL_IsRunning(Task) {
-		Count, err := InputFile.Read(VideoBuf)
-		if err == io.EOF {
+		Count, err := InputFile.Read(Buf)
+		if Count > 0 {
+			VideoPipe.Write(Buf[0:Count])
+		}
+		if err == io.EOF || errors.Is(err, io.EOF) {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		} else if err != nil {
 			L_Printf("File read errored for pipe: '%s' error: %v\n", PipeName, err)
 			break
 		}
-		VideoPipe.Write(VideoBuf[0:Count])
 	}
 }
 
@@ -237,6 +240,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		"-hls_list_size", "1800",		// 30 minutes to 5 hours.
 		"-hls_delete_threshold", "10",
 		//"-hls_flags", "delete_segments+append_list+omit_endlist",
+		"-fflags", "nobuffer", "-flags", "low_delay",
 		"-hls_flags", "independent_segments+delete_segments+append_list+omit_endlist",
 		
 		"-hls_segment_filename", "segment_%03d.ts",
@@ -249,6 +253,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 	if err != nil {
 		return fmt.Errorf("Failed to create download task: %v", err)
 	}
+	Task.Title = fmt.Sprintf("FFmpeg stream for: \"%s\"", Video.Title)
 	defer func() {
 		if Task != nil && CL_IsRunning(Task) {
 			CL_FinishTask(Task, TASK_STATUS_FAILED)
