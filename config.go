@@ -16,6 +16,8 @@ const (
 	CONFIG_PATH = "config.json"
 	CONFIG_PATH_DEBUG = "config_DEBUG.json"
 	
+	DEFAULT_RATE_LIMIT_KBPS_PER_IP = 10_000
+	
 	YT_DLP_CONFIG_FILENAME = "ytdlp_config.txt"
 	
 	DEFAULT_SERVER_PORT = 8867
@@ -47,6 +49,7 @@ type ProgramConfig struct {
 	
 	ServerPort uint16
 	IpStrategy string
+	RateLimitKBPSPerPublicIp int
 	
 	YtDlp_Path     string
 	YtArchive_Path string
@@ -81,6 +84,7 @@ var G_Config = &ProgramConfig{
 	Mutex: &sync.RWMutex{},
 	ServerPort: DEFAULT_SERVER_PORT,
 	IpStrategy: IP_STRATEGY_DIRECT,
+	RateLimitKBPSPerPublicIp: DEFAULT_RATE_LIMIT_KBPS_PER_IP,
 	
 	YtDlp_Path:     "yt-dlp",
 	YtArchive_Path: "ytarchive",
@@ -151,6 +155,11 @@ func Get_DenoPath(Config *ProgramConfig) string {
 	Config.Mutex.RLock()
 	defer Config.Mutex.RUnlock()
 	return Config.Deno_Path_Real
+}
+func Get_RateLimitKBPSPerPublicIp(Config *ProgramConfig) int {
+	Config.Mutex.RLock()
+	defer Config.Mutex.RUnlock()
+	return Config.RateLimitKBPSPerPublicIp
 }
 
 func UpdateConfig(Config *ProgramConfig) error {

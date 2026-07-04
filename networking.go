@@ -20,7 +20,6 @@ const (
 )
 
 const (
-	RATE_LIMIT_KBPS_PER_IP  = 10_000
 	RATE_LIMIT_KBPS_LOCALIP = 1e12
 )
 
@@ -153,7 +152,7 @@ func GetDynThrottledWriterInfo(r *http.Request) *DynamicThrottledWriterInfo {
 	NewInfo := &DynamicThrottledWriterInfo{
 		Ip: Ip,
 		
-		TargetKBPS: RATE_LIMIT_KBPS_PER_IP,
+		TargetKBPS: Get_RateLimitKBPSPerPublicIp(G_Config),
 	}
 	NETWORKING_DYNTHROTTLED_WRITERS[Ip] = NewInfo
 	
@@ -333,6 +332,8 @@ func init() {
 			DeleteTick -= 1
 			
 			N_DT_W_MUTEX.Lock()
+			
+			RATE_LIMIT_KBPS_PER_IP := Get_RateLimitKBPSPerPublicIp(G_Config)
 			
 			for Ip, DTWInfo := range(NETWORKING_DYNTHROTTLED_WRITERS) {
 				DTWInfo.mutex.Lock()
