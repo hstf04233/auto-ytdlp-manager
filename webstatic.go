@@ -85,7 +85,7 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
-	IsAuthorized, err := IsRequestAuthorized(r)
+	IsAuthorized, err := IsRequestReadOnlyAuthorized(r)
 	if err != nil {
 		L_Printf("Auth error: %v\n", err)
 		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)

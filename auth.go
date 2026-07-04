@@ -79,6 +79,8 @@ var AUTH_SESSION_TOKEN_COOKIE_NAME = "AYDM_SESSION_AUTH_TOKEN"
 const (
 	AUTH_ROLE_NONE  = 0
 	AUTH_ROLE_ADMIN = 1
+	AUTH_ROLE_USER_READONLY = 2
+	AUTH_ROLE_USER_DUMMY    = 10  // Account is created
 )
 
 var G_AUTHDB *sql.DB
@@ -172,6 +174,29 @@ func GetAuthUserFromUserId(UserId uint64) (*AuthUser, error) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("Failed to find user, error: %v\n", err)
+	}
+	
+	return AUser, nil
+}
+func GetFirstAuthUserFromRole(UserRole int) (*AuthUser, error) {
+	AUserRow := G_AUTHDB.QueryRow(`
+	SELECT UserId FROM Users WHERE Role = ?
+	`, UserRole)
+	
+	var UserId uint64
+	err := AUserRow.Scan(
+		&UserId,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("Failed to find user, error: %v\n", err)
+	}
+	
+	AUser, err := GetAuthUserFromUserId(UserId)
+	if err != nil {
+		return nil, err
 	}
 	
 	return AUser, nil
@@ -311,7 +336,7 @@ func GetAuthUserFromRequest(r *http.Request) (*AuthUser, error) {
 	return nil, nil
 }
 
-func IsRequestAuthorized(r *http.Request) (bool, error) {
+func IsRequestAdminAuthorized(r *http.Request) (bool, error) {
 	AuthorizationToken := r.Header.Get("authorization")
 	if AuthorizationToken != "" {
 		// TODO:
@@ -326,6 +351,27 @@ func IsRequestAuthorized(r *http.Request) (bool, error) {
 		return false, nil
 	}
 	if AUser.Role == AUTH_ROLE_ADMIN {
+		return true, nil
+	}
+	
+	return false, nil
+}
+
+func IsRequestReadOnlyAuthorized(r *http.Request) (bool, error) {
+	AuthorizationToken := r.Header.Get("authorization")
+	if AuthorizationToken != "" {
+		// TODO:
+	}
+	
+	AUser, err := GetAuthUserFromRequest(r)
+	if err != nil {
+		return false, fmt.Errorf("Could not get auth user, error %v", err)
+	}
+	
+	if AUser == nil {
+		return false, nil
+	}
+	if AUser.Role == AUTH_ROLE_USER_READONLY || AUser.Role == AUTH_ROLE_ADMIN {
 		return true, nil
 	}
 	
@@ -672,9 +718,9 @@ func AuthCreateUserRequest(w http.ResponseWriter, r *http.Request, UserRole int)
 
 func DoesAdminAccountExist() (bool, error) {
 	// TODO: this is temp, find a better way of checking if an admin account exists.
-	AUser, err := GetAuthUserFromUserId(1)
+	AUser, err := GetFirstAuthUserFromRole(AUTH_ROLE_ADMIN)
 	if err != nil {
-		L_Printf("GetAuthUserFromUserId error: %v\n", err)
+		L_Printf("GetFirstAuthUserFromRole error: %v\n", err)
 		return false, err
 	}
 	

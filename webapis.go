@@ -1130,35 +1130,73 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	IsAuthorized, err := IsRequestAuthorized(r)
+	AuthUser, err := GetAuthUserFromRequest(r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)
 		return
 	}
-	if !IsAuthorized {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	if AuthUser == nil {
+		http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 		return
 	}
+	
+	if AuthUser.Role != AUTH_ROLE_ADMIN && AuthUser.Role != AUTH_ROLE_USER_READONLY {
+		http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+		return
+	}
+	/*
+	if !IsAuthorized {
+		http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+		return
+	}
+	*/
+	
+	IsAdminAuthorized := (AuthUser.Role == AUTH_ROLE_ADMIN)
+	IsReadOnlyAuthorized := (AuthUser.Role == AUTH_ROLE_USER_READONLY || IsAdminAuthorized)
 	
 	// Authorized endpoints
 	
 	if Path == "channels" && Method == "POST" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		// POSTing to api/channels will create a new channel.
 		API_NewChannel(w, r)
 	} else if strings.HasPrefix(Path, "channels/") && Method == "PATCH" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		// PATCHing to api/channels/{channel_id} will update a channel.
 		API_UpdateChannel(w, r)
 	} else if strings.HasPrefix(Path, "channels/") && Method == "DELETE" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		// DELETE-ing to api/channels/{channel_id} will delete a channel.
 		API_DeleteChannel(w, r)
 	} else if (Path == "channels" || strings.HasPrefix(Path, "channels/")) && Method == "GET" {
+		if !IsReadOnlyAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		// api/channels will give the entire list of channels !
 		// api/channels/{channel_id} will give you a specific channel.
 		API_GetChannels(w, r)
 	} else if strings.HasPrefix(Path, "check-channel-now/") && Method == "POST" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		// PPOSTing to api/check-channel-now/{channel_id} make the channel be checked first chance it gets.
 		API_CheckChannel(w, r)
 	} else if (Path == "videos" || strings.HasPrefix(Path, "videos/")) && Method == "GET" {
+		if !IsReadOnlyAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		/*
 		  api/videos?limit={int}&offset={int}&status={int}&from_channel={channel_id}&order_by={order}&order_direction={1, -1} Will return a list of videos.
 		  status, from_channel, order_by and order_direction are optional.
@@ -1167,22 +1205,36 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		*/
 		API_GetVideos(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "PATCH" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		// You can set status, refresh_state
 		API_UpdateVideo(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "DELETE" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		// DELETE api/videos/{video_id} will delete a video
 		API_DeleteVideo(w, r)
 	} else if (strings.HasPrefix(Path, "add-videos")) && Method == "POST" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		API_AddVideos(w, r)
-	} else if (strings.HasPrefix(Path, "get-video-status/")) && Method == "GET" {
-		// api/get-video-status/{video_id} will return just the status of the video and nothing else.
-		// Returns as json (example: {status: 0})
-		
-		// This is to grab the video status without refreshing the entire list with the api/videos list api.
-		API_GetVideoStatus(w, r)
 	} else if (strings.HasPrefix(Path, "share-video-file/")) && Method == "GET" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		API_ShareVideoFile(w, r)
 	} else if (Path == "tasks" || strings.HasPrefix(Path, "tasks/")) && Method == "GET" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		/*
 		  api/tasks?limit={int}&offset={int}&status={int}&type={int}&from_channel={channel_id}&from_video={video_id}&order_by={order}&order_direction={1, -1}
 		  
@@ -1190,12 +1242,28 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		*/
 		API_GetTasks(w, r)
 	} else if (strings.HasPrefix(Path, "cancel-task/")) && Method == "POST" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		API_CancelTask(w, r)
 	} else if strings.HasPrefix(Path, "get-realtime-task-output/") && Method == "GET" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		API_GetTaskOutput(w, r)
 	} else if strings.HasPrefix(Path, "config") && Method == "GET" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		API_GetConfig(w, r)
 	} else if strings.HasPrefix(Path, "config") && Method == "PATCH" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
 		API_SetConfig(w, r)
 	} else {
 		fmt.Printf("Api path: '%s' Method: '%s' not found\n", Path, Method)
@@ -1234,7 +1302,7 @@ func IsRequestExpired(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
-	IsAuthorized, err := IsRequestAuthorized(r)
+	IsAuthorized, err := IsRequestReadOnlyAuthorized(r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)
 		return
@@ -1315,7 +1383,7 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 }
 
 func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
-	IsAuthorized, err := IsRequestAuthorized(r)
+	IsAuthorized, err := IsRequestReadOnlyAuthorized(r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)
 		return

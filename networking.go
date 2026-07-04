@@ -188,7 +188,6 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 	totalWritten := 0
 	
 	for len(ToWrite) > 0 {
-		// bytes allowed per 50ms
 		t.mu.Lock()
 		
 		t.kbps_mu.Lock()
@@ -219,8 +218,8 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 		t.bytesUntilSleep -= int64(n)
 		
 		if t.bytesUntilSleep <= 0 {
-			t.mu.Unlock()
 			t.bytesUntilSleep = bytesPerTick
+			t.mu.Unlock()
 			
 			<-t.ticker.C  // Wait for 50ms
 		} else {
