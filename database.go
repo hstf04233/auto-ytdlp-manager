@@ -276,18 +276,18 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 	return ChannelsList, nil
 }
 
-func DB_LoadChannels(WD *ArchiveChannelsBundle) error {
+func DB_LoadChannels(CB *ArchiveChannelsBundle) error {
 	ChannelsList, err := DB_ListChannels("")
 	if err != nil {
 		return err
 	}
-	WD.ChannelsLock.Lock()
-	defer WD.ChannelsLock.Unlock()
+	CB.ChannelsLock.Lock()
+	defer CB.ChannelsLock.Unlock()
 	for _, Channel := range(ChannelsList) {
 		Channel.NextCheckMSEC = 0
 		Channel.NextFullChannelCheckMSEC = 0
 		
-		WD.Channels = append(WD.Channels, Channel)
+		CB.Channels = append(CB.Channels, Channel)
 	}
 	
 	return nil

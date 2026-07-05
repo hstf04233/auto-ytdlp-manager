@@ -100,7 +100,7 @@ type ArchiveChannelsBundle struct {
 
 var G_ArchiveChannels ArchiveChannelsBundle
 
-func AddArchiveChannel(WD *ArchiveChannelsBundle, AChannel *ArchiveChannel) error {
+func AddArchiveChannel(CB *ArchiveChannelsBundle, AChannel *ArchiveChannel) error {
 	if AChannel.Id == "" {
 		AChannel.Id = uuid.New().String()
 	}
@@ -111,23 +111,23 @@ func AddArchiveChannel(WD *ArchiveChannelsBundle, AChannel *ArchiveChannel) erro
 		return err
 	}
 	
-	WD.ChannelsLock.Lock()
-	WD.Channels = append(WD.Channels, AChannel)
-	WD.ChannelsLock.Unlock()
+	CB.ChannelsLock.Lock()
+	CB.Channels = append(CB.Channels, AChannel)
+	CB.ChannelsLock.Unlock()
 	
 	return nil
 }
-func RemoveArchiveChannel(WD *ArchiveChannelsBundle, Id string) error {
+func RemoveArchiveChannel(CB *ArchiveChannelsBundle, Id string) error {
 	err := DB_RemoveChannel(Id)
 	if err != nil {
 		L_Printf("Could not remove channel from database err: %v\n", err)
 		return err
 	}
-	WD.ChannelsLock.Lock()
-	defer WD.ChannelsLock.Unlock()
-	NewChannels := make([]*ArchiveChannel, 0, len(WD.Channels))
+	CB.ChannelsLock.Lock()
+	defer CB.ChannelsLock.Unlock()
+	NewChannels := make([]*ArchiveChannel, 0, len(CB.Channels))
 	
-	for _, AChannel := range(WD.Channels) {
+	for _, AChannel := range(CB.Channels) {
 		if AChannel.Id == Id {
 			AChannel.Enabled = false
 			continue
@@ -136,17 +136,17 @@ func RemoveArchiveChannel(WD *ArchiveChannelsBundle, Id string) error {
 		NewChannels = append(NewChannels, AChannel)
 	}
 	
-	WD.Channels = NewChannels
+	CB.Channels = NewChannels
 	
 	return nil
 }
 
 var _GMAC_Lock sync.Mutex
-func GetManualArchiveChannel(WD *ArchiveChannelsBundle) *ArchiveChannel {
+func GetManualArchiveChannel(CB *ArchiveChannelsBundle) *ArchiveChannel {
 	_GMAC_Lock.Lock()
 	defer _GMAC_Lock.Unlock()
 	
-	AChannel := GetArchiveChannelFromId(WD, MANUAL_CHANNEL_ID)
+	AChannel := GetArchiveChannelFromId(CB, MANUAL_CHANNEL_ID)
 	if AChannel == nil {
 		// Create the manual channel
 		AChannel = &ArchiveChannel{
@@ -157,7 +157,7 @@ func GetManualArchiveChannel(WD *ArchiveChannelsBundle) *ArchiveChannel {
 			Hidden: true,
 			PlaylistEnd: -1,
 		}
-		err := AddArchiveChannel(WD, AChannel)
+		err := AddArchiveChannel(CB, AChannel)
 		if err != nil {
 			L_Printf("Error when creating manual channel: %s\n", err)
 			return nil
@@ -169,10 +169,10 @@ func GetManualArchiveChannel(WD *ArchiveChannelsBundle) *ArchiveChannel {
 	return AChannel
 }
 
-func GetArchiveChannelFromId(WD *ArchiveChannelsBundle, Id string) *ArchiveChannel {
-	WD.ChannelsLock.RLock()
-	defer WD.ChannelsLock.RUnlock()
-	for _, AChannel := range(WD.Channels) {
+func GetArchiveChannelFromId(CB *ArchiveChannelsBundle, Id string) *ArchiveChannel {
+	CB.ChannelsLock.RLock()
+	defer CB.ChannelsLock.RUnlock()
+	for _, AChannel := range(CB.Channels) {
 		if AChannel.Id == Id {
 			return AChannel
 		}
@@ -1057,10 +1057,10 @@ func CheckChannelRefreshes(AChannel *ArchiveChannel) {
 	CL_FinishTask(Task, TASK_STATUS_FINISHED)
 }
 
-func CheckChannels(WD *ArchiveChannelsBundle) {
+func CheckChannels(CB *ArchiveChannelsBundle) {
 	TimeNow := time.Now().UTC().UnixMilli()
 	
-	for _, AChannel := range(WD.Channels) {
+	for _, AChannel := range(CB.Channels) {
 		if AChannel.NeedsRefreshing {
 			go CheckChannelRefreshes(AChannel)
 		}
