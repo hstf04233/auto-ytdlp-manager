@@ -553,10 +553,15 @@ async function saveConfig(event) {
   }
   
   try {
-    await API.patch("/api/config", body);
+    const newProgramConfig = await API.patch("/api/config", body);
     showToast('Config updated!', 'success');
     
-    loadConfig();
+    if (newProgramConfig) {
+      programConfig = newProgramConfig;
+      renderConfig(programConfig);
+    } else {
+      loadConfig();
+    }
   } catch (err) {
     showToast(`Failed: ${err.message}`, 'error');
   }
