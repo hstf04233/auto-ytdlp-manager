@@ -2187,12 +2187,15 @@ async function init() {
 async function quickToggleDisableAllChannels(cb) {
   try {
     let isDisabled = cb.checked
-    await API.patch("/api/config", {
+    const newProgramConfig = await API.patch("/api/config", {
         AllChannels_Disabled: isDisabled
       }
     );
     
-    programConfig.AllChannels_Disabled = isDisabled;
+    if (newProgramConfig) {
+      programConfig = newProgramConfig;
+      renderConfig(programConfig);
+    }
   } catch (err) {
     showToast(`Failed to update AllChannels_Disabled: ${err.message}`, 'error');
     loadConfig();
