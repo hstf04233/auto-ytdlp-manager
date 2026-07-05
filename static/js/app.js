@@ -1996,6 +1996,7 @@ async function loadFullTaskOutput(taskId) {
     const task = allTasks.find(t => t.id === taskId);
     if (task && task.output !== null) {
       outputContainer.innerHTML = formatTerminalOutput(task.output, task.status, task.run_args);
+      
       // Auto-scroll to bottom
       outputContainer.scrollTop = outputContainer.scrollHeight;
     }
@@ -2047,14 +2048,18 @@ function startRealtimePolling() {
         return;
       }
       
+      const outputContainer = document.getElementById('taskOutputContent');
+      const isAtBottom = outputContainer.scrollHeight - outputContainer.scrollTop <= outputContainer.clientHeight + 4;
+      
       const formatedDuration = getFormatedTaskDuration(selectedTask);
       
       const text = await res.text();
-      const outputContainer = document.getElementById('taskOutputContent');
       outputContainer.innerHTML = formatTerminalOutput(text, selectedTask.status, selectedTask.run_args);
       
       // Auto-scroll to bottom
-      outputContainer.scrollTop = outputContainer.scrollHeight;
+      if (isAtBottom) {
+        outputContainer.scrollTop = outputContainer.scrollHeight;
+      }
       
       if (statusEl) statusEl.textContent = 'Live';
       if (taskTitleEl) {
