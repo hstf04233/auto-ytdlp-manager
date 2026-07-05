@@ -291,16 +291,18 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 }
 
 // This must be called with a Video that has been passed through RequestVideoInfo()
-func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int) (error) {
-	DownloadDir := GetDownloadDir(AChannel)
+func ytarchive_DownloadLive(CheckSettings ChannelCheckSettings, Video *VideoInfo) (error) {
+	DownloadDir := GetDownloadDir(CheckSettings)
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
 		L_Printf("Could not make directory \"%s\" err: %v\n", DownloadDir, err)
 	}
 	
+	QualitySelect := CheckSettings.QualitySelect
+	
+	// ytarchive only accepts resolution as a string
 	//144p, 240p, 360p, 480p, 720p, 720p60, 1080p, 1080p60, 1440p, 1440p60, 2160p, 2160p60, best
-	//QualitySelect := AChannel.QualitySelect
 	QualityString := "144p/best"
 	if QualitySelect >= 2160 {
 		QualityString = "2160p60/2160p/best"
@@ -353,7 +355,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo, QualityS
 		Args ...,
 	)
 	Cmd.Dir = DownloadDir
-	DownloadTask, task_err := CL_RunDownloadTask(Cmd, Video, AChannel.Id)
+	DownloadTask, task_err := CL_RunDownloadTask(Cmd, Video, CheckSettings.AChannel.Id)
 	
 	err = Cmd.Start()
 	if err != nil {
@@ -363,7 +365,7 @@ func ytarchive_DownloadLive(AChannel *ArchiveChannel, Video *VideoInfo, QualityS
 	
 	if task_err == nil {
 		go func() {
-			err := TurnYTLiveIntoM3U8LiveStream(DownloadTask, DownloadDir, AChannel, Video)
+			err := TurnYTLiveIntoM3U8LiveStream(DownloadTask, DownloadDir, CheckSettings.AChannel, Video)
 			if err != nil {
 				L_Printf("Failed to TurnYTLiveIntoM3U8LiveStream, error: %v\n", err)
 			}

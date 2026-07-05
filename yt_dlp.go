@@ -215,7 +215,7 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	}
 }
 
-func GetDownloadDir(AChannel *ArchiveChannel) string {
+func GetDownloadDirFromArchiveChannel(AChannel *ArchiveChannel) string {
 	DownloadDir := AChannel.DownloadDir
 	if DownloadDir == "" {
 		DownloadDir = G_Config.Default_DownloadDir
@@ -227,11 +227,23 @@ func GetDownloadDir(AChannel *ArchiveChannel) string {
 	
 	return DownloadDir
 }
-func GetOutputTemplate(AChannel *ArchiveChannel) string {
-	OutputTemplate := AChannel.OutputTemplate
+func GetDownloadDir(CheckSettings ChannelCheckSettings) string {
+	DownloadDir := CheckSettings.DownloadDir
+	if DownloadDir == "" {
+		DownloadDir = G_Config.Default_DownloadDir
+	}
+	
+	if filepath.IsLocal(DownloadDir) {
+		DownloadDir = filepath.Join(CURRENT_WORKING_DIRECTORY, DownloadDir)
+	}
+	
+	return DownloadDir
+}
+func GetOutputTemplate(CheckSettings ChannelCheckSettings) string {
+	OutputTemplate := CheckSettings.OutputTemplate
 	if OutputTemplate == "" {
 		OutputTemplate = G_Config.Default_YtDlp_OutputTemplate
-		if AChannel.Type == ACHANNEL_TYPE_LIVE {
+		if CheckSettings.Type == ACHANNEL_TYPE_LIVE {
 			OutputTemplate = G_Config.Default_YtDlp_OutputTemplate_Live
 		}
 	}
@@ -326,14 +338,14 @@ func GetYtDlpFormatedSortForCodec(Formats string, Prefix string) string {
 	return Sort
 }
 
-func GetYtDlpFormatSort(AChannel *ArchiveChannel, QualitySelect int) string {
+func GetYtDlpFormatSort(CheckSettings ChannelCheckSettings) string {
 	AddComma := false
 	Args := ""
-	PreferredVideoFormat := AChannel.PreferredVideoFormat
-	PreferredAudioFormat := AChannel.PreferredAudioFormat
+	PreferredVideoFormat := CheckSettings.PreferredVideoFormat
+	PreferredAudioFormat := CheckSettings.PreferredAudioFormat
 	
-	if QualitySelect > 0 {
-		Args += fmt.Sprintf("res:%d", QualitySelect)
+	if CheckSettings.QualitySelect > 0 {
+		Args += fmt.Sprintf("res:%d", CheckSettings.QualitySelect)
 		AddComma = true
 	} else {
 		Args += "res"
@@ -356,9 +368,9 @@ func GetYtDlpFormatSort(AChannel *ArchiveChannel, QualitySelect int) string {
 	return Args
 }
 
-func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect int, Video *VideoInfo, Task *CommandTask) (error) {
-	DownloadDir    := GetDownloadDir(AChannel)
-	OutputTemplate := GetOutputTemplate(AChannel)
+func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video *VideoInfo, Task *CommandTask) (error) {
+	DownloadDir    := GetDownloadDir(CheckSettings)
+	OutputTemplate := GetOutputTemplate(CheckSettings)
 	
 	err := os.MkdirAll(DownloadDir, 0755)
 	if err != nil {
@@ -375,15 +387,11 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 		"-o", OutputTemplate,
 	}
 	
-	if QualitySelect == -1 {
-		QualitySelect = AChannel.QualitySelect
-	}
-	
-	FormatSort := GetYtDlpFormatSort(AChannel, QualitySelect)
+	FormatSort := GetYtDlpFormatSort(CheckSettings)
 	if FormatSort != "" {
 		Args = append(Args, "-S", FormatSort)
 	}
-	if ShouldLiveFromStart(AChannel, VideoUrl) {
+	if ShouldLiveFromStart(CheckSettings.AChannel, VideoUrl) {
 		Args = append(Args, "--live-from-start")
 	}
 	
@@ -410,7 +418,7 @@ func RequestVideoInfo(AChannel *ArchiveChannel, VideoUrl string, QualitySelect i
 			Video.VideoType = VIDEO_TYPE_WASLIVE
 		}
 		
-		FilePath, fpErr := GetDownloadedVideoFilePath(Video, AChannel)
+		FilePath, fpErr := GetDownloadedVideoFilePath(Video, CheckSettings.AChannel)
 		if fpErr == nil && FilePath != "" {
 			VFileInfo, err := GetVideoFileInfo(FilePath)
 			if err != nil {
@@ -580,8 +588,8 @@ func yt_dlp_ListVideos(ChannelUrl string, PlaylistEnd int, Task *CommandTask) ([
 
 
 // This must be called with a Video that has been passed through RequestVideoInfo()
-func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySelect int) (error) {
-	DownloadDir    := GetDownloadDir(AChannel)
+func yt_dlp_DownloadVideo(CheckSettings ChannelCheckSettings, Video *VideoInfo) (error) {
+	DownloadDir := GetDownloadDir(CheckSettings)
 	//OutputTemplate := GetOutputTemplate(AChannel)
 	
 	err := os.MkdirAll(DownloadDir, 0755)
@@ -615,14 +623,14 @@ func yt_dlp_DownloadVideo(AChannel *ArchiveChannel, Video *VideoInfo, QualitySel
 		Args = append(Args, "--js-runtimes", fmt.Sprintf("deno:%s", DenoPath))
 	}
 	
-	FormatSort := GetYtDlpFormatSort(AChannel, QualitySelect)
+	FormatSort := GetYtDlpFormatSort(CheckSettings)
 	if FormatSort != "" {
 		Args = append(Args, "-S", FormatSort)
 	}
 	
 	Cmd := exec.Command(Get_YtDlpPath(G_Config), Args...)
 	Cmd.Dir = DownloadDir
-	CL_RunDownloadTask(Cmd, Video, AChannel.Id)
+	CL_RunDownloadTask(Cmd, Video, CheckSettings.AChannel.Id)
 	
 	err = Cmd.Start()
 	if err != nil {

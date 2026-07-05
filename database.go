@@ -185,6 +185,7 @@ type DB_Image struct {
 var GDB *sql.DB
 var VideoDBLock sync.RWMutex
 
+// Add or update archive channel.
 func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	AChannel.Lock.RLock()
 	defer AChannel.Lock.RUnlock()
@@ -275,7 +276,7 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 	return ChannelsList, nil
 }
 
-func DB_LoadChannels(WD *WatchingBundle) error {
+func DB_LoadChannels(WD *ArchiveChannelsBundle) error {
 	ChannelsList, err := DB_ListChannels("")
 	if err != nil {
 		return err
@@ -649,7 +650,7 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 		// We found the videos we want!
 		for _, VideoInfo := range(VideosList) {
 			FullVideoInfo, err := DB_GetVideo(VideoInfo.Id)
-			if err == nil {
+			if err == nil && FullVideoInfo != nil {
 				*VideoInfo = *FullVideoInfo
 			}
 		}
@@ -791,7 +792,7 @@ func DB_PopulateCommandTaskInfo(Task *CommandTask) {
 	defer Task.Lock.Unlock()
 	if Task.FromChannelId != "" {
 		ChannelInfo := &TaskChannelInfo{}
-		AChannel := GetArchiveChannelFromId(&WatchedDownloading, Task.FromChannelId)
+		AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, Task.FromChannelId)
 		if AChannel != nil {
 			ChannelInfo.Name = AChannel.Name
 			ChannelInfo.Url  = AChannel.Url

@@ -116,7 +116,7 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 	// This is intended behavior. I want all newly created channels to be paused by default ! (Even if the request wants it to be enabled...)
 	NewChannel.Enabled = false
 	
-	err := AddArchiveChannel(&WatchedDownloading, NewChannel)
+	err := AddArchiveChannel(&G_ArchiveChannels, NewChannel)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -143,7 +143,7 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
+	AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, RequestId)
 	if AChannel == nil {
 		http.Error(w, "Channel not found.", http.StatusNotFound)
 		return
@@ -238,7 +238,7 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
+	AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, RequestId)
 	if AChannel == nil {
 		http.Error(w, "Channel not found.", http.StatusNotFound)
 		return
@@ -268,13 +268,12 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if Body.InstantCheck {
-		go CheckChannel(AChannel, ChannelCheckSettings{
-			QualitySelect: -1,
-			ForceEnable: true,
-			
-			CheckAllVideos: Body.CheckAll,
-			OverrideChannelType: Body.ChannelType,
-		})
+		CheckSettings := GetCheckSettingsFromAChannel(AChannel)
+		CheckSettings.ForceEnable = true
+		CheckSettings.CheckAllVideos = Body.CheckAll
+		CheckSettings.Type = int32(Body.ChannelType)
+		
+		go CheckChannel(AChannel, CheckSettings)
 	}
 	
 	AChannel.NextCheckMSEC = time.Now().UTC().UnixMilli()-1
@@ -293,12 +292,12 @@ func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
+	AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, RequestId)
 	if AChannel == nil {
 		http.Error(w, "Channel not found.", http.StatusNotFound)
 		return
 	}
-	err := RemoveArchiveChannel(&WatchedDownloading, RequestId)
+	err := RemoveArchiveChannel(&G_ArchiveChannels, RequestId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -335,7 +334,7 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 		}
 		
 		// Request single channel.
-		AChannel := GetArchiveChannelFromId(&WatchedDownloading, RequestId)
+		AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, RequestId)
 		if AChannel == nil {
 			http.Error(w, "Channel not found.", http.StatusNotFound)
 			return
@@ -351,11 +350,11 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	WatchedDownloading.ChannelsLock.RLock()
+	G_ArchiveChannels.ChannelsLock.RLock()
 	
 	SendChannels := []*ArchiveChannel{}
 	
-	Channels := WatchedDownloading.Channels
+	Channels := G_ArchiveChannels.Channels
 	for _, AChannel := range(Channels) {
 		NewChannel := &ArchiveChannel{}
 		*NewChannel = *AChannel
@@ -364,7 +363,7 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 		
 		SendChannels = append(SendChannels, NewChannel)
 	}
-	WatchedDownloading.ChannelsLock.RUnlock()
+	G_ArchiveChannels.ChannelsLock.RUnlock()
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -433,13 +432,13 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 	
 	var AChannel *ArchiveChannel
 	if Body.TargetChannel == "" || Body.TargetChannel == MANUAL_CHANNEL_ID {
-		AChannel = GetManualArchiveChannel(&WatchedDownloading)
+		AChannel = GetManualArchiveChannel(&G_ArchiveChannels)
 	} else {
 		if len(Body.TargetChannel) > API_MAX_REQUEST_ID {
 			http.Error(w, "Invalid target channel id.", http.StatusBadRequest)
 			return
 		}
-		AChannel = GetArchiveChannelFromId(&WatchedDownloading, Body.TargetChannel)
+		AChannel = GetArchiveChannelFromId(&G_ArchiveChannels, Body.TargetChannel)
 	}
 	if AChannel == nil {
 		http.Error(w, "Could not find target channel.", http.StatusNotFound)
@@ -472,7 +471,13 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 	
 	CS := &CheckStatus{}
 	
-	go ManuallyAddVideos(AChannel, Body.DownloadUrl, Body.Type, Body.QualitySelect, CS)
+	CheckSettings := GetCheckSettingsFromAChannel(AChannel)
+	CheckSettings.CheckUrls = []string{Body.DownloadUrl}
+	CheckSettings.Type = int32(Body.Type)
+	CheckSettings.QualitySelect = Body.QualitySelect
+	
+	// TODO: ManuallyAddVideos is a pretty shit function, I need to gut it or remove it and use something else...
+	go ManuallyAddVideos(CheckSettings, Body.DownloadUrl, Body.Type, CS)
 	
 	Status := 0
 	QuitTime := time.Now().UTC().Add(time.Duration(time.Minute * 1))
@@ -694,7 +699,7 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 			DB_UpdateVideoRefreshState(VideoInfo, 0)
 		}
 		
-		AChannel := GetArchiveChannelFromId(&WatchedDownloading, VideoInfo.FromChannel)
+		AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, VideoInfo.FromChannel)
 		if AChannel != nil {
 			AChannel.NeedsRefreshing = true
 		}
@@ -1348,7 +1353,7 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Video contains no file attached.", http.StatusNotFound)
 		return
 	}
-	AChannel := GetArchiveChannelFromId(&WatchedDownloading, VideoInfo.FromChannel)
+	AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, VideoInfo.FromChannel)
 	if AChannel == nil {
 		http.Error(w, "Video info exists but no channel is attached to it?", http.StatusNotFound)
 		return
