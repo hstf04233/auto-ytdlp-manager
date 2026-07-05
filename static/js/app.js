@@ -840,7 +840,16 @@ async function deleteChannel(id) {
     showToast(`Failed to delete: ${err.message}`, 'error');
   }
 }
+
+let firstTimeDeleteVideo = true;
 async function deleteVideo(id) {
+  if (firstTimeDeleteVideo) {
+    if (!confirm("Delete this video? (This prompt will only appear once. If you accept, this prompt will NOT pop up again.)")) {
+      return;
+    }
+    firstTimeDeleteVideo = false;
+  }
+  
   try {
     await API.del(`/api/videos/${id}`);
     showToast("Video was deleted!", 'success');
