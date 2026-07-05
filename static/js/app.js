@@ -593,7 +593,7 @@ function renderConfig(config) {
     if (!element) continue;
     
     if (cfg.type == "string" || cfg.type == "number") {
-      element.value = programConfig[cfg.value];
+      setInputPV(element, programConfig[cfg.value]);
     } else if (cfg.type == "bool") {
       element.checked = programConfig[cfg.value];
     }
