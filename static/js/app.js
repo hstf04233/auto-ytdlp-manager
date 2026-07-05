@@ -694,7 +694,7 @@ function renderUpdateChannel(ch) {
     let now = new Date();
     let delta = checkTime-now;
     
-    let isEnabled = (ch.enabled && !programConfig.AllChannels_Disabled && !ch.active_task);
+    let isEnabled = (ch.enabled && !programConfig.AllChannels_Disabled && !ch.is_being_checked);
     
     if (delta <= 1 || !isEnabled) {
       channelCheckBtnEl.disabled = true;
@@ -703,7 +703,7 @@ function renderUpdateChannel(ch) {
     }
     
     let disabledText = "DISABLED!"
-    if (ch.active_task) {
+    if (ch.is_being_checked) {
       disabledText = "Checking channel now...";
     }
     

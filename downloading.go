@@ -56,22 +56,22 @@ type ArchiveChannel struct {
 	CheckInterval  int64  `json:"check_interval"`
 	FullCheckInterval int64 `json:"full_check_interval"`
 	
-	QualitySelect  int    `json:"quality_select"`
+	QualitySelect        int    `json:"quality_select"`
 	PreferredVideoFormat string `json:"preferred_video_format"`
 	PreferredAudioFormat string `json:"preferred_audio_format"`
 	
 	NeedsRefreshing bool `json:"-"`
 	
-	Enabled        bool `json:"enabled"`
-	Hidden         bool `json:"hidden"`
-	IsBeingChecked bool `json:"-"`
+	Enabled bool `json:"enabled"`
+	Hidden  bool `json:"hidden"`
 	
-	NextCheckMSEC            int64 `json:"_nextCheckMsec"`
+	IsBeingChecked bool  `json:"is_being_checked"`
+	NextCheckMSEC  int64 `json:"_nextCheckMsec"`
 	NextFullChannelCheckMSEC int64 `json:"_nextFullChannelCheckMsec"`
 	
 	PlaylistEnd int `json:"playlist_end"`
 	
-	FORAPI_TasksCount   int `json:"tasks_count"`
+	FORAPI_TasksCount   int    `json:"tasks_count"`
 	FORAPI_ActiveTaskId string `json:"active_task"`
 }
 
