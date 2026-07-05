@@ -489,78 +489,68 @@ function cancelConfigChanges() {
 
 // Set .value and .placeholder to the same value.
 function setInputPV(el, value) {
-  el.placeholder = value
-  el.value       = value
+  el.placeholder = value;
+  el.value       = value;
 }
+
+const configSettings = [
+  {element: "config-YtDlpPath",     value: "YtDlp_Path",     type: "string"},
+  {element: "config-YtArchivePath", value: "YtArchive_Path", type: "string"},
+  {element: "config-FFmpegPath",    value: "FFmpeg_Path",    type: "string"},
+  
+  {element: "config-DownloadDir",        value: "Default_DownloadDir",               type: "string"},
+  {element: "config-OutputTemplate",     value: "Default_YtDlp_OutputTemplate",      type: "string"},
+  {element: "config-OutputTemplateLive", value: "Default_YtDlp_OutputTemplate_Live", type: "string"},
+  
+  {element: "config-AllChannelsDisabled",      value: "AllChannels_Disabled",       type: "bool"},
+  {element: "config-TaskLogAutoDeleteEnabled", value: "TaskLog_AutoDelete_Enabled", type: "bool"},
+  {element: "config-DownloadVideoThumbnails",  value: "Download_Video_Thumbnails",  type: "bool"},
+  
+  {element: "config-TaskLogAutoDeleteSeconds",     value: "TaskLog_AutoDelete_Seconds",      type: "number"},
+  {element: "config-TaskLogListAutoDeleteSeconds", value: "TaskLog_List_AutoDelete_Seconds", type: "number"},
+  {element: "config-AutoRefreshVideosSeconds",     value: "AutoRefresh_Videos_Seconds",      type: "number"},
+];
 
 function areThereConfigChanges() {
-  const YtDlpPathEl = document.getElementById("config-YtDlpPath")
-  if (YtDlpPathEl && YtDlpPathEl.value !== programConfig.YtDlp_Path) return true
-  const YtArchivePathEl = document.getElementById("config-YtArchivePath")
-  if (YtArchivePathEl && YtArchivePathEl.value !== programConfig.YtArchive_Path) return true
-  const FFmpegPathEl = document.getElementById("config-FFmpegPath")
-  if (FFmpegPathEl && FFmpegPathEl.value !== programConfig.FFmpeg_Path) return true
+  for (const cfg of configSettings) {
+    const element = document.getElementById(cfg.element);
+    if (!element) continue;
+    
+    if (cfg.type == "string") {
+      if (element.value !== programConfig[cfg.value]) return true;
+    } else if (cfg.type == "number") {
+      if (parseFloat(element.value) !== programConfig[cfg.value]) return true;
+    } else if (cfg.type == "bool") {
+      if (element.checked !== programConfig[cfg.value]) return true;
+    }
+  }
   
-  const DownloadDirEl = document.getElementById("config-DownloadDir")
-  if (DownloadDirEl && DownloadDirEl.value !== programConfig.Default_DownloadDir) return true
-  const OutputTemplateEl = document.getElementById("config-OutputTemplate")
-  if (OutputTemplateEl && OutputTemplateEl.value !== programConfig.Default_YtDlp_OutputTemplate) return true
-  const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive")
-  if (OutputTemplateLiveEl && OutputTemplateLiveEl.value !== programConfig.Default_YtDlp_OutputTemplate_Live) return true
-  
-  const AllChannelsDisabledEl = document.getElementById("config-AllChannelsDisabled")
-  if (AllChannelsDisabledEl && AllChannelsDisabledEl.checked !== programConfig.AllChannels_Disabled) return true
-  const TaskLogAutoDeleteEnabledEl = document.getElementById("config-TaskLogAutoDeleteEnabled")
-  if (TaskLogAutoDeleteEnabledEl && TaskLogAutoDeleteEnabledEl.checked !== programConfig.TaskLog_AutoDelete_Enabled) return true
-  const DownloadVideoThumbnailsEl = document.getElementById("config-DownloadVideoThumbnails")
-  if (DownloadVideoThumbnailsEl && DownloadVideoThumbnailsEl.checked !== programConfig.Download_Video_Thumbnails) return true
-  
-  const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds")
-  if (TaskLogAutoDeleteSecondsEl && TaskLogAutoDeleteSecondsEl.value != programConfig.TaskLog_AutoDelete_Seconds) return true
-  const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds")
-  if (TaskLogListAutoDeleteSecondsEl && TaskLogListAutoDeleteSecondsEl.value != programConfig.TaskLog_List_AutoDelete_Seconds) return true
-  const AutoRefreshVideosSecondsEl = document.getElementById("config-AutoRefreshVideosSeconds")
-  if (AutoRefreshVideosSecondsEl && AutoRefreshVideosSecondsEl.value != programConfig.TaskLog_List_AutoDelete_Seconds) return true
-  
-  return false
+  return false;
 }
 
-async function saveConfig(e) {
-  e.preventDefault();
+async function saveConfig(event) {
+  event.preventDefault();
   
-  const YtDlpPathEl = document.getElementById("config-YtDlpPath");
-  const YtArchivePathEl = document.getElementById("config-YtArchivePath");
-  const FFmpegPathEl = document.getElementById("config-FFmpegPath");
+  let body = {};
   
-  const DownloadDirEl = document.getElementById("config-DownloadDir");
-  const OutputTemplateEl = document.getElementById("config-OutputTemplate");
-  const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive");
-  
-  const AllChannelsDisabledEl = document.getElementById("config-AllChannelsDisabled");
-  const TaskLogAutoDeleteEnabledEl = document.getElementById("config-TaskLogAutoDeleteEnabled");
-  const DownloadVideoThumbnailsEl = document.getElementById("config-DownloadVideoThumbnails");
-  
-  const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds");
-  const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds");
-  const AutoRefreshVideosSecondsEl = document.getElementById("config-AutoRefreshVideosSeconds");
-  
-  const body = {
-    YtDlp_Path:     YtDlpPathEl.value.trim(),
-    YtArchive_Path: YtArchivePathEl.value.trim(),
-    FFmpeg_Path:    FFmpegPathEl.value.trim(),
+  for (const cfg of configSettings) {
+    const element = document.getElementById(cfg.element);
+    if (!element) continue;
     
-    AllChannels_Disabled: AllChannelsDisabledEl.checked,
-    TaskLog_AutoDelete_Enabled: TaskLogAutoDeleteEnabledEl.checked,
-    Download_Video_Thumbnails: DownloadVideoThumbnailsEl.checked,
-    
-    Default_DownloadDir:  DownloadDirEl.value.trim(),
-    Default_YtDlp_OutputTemplate: OutputTemplateEl.value,
-    Default_YtDlp_OutputTemplate_Live: OutputTemplateLiveEl.value,
-    
-    TaskLog_AutoDelete_Seconds: TaskLogAutoDeleteSecondsEl.value ? parseInt(TaskLogAutoDeleteSecondsEl.value) : programConfig.TaskLog_AutoDelete_Seconds,
-    TaskLog_List_AutoDelete_Seconds: TaskLogListAutoDeleteSecondsEl.value ? parseInt(TaskLogListAutoDeleteSecondsEl.value) : programConfig.TaskLog_List_AutoDelete_Seconds,
-    AutoRefresh_Videos_Seconds: AutoRefreshVideosSecondsEl.value ? parseInt(AutoRefreshVideosSecondsEl.value) : programConfig.AutoRefresh_Videos_Seconds,
-  };
+    if (cfg.type == "string") {
+      if (element.value !== programConfig[cfg.value]) {
+        body[cfg.value] = element.value;
+      }
+    } else if (cfg.type == "number") {
+      if (parseFloat(element.value) !== programConfig[cfg.value]) {
+        body[cfg.value] = parseFloat(element.value);
+      }
+    } else if (cfg.type == "bool") {
+      if (element.checked !== programConfig[cfg.value]) {
+        body[cfg.value] = element.checked;
+      }
+    }
+  }
   
   try {
     await API.patch("/api/config", body);
@@ -572,7 +562,7 @@ async function saveConfig(e) {
   }
 }
 
-document.getElementById("configForm").addEventListener('input', () => {
+function updateConfigChanges() {
   const configSubmitBtn = document.getElementById("configSubmitBtn");
   const configCancelBtn = document.getElementById("configCancelBtn");
   wereChangesMade = areThereConfigChanges();
@@ -583,7 +573,9 @@ document.getElementById("configForm").addEventListener('input', () => {
   if (configCancelBtn) {
     configCancelBtn.disabled = !wereChangesMade;
   }
-});
+}
+
+document.getElementById("configForm").addEventListener('input', updateConfigChanges);
 
 function renderConfig(config) {
   const ApplicationVersionEl = document.getElementById("side-bar-application-version");
@@ -591,75 +583,23 @@ function renderConfig(config) {
     ApplicationVersionEl.textContent = config.application_version;
   }
   
+  for (const cfg of configSettings) {
+    const element = document.getElementById(cfg.element);
+    if (!element) continue;
+    
+    if (cfg.type == "string" || cfg.type == "number") {
+      element.value = programConfig[cfg.value];
+    } else if (cfg.type == "bool") {
+      element.checked = programConfig[cfg.value];
+    }
+  }
   
-  const YtDlpPathEl = document.getElementById("config-YtDlpPath");
-  const YtArchivePathEl = document.getElementById("config-YtArchivePath");
-  const FFmpegPathEl = document.getElementById("config-FFmpegPath");
-  
-  const DownloadDirEl = document.getElementById("config-DownloadDir");
-  const OutputTemplateEl = document.getElementById("config-OutputTemplate");
-  const OutputTemplateLiveEl = document.getElementById("config-OutputTemplateLive");
-  
-  const AllChannelsDisabledEl = document.getElementById("config-AllChannelsDisabled");
   const AllChannelsDisabledEl2 = document.getElementById("channels-config-AllChannelsDisabled");
-  const TaskLogAutoDeleteEnabledEl = document.getElementById("config-TaskLogAutoDeleteEnabled");
-  const DownloadVideoThumbnailsEl = document.getElementById("config-DownloadVideoThumbnails");
-  
-  const TaskLogAutoDeleteSecondsEl = document.getElementById("config-TaskLogAutoDeleteSeconds");
-  const TaskLogListAutoDeleteSecondsEl = document.getElementById("config-TaskLogListAutoDeleteSeconds");
-  const AutoRefreshVideosSecondsEl = document.getElementById("config-AutoRefreshVideosSeconds");
-  
-  const configSubmitBtn = document.getElementById("configSubmitBtn");
-  if (configSubmitBtn) {
-    configSubmitBtn.disabled = true;
-  }
-  const configCancelBtn = document.getElementById("configCancelBtn");
-  if (configCancelBtn) {
-    configCancelBtn.disabled = true;
-  }
-  
-  if (YtDlpPathEl) {
-    setInputPV(YtDlpPathEl, programConfig.YtDlp_Path);
-  }
-  if (YtArchivePathEl) {
-    setInputPV(YtArchivePathEl, programConfig.YtArchive_Path);
-  }
-  if (FFmpegPathEl) {
-    setInputPV(FFmpegPathEl, programConfig.FFmpeg_Path);
-  }
-  
-  if (DownloadDirEl) {
-    setInputPV(DownloadDirEl, programConfig.Default_DownloadDir);
-  }
-  if (OutputTemplateEl) {
-    setInputPV(OutputTemplateEl, programConfig.Default_YtDlp_OutputTemplate);
-  }
-  if (OutputTemplateLiveEl) {
-    setInputPV(OutputTemplateLiveEl, programConfig.Default_YtDlp_OutputTemplate_Live);
-  }
-  
-  if (AllChannelsDisabledEl) {
-    AllChannelsDisabledEl.checked = programConfig.AllChannels_Disabled;
-  }
   if (AllChannelsDisabledEl2) {
     AllChannelsDisabledEl2.checked = programConfig.AllChannels_Disabled;
   }
-  if (TaskLogAutoDeleteEnabledEl) {
-    TaskLogAutoDeleteEnabledEl.checked = programConfig.TaskLog_AutoDelete_Enabled;
-  }
-  if (DownloadVideoThumbnailsEl) {
-    DownloadVideoThumbnailsEl.checked = programConfig.Download_Video_Thumbnails;
-  }
   
-  if (TaskLogAutoDeleteSecondsEl) {
-    setInputPV(TaskLogAutoDeleteSecondsEl, programConfig.TaskLog_AutoDelete_Seconds);
-  }
-  if (TaskLogListAutoDeleteSecondsEl) {
-    setInputPV(TaskLogListAutoDeleteSecondsEl, programConfig.TaskLog_List_AutoDelete_Seconds);
-  }
-  if (AutoRefreshVideosSecondsEl) {
-    setInputPV(AutoRefreshVideosSecondsEl, programConfig.AutoRefresh_Videos_Seconds);
-  }
+  updateConfigChanges();
 }
 
 // ========== Channels ==========
