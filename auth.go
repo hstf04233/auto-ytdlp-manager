@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS Sessions (
 	TokenId TEXT PRIMARY KEY UNIQUE,
 	UserId  INTEGER NOT NULL,
 	
+	CreatedFromLocalIp BOOLEAN NOT NULL,
 	IpAddress TEXT NOT NULL,
 	UserAgent TEXT NOT NULL,
 	
@@ -87,6 +88,7 @@ var G_AUTHDB *sql.DB
 
 type AuthUser struct {
 	UserId   uint64 `json:"userid"`
+	
 	Username string        `json:"raw_username"`
 	UsernameDisplay string `json:"username"`
 	SecuredPassword string `json:"-"`
@@ -100,6 +102,7 @@ type AuthSession struct {
 	TokenId string
 	UserId  uint64
 	
+	CreatedFromLocalIp bool
 	IpAddress string
 	UserAgent string
 	
@@ -223,15 +226,17 @@ func GetAuthUserFromUsername(Username string) (*AuthUser, error) {
 	return AUser, nil
 }
 
-func GetAuthUserFromSessionToken(Token string) (*AuthUser, error) {
+func GetAuthSessionFromSessionToken(Token string) (*AuthSession, error) {
 	SessionRow := G_AUTHDB.QueryRow(`
-	SELECT TokenId, UserId, ExpireAt, CreatedAt FROM Sessions WHERE TokenId = ?
+	SELECT TokenId, UserId, CreatedFromLocalIp, ExpireAt, CreatedAt FROM Sessions WHERE TokenId = ?
 	`, Token)
 	
 	Session := &AuthSession{}
 	err := SessionRow.Scan(
 		&Session.TokenId,
 		&Session.UserId,
+		
+		&Session.CreatedFromLocalIp,
 		
 		&Session.ExpireAt,
 		&Session.CreatedAt,
@@ -241,6 +246,22 @@ func GetAuthUserFromSessionToken(Token string) (*AuthUser, error) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("Failed to find session from database, error: %v\n", err)
+	}
+	
+	return Session, nil
+}
+
+func GetAuthUserFromSessionToken(Token string, IsLocalIp bool) (*AuthUser, error) {
+	Session, err := GetAuthSessionFromSessionToken(Token)
+	if err != nil {
+		return nil, err
+	}
+	if Session == nil {
+		return nil, nil
+	}
+	
+	if Session.CreatedFromLocalIp && !IsLocalIp {
+		return nil, fmt.Errorf("Session created from local ip address is being used by public ip address? UserId: %d", Session.UserId)
 	}
 	
 	if time.Now().UnixMilli() > Session.ExpireAt.UnixMilli() {
@@ -273,6 +294,7 @@ func CreateAuthSessionFromRequest(AUser *AuthUser, r *http.Request) (*AuthSessio
 	} else {
 		Session.IpAddress = "-NOT-SAVED-"
 	}
+	Session.CreatedFromLocalIp = IsIpAddressLocal(IpAddress)
 	
 	if SAVE_USER_AGENT_TO_AUTH_DATABASE {
 		Session.UserAgent = r.Header.Get("User-Agent")
@@ -290,9 +312,9 @@ func CreateAuthSessionFromRequest(AUser *AuthUser, r *http.Request) (*AuthSessio
 	Session.ExpireAt = time.Now().UTC().Add(time.Second*60*60*24*365)  // Expire in 1 year
 	
 	_, err := G_AUTHDB.Exec(`
-	INSERT INTO Sessions(TokenId, UserId, IpAddress, UserAgent, ExpireAt, CreatedAt)
-	VALUES (?, ?, ?, ?, ?, ?)
-	`, Session.TokenId, Session.UserId, Session.IpAddress, Session.UserAgent, Session.ExpireAt, Session.CreatedAt)
+	INSERT INTO Sessions(TokenId, UserId, CreatedFromLocalIp, IpAddress, UserAgent, ExpireAt, CreatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, Session.TokenId, Session.UserId, Session.CreatedFromLocalIp, Session.IpAddress, Session.UserAgent, Session.ExpireAt, Session.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to insert session into database, error: %v", err)
 	}
@@ -322,7 +344,10 @@ func GetAuthUserFromRequest(r *http.Request) (*AuthUser, error) {
 	if AuthorizationCookie != nil {
 		SessionToken := AuthorizationCookie.Value
 		
-		AUser, err := GetAuthUserFromSessionToken(SessionToken)
+		IpAddress := GetIpAddressFromRequest(r)
+		IsLocalIp := IsIpAddressLocal(IpAddress)
+		
+		AUser, err := GetAuthUserFromSessionToken(SessionToken, IsLocalIp)
 		if err != nil {
 			return nil, fmt.Errorf("Error when getting auth user from session token: %v", err)
 		}
@@ -344,7 +369,7 @@ func IsRequestAdminAuthorized(r *http.Request) (bool, error) {
 	
 	AUser, err := GetAuthUserFromRequest(r)
 	if err != nil {
-		return false, fmt.Errorf("Could not get auth user, error %v", err)
+		return false, fmt.Errorf("Could not get auth user, error: %v", err)
 	}
 	
 	if AUser == nil {
@@ -365,7 +390,7 @@ func IsRequestReadOnlyAuthorized(r *http.Request) (bool, error) {
 	
 	AUser, err := GetAuthUserFromRequest(r)
 	if err != nil {
-		return false, fmt.Errorf("Could not get auth user, error %v", err)
+		return false, fmt.Errorf("Could not get auth user, error: %v", err)
 	}
 	
 	if AUser == nil {
@@ -770,6 +795,7 @@ func OpenAuthDB() error {
 		"ALTER TABLE Sessions ADD COLUMN UserAgent TEXT NOT NULL DEFAULT ''",
 		
 		// v0.21
+		"ALTER TABLE Sessions ADD COLUMN CreatedFromLocalIp BOOLEAN NOT NULL DEFAULT FALSE",
 	}
 	
 	for i, Upgrade := range(AuthDatabaseUpgrades) {
