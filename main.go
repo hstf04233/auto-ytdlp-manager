@@ -90,9 +90,16 @@ func StartServer(ServerPort int) {
 	}
 }
 
-func ExitProgram() {
+func OnProgramExit() {
+	st_Quit()
 	DB_Close()
 	AuthDB_Close()
+}
+
+var ProgramShouldExit = false
+
+func G_ExitProgram() {
+	ProgramShouldExit = true
 }
 
 func main() {
@@ -161,7 +168,7 @@ func main() {
 		return
 	}
 	
-	defer ExitProgram()
+	defer OnProgramExit()
 	
 	{
 		// Handle command arguments
@@ -205,6 +212,8 @@ func main() {
 	ExitSignal := make(chan os.Signal, 1)
 	signal.Notify(ExitSignal, syscall.SIGINT, syscall.SIGTERM)
 	
+	StartSystray()
+	
 	for {
 		select {
 		case sig := <-ExitSignal:
@@ -214,7 +223,7 @@ func main() {
 			}
 		default:
 		}
-		if Exit == true {
+		if Exit || ProgramShouldExit {
 			break
 		}
 		

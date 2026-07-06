@@ -52,6 +52,15 @@ func webstatic_ServeLoginHtml(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache, must-revalidate")
 }
 
+func ReadFileFromStatic(Path string) []byte {
+	FileContent, err := WebStaticContent.ReadFile(fmt.Sprintf("static/%s", Path))
+	if err != nil {
+		panic(err)
+	}
+	
+	return FileContent
+}
+
 func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	if RateLimitRequest(w, r, RATE_LIMIT_BUCKET_GLOBAL) { return }
 	

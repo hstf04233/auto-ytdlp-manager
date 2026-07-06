@@ -6,10 +6,23 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/natefinch/npipe" // Only used on Windows
 	"golang.org/x/sys/windows"
+)
+
+const (
+	SW_HIDE = 0
+	SW_SHOW = 5
+)
+
+var (
+	user32           = syscall.NewLazyDLL("user32.dll")
+	kernel32         = syscall.NewLazyDLL("kernel32.dll")
+	showWindow       = user32.NewProc("ShowWindow")
+	getConsoleWindow = kernel32.NewProc("GetConsoleWindow")
 )
 
 // This will open a file in read only mode and will not lock the file which means it can be deleted by another process
@@ -54,4 +67,19 @@ func CreatePipe(PipeName string) (io.WriteCloser, error) {
 
 func OpenPipe(PipeName string) (io.WriteCloser, error) {
 	return npipe.DialTimeout(PipeName, time.Second * 5)
+}
+
+func ToggleConsoleVisibility(show bool) {
+	// 1. Get the handle of the current console window
+	hwnd, _, _ := getConsoleWindow.Call()
+	if hwnd == 0 {
+		return // No console window associated with this process
+	}
+	
+	// 2. Set the visibility state
+	if show {
+		showWindow.Call(hwnd, SW_SHOW)
+	} else {
+		showWindow.Call(hwnd, SW_HIDE)
+	}
 }

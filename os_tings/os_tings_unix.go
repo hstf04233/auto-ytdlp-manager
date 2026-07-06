@@ -41,3 +41,8 @@ func CreatePipe(PipeName string) (io.WriteCloser, error) {
 func OpenPipe(PipeName string) (io.WriteCloser, error) {
 	return os.OpenFile(PipeName, os.O_WRONLY, 0666)
 }
+
+func ToggleConsoleVisibility(show bool) {
+	// Do nothing on unix systems...
+	return
+}
