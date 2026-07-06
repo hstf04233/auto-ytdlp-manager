@@ -473,7 +473,7 @@ func DownloadThumbnailForVideo(Video *VideoInfo, ThumbnailUrl string) (string, e
 		return "", fmt.Errorf("Failed because response status: %s", Response.Status)
 	}
 	
-	ContentType := Response.Header.Get("Content-Type")
+	ContentType := strings.Split(Response.Header.Get("Content-Type"), ";")[0]
 	
 	ImageContainer := ""
 	if ContentType == "image/jpeg" {
