@@ -447,13 +447,13 @@ async function changeVideoStatus(videoId, newStatus) {
         body.quality_select = qualitySelect;
       }
       
-      await API.post(`/api/add-videos?no_wait=true&queue_video_id=${videoId}`, body);
+      await API.post(`/api/add-videos?no_wait=true&queue_video_id=${encodeURIComponent(videoId)}`, body);
       showToast('Status changed', 'success');
       loadVideos();
       return;
     }
     
-    await API.patch(`/api/videos/${videoId}`, { status: parseInt(newStatus) });
+    await API.patch(`/api/videos/${encodeURIComponent(videoId)}`, { status: parseInt(newStatus) });
     showToast('Status changed', 'success');
     loadVideos();
   } catch (err) {
@@ -666,9 +666,13 @@ function renderUpdateChannel(ch) {
   const channelTaskBtnEl = channelEl.querySelector("#channel-task-btn");
   
   if (channelTaskBtnEl) {
-    let tasksButtonText = `View Logs[${ch.tasks_count}]`;
+    let countText = `${ch.tasks_count}`;
+    if (ch.tasks_count >= 100) {
+      countText = "99+"
+    }
+    let tasksButtonText = `View ${countText} Logs`;
     if (ch.active_task) {
-      tasksButtonText = `View Active Task + Logs[${ch.tasks_count-1}]`;
+      tasksButtonText = `View Active Task + ${countText} Logs`;
     }
     
     if (channelTaskBtnEl.textContent != tasksButtonText) {
@@ -796,16 +800,16 @@ async function deleteVideo(id) {
   }
   
   try {
-    await API.del(`/api/videos/${id}`);
+    await API.del(`/api/videos/${encodeURIComponent(id)}`);
     showToast("Video was deleted!", 'success');
     loadVideos();
   } catch (err) {
     showToast(`Failed to delete: ${err.message}`, 'error');
   }
 }
-async function refreshVideoInfo(id,) {
+async function refreshVideoInfo(id) {
   try {
-    await API.patch(`/api/videos/${id}`, {refresh_state: true});
+    await API.patch(`/api/videos/${encodeURIComponent(id)}`, {refresh_state: true});
     loadVideos()
   } catch (err) {
     showToast(`Failed to refresh: ${err.message}`, 'error');
@@ -910,7 +914,7 @@ async function openVideoDetailsModal(videoId) {
   let videoInfo = null;
   if (!videoInfo) {
     try {
-      const returnedVideoInfo = await API.get(`/api/videos/${videoId}`);
+      const returnedVideoInfo = await API.get(`/api/videos/${encodeURIComponent(videoId)}`);
       
       if (returnedVideoInfo) {
         videoInfo = returnedVideoInfo;
@@ -1359,7 +1363,7 @@ function renderVideos() {
           </p>
           <p>Released: ${formatDateAndTime(v.release_date)}</p>
           <p>${escHtml(v.availability)}</p>
-          <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)}</p>
+          <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)} ${v.filesize ? formatBytesSize(v.filesize) : ''}</p>
           
           ${(v.tasks_count > 0 || v.active_task) ? `<p><a href="/tasks?video=${v.id}" onclick="${tasksButtonOnClick}">${tasksButtonText}</a></p>` : ''}
         </div>

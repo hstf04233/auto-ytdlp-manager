@@ -127,6 +127,9 @@ CREATE TABLE IF NOT EXISTS CommandTasks (
 
 CREATE INDEX IF NOT EXISTS idx_commandtasks_fromchannel ON CommandTasks(FromChannel);
 CREATE INDEX IF NOT EXISTS idx_commandtasks_fromvideo   ON CommandTasks(FromVideo);
+CREATE INDEX IF NOT EXISTS idx_commandtasks_starttime   ON CommandTasks(StartTime);
+CREATE INDEX IF NOT EXISTS idx_commandtasks_endtime     ON CommandTasks(EndTime);
+CREATE INDEX IF NOT EXISTS idx_commandtasks_updatedat   ON CommandTasks(UpdatedAt);
 
 CREATE TABLE IF NOT EXISTS Images (
 	Id         TEXT PRIMARY KEY,  /* Should a hashed value of ImageData */
@@ -380,8 +383,8 @@ func DB_UpdateVideoFileSize(Video *VideoInfo, FileSize uint64) error {
 	defer VideoDBLock.Unlock()
 	Video.FileSize = FileSize
 	_, err := GDB.Exec(`
-	UPDATE Videos SET FileSize = ?, UpdatedAt = ? WHERE Id = ?
-	`, FileSize, time.Now().UTC(), Video.Id)
+	UPDATE Videos SET FileSize = ? WHERE Id = ?
+	`, FileSize, Video.Id)
 	return err
 }
 func DB_UpdateVideoStreamedDirectory(Video *VideoInfo, StreamedDirectory string) error {
@@ -477,6 +480,7 @@ const (
 	DB_VIDEO_ORDERBY_AddedAt     = 0
 	DB_VIDEO_ORDERBY_ReleaseDate = 1
 	DB_VIDEO_ORDERBY_UpdatedAt   = 2
+	DB_VIDEO_ORDERBY_FileSize    = 3
 )
 
 type ListVideosQuery struct {
@@ -542,6 +546,8 @@ func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, 
 		OrderBy = "ReleaseDate"
 	case DB_VIDEO_ORDERBY_UpdatedAt:
 		OrderBy = "UpdatedAt"
+	case DB_VIDEO_ORDERBY_FileSize:
+		OrderBy = "FileSize"
 	}
 	
 	OrderDirection := "DESC"

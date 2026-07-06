@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -115,6 +116,27 @@ type YT_DLP_OUTVIDEO struct {
 	WasLive bool `json:"was_live"`
 }
 
+func SanitizeVideoId(RawVideoId string) string {
+	var StrBuf bytes.Buffer
+	for _, Char := range([]byte(RawVideoId)) {
+		switch Char {
+		case byte('/'): fallthrough
+		case byte('&'): fallthrough
+		case byte('?'): fallthrough
+		case byte('%'): fallthrough
+		case byte('\''): fallthrough
+		case byte('"'): fallthrough
+		case byte('<'): fallthrough
+		case byte('>'):
+			StrBuf.Write([]byte("_"))
+		default:
+			StrBuf.WriteByte(Char)
+		}
+	}
+	
+	return StrBuf.String()
+}
+
 func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDEO) {
 	if OutVideo.FullTitle != "" {
 		VideoInfo.Title = OutVideo.FullTitle
@@ -132,7 +154,7 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 		VideoInfo.Description = OutVideo.Description
 	}
 	VideoInfo.Url      = OutVideo.Url
-	VideoInfo.Id       = OutVideo.Id
+	VideoInfo.Id       = SanitizeVideoId(OutVideo.Id)
 	VideoInfo.Duration = OutVideo.Duration
 	if OutVideo.IsLive {
 		VideoInfo.VideoType = VIDEO_TYPE_ISLIVE

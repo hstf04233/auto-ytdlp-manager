@@ -308,7 +308,7 @@ func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_SpiceUpChannelInfo(w http.ResponseWriter, r *http.Request, AChannel *ArchiveChannel) {
-	TasksList, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
+	TasksList, err := CL_ListCommandTasks(100, 0, ListCommandTasksQuery{
 		FromChannelId: AChannel.Id,
 		Status: -1,
 		Type: -1,
@@ -509,7 +509,7 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_GetVideos(w http.ResponseWriter, r *http.Request) {
-	RequestId := path.Base(r.URL.Path)
+	RequestId := strings.TrimPrefix(r.URL.Path, "videos/")
 	if strings.HasPrefix(r.URL.Path, "videos/") && RequestId != "" {
 		if len(RequestId) > API_MAX_REQUEST_ID {
 			http.Error(w, "Invalid video id.", http.StatusBadRequest)
@@ -523,6 +523,7 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if VideoInfo == nil {
+			L_Printf("Exact RequestId: '%s'\n", RequestId)
 			http.Error(w, "Video not found.", http.StatusNotFound)
 			return
 		}
@@ -579,6 +580,8 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 			OrderBy = DB_VIDEO_ORDERBY_ReleaseDate
 		} else if o == "updated_at" {
 			OrderBy = DB_VIDEO_ORDERBY_UpdatedAt
+		} else if o == "file_size" {
+			OrderBy = DB_VIDEO_ORDERBY_FileSize
 		}
 	}
 	
@@ -621,37 +624,10 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func API_GetVideoStatus(w http.ResponseWriter, r *http.Request) {
-	RequestId := path.Base(r.URL.Path)
-	if RequestId == "" {
-		http.Error(w, "Video id required.", http.StatusBadRequest)
-		return
-	}
-	if len(RequestId) > API_MAX_REQUEST_ID {
-		http.Error(w, "Invalid video id.", http.StatusBadRequest)
-		return
-	}
-	
-	VideoInfo, err := DB_GetVideo(RequestId)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error when getting video: %v !", err), http.StatusInternalServerError)
-		return
-	}
-	if VideoInfo == nil {
-		http.Error(w, "Video not found.", http.StatusNotFound)
-		return
-	}
-	
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": VideoInfo.Status,
-	})
-	
-	return
-}
 
 func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
-	RequestId := path.Base(r.URL.Path)
+	//RequestId := path.Base(r.URL.Path)
+	RequestId := strings.TrimPrefix(r.URL.Path, "videos/")
 	if RequestId == "" {
 		http.Error(w, "Video id required.", http.StatusBadRequest)
 		return
@@ -710,7 +686,8 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
-	RequestId := path.Base(r.URL.Path)
+	//RequestId := path.Base(r.URL.Path)
+	RequestId := strings.TrimPrefix(r.URL.Path, "videos/")
 	if len(RequestId) > API_MAX_REQUEST_ID {
 		http.Error(w, "Invalid video id.", http.StatusBadRequest)
 		return

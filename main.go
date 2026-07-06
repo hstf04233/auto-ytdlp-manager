@@ -8,10 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	//"yt-stream-manager/webstatic"
-
-	//"yt-stream-manager/database"
+	
 	"fmt"
 	"net/http"
 )
