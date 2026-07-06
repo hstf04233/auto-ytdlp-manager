@@ -123,6 +123,7 @@ func SanitizeVideoId(RawVideoId string) string {
 	for _, Char := range([]byte(RawVideoId)) {
 		switch Char {
 		case byte('/'): fallthrough
+		case byte('\\'): fallthrough
 		case byte('&'): fallthrough
 		case byte('?'): fallthrough
 		case byte('%'): fallthrough
