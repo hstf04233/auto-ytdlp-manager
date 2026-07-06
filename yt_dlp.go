@@ -89,6 +89,7 @@ type YT_DLP_OUTVIDEO struct {
 	FullTitle    string `json:"fulltitle"`
 	Description  string `json:"description"`
 	Url          string `json:"webpage_url"`
+	DownloadUrl  string `json:"url"`
 	Id           string `json:"id"`
 	Availability string `json:"availability"`
 	Thumbnail    string `json:"thumbnail"`
@@ -99,7 +100,8 @@ type YT_DLP_OUTVIDEO struct {
 	VidWidth     int `json:"width"`
 	AspectRatio  float64 `json:"aspect_ratio"`
 	
-	Extractor string `json:"extractor"`
+	Extractor    string `json:"extractor"`
+	ExtractorKey string `json:"extractor_key"`
 	
 	ChannelName  string `json:"channel"`
 	ChannelUrl   string `json:"channel_url"`
@@ -153,9 +155,16 @@ func PopulateVideoInfoFromOutVideo(VideoInfo *VideoInfo, OutVideo YT_DLP_OUTVIDE
 	if OutVideo.Description != "" {
 		VideoInfo.Description = OutVideo.Description
 	}
-	VideoInfo.Url      = OutVideo.Url
-	VideoInfo.Id       = SanitizeVideoId(OutVideo.Id)
-	VideoInfo.Duration = OutVideo.Duration
+	VideoInfo.Url = OutVideo.Url
+	VideoInfo.Id  = SanitizeVideoId(OutVideo.Id)
+	if OutVideo.Extractor != "generic" || VideoInfo.Duration <= 0 {
+		VideoInfo.Duration = OutVideo.Duration
+	}
+	
+	if OutVideo.Extractor == "archive.org" && OutVideo.DownloadUrl != "" {
+		VideoInfo.Url = OutVideo.DownloadUrl
+	}
+	
 	if OutVideo.IsLive {
 		VideoInfo.VideoType = VIDEO_TYPE_ISLIVE
 	} else if OutVideo.WasLive {
