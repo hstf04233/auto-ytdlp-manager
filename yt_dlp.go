@@ -450,12 +450,12 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 		}
 		
 		FilePath, fpErr := GetDownloadedVideoFilePath(Video, CheckSettings.AChannel)
-		if fpErr == nil && FilePath != "" {
+		if Video.Duration <= 0.1 && fpErr == nil && FilePath != "" {
 			VFileInfo, err := GetVideoFileInfo(FilePath)
 			if err != nil {
-				CL_Logf(Task, "Could not get video file info because: %v\n", err)
+				CL_Logf(Task, "Could not get video file info, error: %v\n", err)
 			}
-			if Video.Duration <= 1 {
+			if VFileInfo != nil {
 				Video.Duration = VFileInfo.Duration
 			}
 		}
@@ -497,6 +497,19 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 	if OutVideo.Availability == "" {
 		// Grabbing video info was successful! Assume availability is 'public'.
 		Video.Availability = "public"
+	}
+	
+	if Video.Duration <= 0.1 {
+		FilePath, fpErr := GetDownloadedVideoFilePath(Video, CheckSettings.AChannel)
+		if fpErr == nil && FilePath != "" {
+			VFileInfo, err := GetVideoFileInfo(FilePath)
+			if err != nil {
+				CL_Logf(Task, "Could not get video file info, error: %v\n", err)
+			}
+			if VFileInfo != nil {
+				Video.Duration = VFileInfo.Duration
+			}
+		}
 	}
 	
 	// Some platforms (like twitch) might give out a completely different video ids...
