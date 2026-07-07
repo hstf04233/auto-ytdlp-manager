@@ -43,13 +43,13 @@ var ProgramStartTime = time.Now().UTC()
 
 func webstatic_ServeIndexHtml(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(WebStatic_INDEX_HTML)
 	w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+	w.Write(WebStatic_INDEX_HTML)
 }
 func webstatic_ServeLoginHtml(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(WebStatic_LOGIN_HTML)
 	w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+	w.Write(WebStatic_LOGIN_HTML)
 }
 
 func ReadFileFromStatic(Path string) []byte {
@@ -143,6 +143,8 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	
+	w.Header().Set("Cache-Control", "Cache-Control: public, max-age=86400")  // 1 day
 	
 	http.ServeContent(w, r, filepath.Base(path), ProgramStartTime, FileSeeker)
 	//w.Write(FileContent)

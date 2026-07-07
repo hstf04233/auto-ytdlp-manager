@@ -1058,6 +1058,8 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 	Path := r.URL.Path
 	Method := r.Method
 	
+	w.Header().Set("Cache-Control", "private, no-cache")
+	
 	// Unauthorized endpoints
 	
 	if Path == "login" && Method == "POST" {
@@ -1493,6 +1495,7 @@ func ServeDBImage(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", ImageInfo.Filename))
+	w.Header().Set("Cache-Control", "Cache-Control: public, max-age=604800")  // 1 week
 	
 	Seeker := bytes.NewReader(ImageData)
 	
