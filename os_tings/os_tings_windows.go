@@ -15,7 +15,8 @@ import (
 
 const (
 	SW_HIDE = 0
-	SW_SHOW = 5
+	//SW_SHOW = 5
+	SW_RESTORE = 9
 )
 
 var (
@@ -23,6 +24,9 @@ var (
 	kernel32         = syscall.NewLazyDLL("kernel32.dll")
 	showWindow       = user32.NewProc("ShowWindow")
 	getConsoleWindow = kernel32.NewProc("GetConsoleWindow")
+	
+	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
+	procSetActiveWindow     = user32.NewProc("SetActiveWindow")
 )
 
 // This will open a file in read only mode and will not lock the file which means it can be deleted by another process
@@ -78,7 +82,10 @@ func ToggleConsoleVisibility(show bool) {
 	
 	// 2. Set the visibility state
 	if show {
-		showWindow.Call(hwnd, SW_SHOW)
+		showWindow.Call(hwnd, SW_RESTORE)
+		_, _, _ = procSetForegroundWindow.Call(hwnd)
+		
+		_, _, _ = procSetActiveWindow.Call(hwnd)
 	} else {
 		showWindow.Call(hwnd, SW_HIDE)
 	}
