@@ -12,11 +12,14 @@ const (
 	RATE_LIMIT_BUCKET_GLOBAL = 0
 	RATE_LIMIT_BUCKET_API    = 1
 	RATE_LIMIT_BUCKET_LOGIN  = 2
+	RATE_LIMIT_BUCKET_CREATEACCOUNT = 3
 )
 
 const (
 	MAX_GLOBAL_REQUESTS_PER_MINUTE = 7_500
-	MAX_API_REQUESTS_PER_MINUTE    = 1_000
+	MAX_API_REQUESTS_PER_MINUTE    = 400
+	MAX_LOGIN_REQUESTS_PER_MINUTE  = 15
+	MAX_ACCOUNTCREATION_REQUESTS_PER_MINUTE = 5
 )
 
 const (
@@ -31,6 +34,7 @@ type RateLimitInfo struct {
 	TotalRequests int
 	ApiRequests   int
 	LoginRequests int
+	AccountCreationRequests int
 }
 
 type DynamicThrottledWriterInfo struct {
@@ -82,18 +86,25 @@ func TestRateLimitForRequest(w http.ResponseWriter, r *http.Request, Bucket int)
 	if RInfo.TotalRequests > MAX_GLOBAL_REQUESTS_PER_MINUTE {
 		return true
 	}
-	if Bucket == RATE_LIMIT_BUCKET_GLOBAL {
+	
+	switch Bucket {
+	case RATE_LIMIT_BUCKET_GLOBAL:
 		RInfo.TotalRequests++
-	} else if Bucket == RATE_LIMIT_BUCKET_API {
-		if RInfo.LoginRequests > MAX_API_REQUESTS_PER_MINUTE {
+	case RATE_LIMIT_BUCKET_API:
+		if RInfo.ApiRequests > MAX_API_REQUESTS_PER_MINUTE {
+			return true
+		}
+		RInfo.ApiRequests++
+	case RATE_LIMIT_BUCKET_LOGIN:
+		if RInfo.LoginRequests > MAX_LOGIN_REQUESTS_PER_MINUTE {
 			return true
 		}
 		RInfo.LoginRequests++
-	} else if Bucket == RATE_LIMIT_BUCKET_LOGIN {
-		if RInfo.LoginRequests > 20 {
+	case RATE_LIMIT_BUCKET_CREATEACCOUNT:
+		if RInfo.AccountCreationRequests > MAX_ACCOUNTCREATION_REQUESTS_PER_MINUTE {
 			return true
 		}
-		RInfo.LoginRequests++
+		RInfo.AccountCreationRequests++
 	}
 	
 	return false

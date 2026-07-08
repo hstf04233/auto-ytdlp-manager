@@ -1077,6 +1077,11 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(AUser)
 		return
 	} else if Path == "create-admin" && Method == "POST" {
+		if TestRateLimitForRequest(w, r, RATE_LIMIT_BUCKET_CREATEACCOUNT) {
+			http.Error(w, "Too many account creation attempts, try again in a few minutes.", http.StatusTooManyRequests)
+			return
+		}
+		
 		AdminExists, err := DoesAdminAccountExist()
 		if err != nil {
 			L_Printf("Error checking if admin account exists: %v", err)
