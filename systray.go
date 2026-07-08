@@ -13,13 +13,15 @@ func StartSystray() {
 
 func st_OnReady() {
 	// 1. Set the visual properties of the tray icon
-	IconFileName := "p_icon.ico"
+	IconFileName := "p_icon.png"
+	IconFileIcoName := "p_icon.ico"
 	
 	if APPLICATION_VERSION_TYPE == "debug" {
-		IconFileName = "p_icon_debog.ico"
+		IconFileName = "p_icon_debog.png"
+		IconFileIcoName = "p_icon_debog.ico"
 	}
 	
-	systray.SetTemplateIcon(ReadFileFromStatic(IconFileName), ReadFileFromStatic(IconFileName))
+	systray.SetTemplateIcon(ReadFileFromStatic(IconFileName), ReadFileFromStatic(IconFileIcoName))
 	systray.SetTitle("Auto yt-dlp Manager")
 	systray.SetTooltip("Auto yt-dlp Manager")
 	
