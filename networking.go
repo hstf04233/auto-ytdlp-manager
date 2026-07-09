@@ -23,7 +23,7 @@ const (
 )
 
 const (
-	RATE_LIMIT_KBPS_LOCALIP = 1e12
+	RATE_LIMIT_KBPS_LOCALIP = int(1e12)
 )
 
 type RateLimitInfo struct {
@@ -31,9 +31,9 @@ type RateLimitInfo struct {
 	
 	Ip string
 	
-	TotalRequests int
-	ApiRequests   int
-	LoginRequests int
+	GlobalRequests int
+	ApiRequests    int
+	LoginRequests  int
 	AccountCreationRequests int
 }
 
@@ -44,11 +44,13 @@ type DynamicThrottledWriterInfo struct {
 	
 	TargetKBPS int
 	
+	
 	RequestsCountBacklog int
 	ActiveCount int
 	Writers []*ThrottledResponseWriter
 }
 
+// The rate limit info automatically expires after 1 minute.
 var NETWORKING_RATELIMIT_INFOS = NewCache(time.Second * 60)
 var NETWORKING_DYNTHROTTLED_WRITERS = make(map[string]*DynamicThrottledWriterInfo)
 var N_DT_W_MUTEX = sync.RWMutex{}
@@ -56,10 +58,10 @@ var N_DT_W_MUTEX = sync.RWMutex{}
 func GetRateLimitInfoFromRequest(r *http.Request) *RateLimitInfo {
 	IpAddress := GetIpAddressFromRequest(r)
 	
-	var RInfo *RateLimitInfo
-	
 	NETWORKING_RATELIMIT_INFOS.mutex.Lock()
 	defer NETWORKING_RATELIMIT_INFOS.mutex.Unlock()
+	
+	var RInfo *RateLimitInfo
 	
 	RateLimitCache, Exists := NETWORKING_RATELIMIT_INFOS.GetNoMutex(IpAddress)
 	if Exists {
@@ -68,8 +70,10 @@ func GetRateLimitInfoFromRequest(r *http.Request) *RateLimitInfo {
 		RInfo = &RateLimitInfo{
 			Ip: IpAddress,
 			
-			TotalRequests: 0,
+			GlobalRequests: 0,
+			ApiRequests:   0,
 			LoginRequests: 0,
+			AccountCreationRequests:   0,
 		}
 		NETWORKING_RATELIMIT_INFOS.SetNoMutex(IpAddress, RInfo)
 	}
@@ -83,13 +87,13 @@ func TestRateLimitForRequest(w http.ResponseWriter, r *http.Request, Bucket int)
 	RInfo.mutex.Lock()
 	defer RInfo.mutex.Unlock()
 	
-	if RInfo.TotalRequests > MAX_GLOBAL_REQUESTS_PER_MINUTE {
+	if RInfo.GlobalRequests > MAX_GLOBAL_REQUESTS_PER_MINUTE {
 		return true
 	}
 	
 	switch Bucket {
 	case RATE_LIMIT_BUCKET_GLOBAL:
-		RInfo.TotalRequests++
+		RInfo.GlobalRequests++
 	case RATE_LIMIT_BUCKET_API:
 		if RInfo.ApiRequests > MAX_API_REQUESTS_PER_MINUTE {
 			return true
@@ -105,6 +109,8 @@ func TestRateLimitForRequest(w http.ResponseWriter, r *http.Request, Bucket int)
 			return true
 		}
 		RInfo.AccountCreationRequests++
+	default:
+		break
 	}
 	
 	return false
@@ -114,7 +120,7 @@ func TestRateLimitForRequest(w http.ResponseWriter, r *http.Request, Bucket int)
 func RateLimitRequest(w http.ResponseWriter, r *http.Request, Bucket int) bool {
 	// Handle rate limit errors automatically.
 	if TestRateLimitForRequest(w, r, Bucket) {
-		L_Printf("Request[%s] Path: %s was rate limited\n", GetIpAddressFromRequest(r), r.URL.Path)
+		L_Printf("Request from \"%s\" Path: \"%s\" was rate limited\n", GetIpAddressFromRequest(r), r.URL.Path)
 		http.Error(w, "Too many requests, please try again later.", http.StatusTooManyRequests)
 		return true
 	}
@@ -126,15 +132,13 @@ func RateLimitRequest(w http.ResponseWriter, r *http.Request, Bucket int) bool {
 type ThrottledResponseWriter struct {
 	http.ResponseWriter
 	kbps   int64
-	bytesUntilSleep int64
+	BytesUntilSleep int64
 	mu      sync.Mutex
 	kbps_mu sync.Mutex
 	
 	LastWriteTime time.Time
 	
 	DTWInfo *DynamicThrottledWriterInfo
-	
-	ticker *time.Ticker
 }
 
 func NewThrottledResponseWriter(w http.ResponseWriter, kbps int) *ThrottledResponseWriter {
@@ -144,8 +148,6 @@ func NewThrottledResponseWriter(w http.ResponseWriter, kbps int) *ThrottledRespo
 	return &ThrottledResponseWriter{
 		ResponseWriter: w,
 		kbps: int64(kbps),
-		
-		ticker: time.NewTicker(50 * time.Millisecond),
 	}
 }
 
@@ -173,8 +175,6 @@ func NewDynamicThrottledResponseWriter(w http.ResponseWriter, r *http.Request) *
 	NewThrottleWriter := &ThrottledResponseWriter{
 		ResponseWriter: w,
 		kbps: 1000,
-		
-		ticker: time.NewTicker(50 * time.Millisecond),
 	}
 	
 	DTWInfo := GetDynThrottledWriterInfo(r)
@@ -187,6 +187,9 @@ func NewDynamicThrottledResponseWriter(w http.ResponseWriter, r *http.Request) *
 	
 	//KBPS := RATE_LIMIT_KBPS_PER_IP
 	NewThrottleWriter.kbps = int64(DTWInfo.TargetKBPS)
+	
+	// Set bytesUntilSleep immediately so there isn't a 50ms delay when something writes to it for the first time.
+	NewThrottleWriter.BytesUntilSleep = (NewThrottleWriter.kbps * 1024 * 50) / 1000
 	
 	DTWInfo.mutex.Unlock()
 	
@@ -221,17 +224,17 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 		}
 		t.mu.Lock()
 		
-		if t.bytesUntilSleep > bytesPerTick {  // kbps could have changed!
-			t.bytesUntilSleep = bytesPerTick
+		if t.BytesUntilSleep > bytesPerTick {  // kbps could have changed!
+			t.BytesUntilSleep = bytesPerTick
 		}
 		
-		t.bytesUntilSleep -= int64(n)
+		t.BytesUntilSleep -= int64(n)
 		
-		if t.bytesUntilSleep <= 0 {
-			t.bytesUntilSleep = bytesPerTick
+		if t.BytesUntilSleep <= 0 {
+			t.BytesUntilSleep += bytesPerTick
 			t.mu.Unlock()
 			
-			<-t.ticker.C  // Wait for 50ms
+			time.Sleep(50 * time.Millisecond)
 		} else {
 			t.mu.Unlock()
 		}
@@ -241,7 +244,6 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 }
 
 func (t *ThrottledResponseWriter) Close() {
-	t.ticker.Stop()
 	if t.DTWInfo != nil {
 		t.DTWInfo.mutex.Lock()
 		t.DTWInfo.ActiveCount -= 1
@@ -337,10 +339,13 @@ func IsIpAddressLocal(Ip string) bool {
 
 func init() {
 	go func() {
-		DeleteTick := 0
+		CleanUpTick := 0
 		for {
 			time.Sleep(time.Millisecond * 1000)
-			DeleteTick -= 1
+			CleanUpTick -= 1
+			if CleanUpTick <= 0 {
+				NETWORKING_RATELIMIT_INFOS.CleanUp()
+			}
 			
 			N_DT_W_MUTEX.Lock()
 			
@@ -348,9 +353,9 @@ func init() {
 			
 			for Ip, DTWInfo := range(NETWORKING_DYNTHROTTLED_WRITERS) {
 				DTWInfo.mutex.Lock()
-				if DTWInfo.ActiveCount <= 0 && DTWInfo.RequestsCountBacklog <= 0 && DeleteTick <= 0 {
+				if DTWInfo.ActiveCount <= 0 && DTWInfo.RequestsCountBacklog <= 0 && CleanUpTick <= 0 {
 					DTWInfo.mutex.Unlock()
-					// Delete this info.
+					// This info has expired! Delete it.
 					delete(NETWORKING_DYNTHROTTLED_WRITERS, Ip)
 					continue
 				}
@@ -387,7 +392,7 @@ func init() {
 				}
 				
 				if DTWInfo.RequestsCountBacklog > 0 {
-					DTWInfo.RequestsCountBacklog = max(DTWInfo.RequestsCountBacklog - 40, 0)
+					DTWInfo.RequestsCountBacklog = max(DTWInfo.RequestsCountBacklog - 20, 0)
 					
 				}
 				
@@ -395,8 +400,8 @@ func init() {
 			}
 			N_DT_W_MUTEX.Unlock()
 			
-			if DeleteTick < 0 {
-				DeleteTick = 60
+			if CleanUpTick < 0 {
+				CleanUpTick = 60
 			}
 		}
 	}()
