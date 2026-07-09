@@ -1067,7 +1067,7 @@ func CheckChannels(CB *ArchiveChannelsBundle) {
 		if !IsChannelEnabled(AChannel) {
 			continue
 		}
-		if time.Now().UTC().UnixMilli() < AChannel.NextCheckMSEC || AChannel.CheckInterval <= 0 {
+		if TimeNow < AChannel.NextCheckMSEC || AChannel.CheckInterval <= 0 {
 			continue
 		}
 		if AChannel.Id == MANUAL_CHANNEL_ID {
@@ -1075,18 +1075,18 @@ func CheckChannels(CB *ArchiveChannelsBundle) {
 			continue
 		}
 		
-		CheckAll := false
+		CheckAllVideos := false
 		
 		if AChannel.PlaylistEnd <= -1 && TimeNow > AChannel.NextFullChannelCheckMSEC {
 			if AChannel.FullCheckInterval <= 0 {
 				AChannel.FullCheckInterval = 86400
 			}
 			AChannel.NextFullChannelCheckMSEC = TimeNow + (AChannel.FullCheckInterval * 1000)
-			CheckAll = true
+			CheckAllVideos = true
 		}
 		
 		CheckSettings := GetCheckSettingsFromAChannel(AChannel)
-		if CheckAll {
+		if CheckAllVideos {
 			CheckSettings.CheckAllVideos = true
 		}
 		
