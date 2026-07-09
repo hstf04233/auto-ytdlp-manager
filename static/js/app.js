@@ -13,7 +13,8 @@ const API = {
     const res = await fetch(url);
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API GET ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      console.log(`API GET ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      throw new Error(`${res.status} - ${text}`);
     }
     return res.json();
   },
@@ -21,7 +22,8 @@ const API = {
     const res = await fetch(url);
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API GET ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      console.log(`API GET ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      throw new Error(`${res.status} - ${text}`);
     }
     return res.text();
   },
@@ -33,7 +35,8 @@ const API = {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API POST ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      console.log(`API POST ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      throw new Error(`${res.status} - ${text}`);
     }
     return res.json();
   },
@@ -45,7 +48,8 @@ const API = {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API PATCH ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      console.log(`API PATCH ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      throw new Error(`${res.status} - ${text}`);
     }
     return res.json();
   },
@@ -55,7 +59,8 @@ const API = {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`API DELETE ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      console.log(`API DELETE ${truncateString(url, 128)}: ${res.status} - ${text}`);
+      throw new Error(`${res.status} - ${text}`);
     }
     return res.json();
   },
