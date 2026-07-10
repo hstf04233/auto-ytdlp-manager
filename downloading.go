@@ -343,6 +343,12 @@ func RefreshVideoInfo(CheckSettings ChannelCheckSettings, Video *VideoInfo, Task
 		DB_UpdateVideoRefreshState(Video, 0)
 		return
 	}
+	
+	if OldVideoInfo.Resolution != "" {
+		// We are just refreshing the video, don't update the resolution!
+		Video.Resolution = OldVideoInfo.Resolution
+	}
+	
 	DB_UpdateVideoInfo(Video)
 	DB_UpdateVideoRefreshState(Video, 0)
 	
