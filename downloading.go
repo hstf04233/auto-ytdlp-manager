@@ -10,9 +10,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
+	"autoytdlpmanager/os_tings"
 
 	"github.com/google/uuid"
 	//"os/exec"
@@ -383,6 +385,14 @@ func UpdateVideoFileSize(Video *VideoInfo, AChannel *ArchiveChannel) {
 				for _, File := range(Files) {
 					if File.IsDir() { continue }
 					
+					if runtime.GOOS == "windows" {
+						// Open the file first because windows might report an absolutely wrong file size...
+						// This truely is a bruh moment
+						OpenedFile, err := os_tings.OpenFileWithoutLocking(filepath.Join(ytaState.TempDir, File.Name()))
+						if err == nil {
+							OpenedFile.Close()
+						}
+					}
 					Info, err := File.Info()
 					if err == nil {
 						TotalSize += uint64(Info.Size())
