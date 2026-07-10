@@ -340,7 +340,7 @@ func ytarchive_DownloadLive(CheckSettings ChannelCheckSettings, Video *VideoInfo
 		"--no-wait",
 		"--add-metadata",
 		"--save-state",
-		"--threads", "2",
+		"--threads", "6",
 		"-o", FilenameWithoutExt,
 	}
 	
