@@ -411,8 +411,6 @@ func UpdateVideoFileSize(Video *VideoInfo, AChannel *ArchiveChannel) {
 			}
 		}
 		
-		L_Printf("TotalSize: %d\n", TotalSize)
-		
 		DB_UpdateVideoFileSize(Video, TotalSize)
 		
 		return
