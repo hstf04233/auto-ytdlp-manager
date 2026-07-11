@@ -15,7 +15,7 @@ import (
 
 const (
 	YT_CHAT_DEBUG_HTML = true
-	YT_CHART_UPDATE_MS = 1000
+	YT_CHAT_UPDATE_MS = 1000
 )
 
 type YTChatContext struct {
@@ -423,7 +423,7 @@ func yt_chat_Run(VideoUrl string, OutputPath string, Task *CommandTask) {
 		
 		ThisChatContext.SegmentId += 1
 		
-		time.Sleep(time.Millisecond * YT_CHART_UPDATE_MS)
+		time.Sleep(time.Millisecond * YT_CHAT_UPDATE_MS)
 		if Task != nil && Task.Status != TASK_STATUS_RUNNING {
 			// This task has ended??
 			break

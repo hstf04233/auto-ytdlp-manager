@@ -254,6 +254,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		return fmt.Errorf("Failed to create download task: %v", err)
 	}
 	Task.Title = fmt.Sprintf("FFmpeg stream for: \"%s\"", Video.Title)
+	Task.Type = TASK_TYPE_GENERIC
 	defer func() {
 		if Task != nil && CL_IsRunning(Task) {
 			CL_FinishTask(Task, TASK_STATUS_FAILED)

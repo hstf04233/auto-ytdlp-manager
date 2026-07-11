@@ -672,6 +672,9 @@ func yt_dlp_DownloadVideo(CheckSettings ChannelCheckSettings, Video *VideoInfo) 
 	if FormatSort != "" {
 		Args = append(Args, "-S", FormatSort)
 	}
+	if CheckSettings.YtDlpFormatSelect != "" {
+		Args = append(Args, "-f", CheckSettings.YtDlpFormatSelect)
+	}
 	
 	Cmd := exec.Command(Get_YtDlpPath(G_Config), Args...)
 	Cmd.Dir = DownloadDir

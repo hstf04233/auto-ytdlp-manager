@@ -199,7 +199,7 @@ func main() {
 				L_Printf("\nFailed to create admin account! error: %v\n\n", err)
 				return
 			}
-			L_Printf("Admin account created! You can now log in on the webui. Username: %s\n", NewUser.UsernameDisplay)
+			L_Printf("Admin account created! You can now log in on the webui. \"Username\": %s\n", NewUser.UsernameDisplay)
 		}
 	}
 	

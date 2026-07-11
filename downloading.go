@@ -88,6 +88,7 @@ type ChannelCheckSettings struct{
 	Type           int32
 	
 	QualitySelect int
+	YtDlpFormatSelect string
 	PreferredVideoFormat string
 	PreferredAudioFormat string
 	
