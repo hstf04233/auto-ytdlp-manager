@@ -328,15 +328,15 @@ function formatDuration(sec) {
 }
 
 function formatBytesSize(sizeInBytes) {
-  const kb = Math.ceil(sizeInBytes/1000*10)/10;   // Rounded by one decimal place.
+  const kb = Math.ceil(sizeInBytes/1024*10)/10;   // Rounded by one decimal place.
   if (kb < 1000) {
     return `${kb} KB`
   }
-  const mb = Math.ceil(sizeInBytes/1000/1000*10)/10;
+  const mb = Math.ceil(sizeInBytes/1024/1024*10)/10;
   if (mb < 1000) {
     return `${mb} MB`
   }
-  const gb = Math.ceil(sizeInBytes/1000/1000/1000*10)/10;
+  const gb = Math.ceil(sizeInBytes/1024/1024/1024*10)/10;
   return `${gb} GB`
 }
 
