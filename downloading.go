@@ -242,7 +242,11 @@ func CheckIsVideoDownloaded(Video *VideoInfo) bool {
 	return false
 }
 
-func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) *VideoInfoHistory {
+type HistoryPointSettings struct {
+	OnlyAvailability bool
+}
+
+func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo, Settings HistoryPointSettings) *VideoInfoHistory {
 	if OldVideoInfo.Id == "" {
 		// Wat??? Video might not have existed before?
 		return nil
@@ -268,11 +272,11 @@ func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) *Vid
 		UpdatedAt: time.Now().UTC(),
 	}
 	
-	if OldVideoInfo.Title != NewVideoInfo.Title {
+	if OldVideoInfo.Title != NewVideoInfo.Title && !Settings.OnlyAvailability {
 		ChangesWereMade = true
 		HistoryInfo.Title = &OldVideoInfo.Title
 	}
-	if OldVideoInfo.Description != NewVideoInfo.Description {
+	if OldVideoInfo.Description != NewVideoInfo.Description && !Settings.OnlyAvailability {
 		ChangesWereMade = true
 		HistoryInfo.Description = &OldVideoInfo.Description
 	}
@@ -287,12 +291,12 @@ func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) *Vid
 		HistoryInfo.Thumbnail = &OldVideoInfo.Thumbnail
 		HistoryInfo.OriginThumbnail = &OldVideoInfo.OriginThumbnail
 	}
-	if OldVideoInfo.Duration != NewVideoInfo.Duration {
+	if OldVideoInfo.Duration != NewVideoInfo.Duration && !Settings.OnlyAvailability {
 		ChangesWereMade = true
 		HistoryInfo.Duration = OldVideoInfo.Duration
 	}
 	
-	if OldVideoInfo.VideoType != NewVideoInfo.VideoType {
+	if OldVideoInfo.VideoType != NewVideoInfo.VideoType && !Settings.OnlyAvailability {
 		ChangesWereMade = true
 		HistoryInfo.VideoType = OldVideoInfo.VideoType
 	}
@@ -305,8 +309,8 @@ func GetHistoryDifference(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) *Vid
 	return nil
 }
 
-func AddVideoHistoryPoint(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo) bool {
-	HistoryDifference := GetHistoryDifference(OldVideoInfo, NewVideoInfo)
+func AddVideoHistoryPoint(OldVideoInfo *VideoInfo, NewVideoInfo *VideoInfo, Settings HistoryPointSettings) bool {
+	HistoryDifference := GetHistoryDifference(OldVideoInfo, NewVideoInfo, Settings)
 	if HistoryDifference == nil {
 		//L_Printf("No history changes found for video: %s !!!\n", NewVideoInfo.Id)
 		// No changes...
@@ -337,7 +341,7 @@ func RefreshVideoInfo(CheckSettings ChannelCheckSettings, Video *VideoInfo, Task
 		DB_UpdateVideoAvailability(Video, Video.Availability)
 	}
 	if err != nil {
-		AddVideoHistoryPoint(&OldVideoInfo, Video)
+		AddVideoHistoryPoint(&OldVideoInfo, Video, HistoryPointSettings{OnlyAvailability: true})
 		
 		CL_Logf(Task, "Failed to grab video info... err: %v\n", err)
 		DB_UpdateVideoInfo(Video)
@@ -360,7 +364,7 @@ func RefreshVideoInfo(CheckSettings ChannelCheckSettings, Video *VideoInfo, Task
 		}
 	}
 	
-	AddVideoHistoryPoint(&OldVideoInfo, Video)
+	AddVideoHistoryPoint(&OldVideoInfo, Video, HistoryPointSettings{})
 	
 	if Video.QueuedAction == VIDEO_QACTION_WILL_IGNORE {
 		// This video was queued to be ignored.
@@ -609,9 +613,8 @@ func CheckVideoAndDownload(CheckSettings ChannelCheckSettings, Video *VideoInfo,
 	if err != nil {
 		DB_UpdateVideoStatus(Video, VIDEO_STATUS_FAILED)
 		if OldDBVideoInfo == nil || OldDBVideoInfo.Availability != Video.Availability {
-			// TODO: Create a history point because the availability changed!!!
-			// I can't do that rn because the video info that we have might not be from the database and have no title, description, duration, etc...
 			DB_UpdateVideoAvailability(Video, Video.Availability)
+			AddVideoHistoryPoint(OldDBVideoInfo, Video, HistoryPointSettings{OnlyAvailability: true})
 		}
 		CL_Logf(Task, "Failed to grab video info for \"%s\"... Error: %v\n", Video.Title, err)
 		return false
@@ -624,7 +627,7 @@ func CheckVideoAndDownload(CheckSettings ChannelCheckSettings, Video *VideoInfo,
 		}
 	}
 	if OldDBVideoInfo != nil {
-		AddVideoHistoryPoint(OldDBVideoInfo, Video)
+		AddVideoHistoryPoint(OldDBVideoInfo, Video, HistoryPointSettings{})
 	}
 	
 	DB_UpdateVideoInfo(Video)
