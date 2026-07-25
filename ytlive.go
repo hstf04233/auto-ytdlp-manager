@@ -323,10 +323,9 @@ func ytarchive_DownloadLive(CheckSettings ChannelCheckSettings, Video *VideoInfo
 		QualityString = "best"
 	}
 	
-	//DateAndTime := time.Unix(Video.ReleaseDate, 0).Format("2006-01-02")
-	
 	Filename := Video.Filename
 	if Video.DownloadedFilename != "" {
+		// Resume the download from the exact same filename as last time
 		Filename = Video.DownloadedFilename
 	}
 	
