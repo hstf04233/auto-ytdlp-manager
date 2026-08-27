@@ -21,6 +21,8 @@ var (
 	CURRENT_WORKING_DIRECTORY = ""
 )
 
+var PRINT_NETWORK_REQUESTS = true
+
 var HttpServer *http.Server
 
 func SecurityMiddleware(next http.Handler) http.Handler {
@@ -36,9 +38,10 @@ func SecurityMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		
-		if false {
+		if PRINT_NETWORK_REQUESTS {
 			L_Printf("-------- %s | %s --------\n", GetIpAddressFromRequest(r), r.RequestURI)
 			
+			/*
 			for Key, Value := range(r.Header) {
 				Pn := fmt.Sprintf(" Key: %s: ", Key)
 				for _, Str := range(Value) {
@@ -48,6 +51,7 @@ func SecurityMiddleware(next http.Handler) http.Handler {
 				L_Printf("%s\n", Pn)
 			}
 			L_Printf("\n")
+			*/
 		}
 		
 		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
@@ -226,7 +230,7 @@ func main() {
 			break
 		}
 		
-		time.Sleep(33 * time.Millisecond)
+		time.Sleep(50 * time.Millisecond)
 	}
 	
 	// The program will exit now.

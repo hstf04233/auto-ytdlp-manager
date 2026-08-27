@@ -101,7 +101,7 @@ type ArchiveChannelsBundle struct {
 	Channels []*ArchiveChannel
 }
 
-var G_ArchiveChannels ArchiveChannelsBundle
+var G_ArchiveChannels *ArchiveChannelsBundle = &ArchiveChannelsBundle{}
 
 func AddArchiveChannel(CB *ArchiveChannelsBundle, AChannel *ArchiveChannel) error {
 	if AChannel.Id == "" {
@@ -186,7 +186,7 @@ func GetArchiveChannelFromId(CB *ArchiveChannelsBundle, Id string) *ArchiveChann
 
 func GetDownloadedVideoFilePath(Video *VideoInfo, AChannel *ArchiveChannel) (string, error) {
 	if AChannel == nil {
-		AChannel = GetArchiveChannelFromId(&G_ArchiveChannels, Video.FromChannel)
+		AChannel = GetArchiveChannelFromId(G_ArchiveChannels, Video.FromChannel)
 		if AChannel == nil {
 			return "", fmt.Errorf("Channel for video could not be found.")
 		}
@@ -1166,7 +1166,7 @@ func AutoRefreshOldUpdatedVideos() {
 			if Task.Status != TASK_STATUS_RUNNING { return }
 			if G_Config.AutoRefresh_Videos_Seconds <= 0 { return }
 			
-			AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, Video.FromChannel)
+			AChannel := GetArchiveChannelFromId(G_ArchiveChannels, Video.FromChannel)
 			if AChannel == nil {
 				continue
 			}
@@ -1208,12 +1208,12 @@ func AutoRefreshOldUpdatedVideos() {
 }
 
 func InitDownloading() {
-	err := DB_LoadChannels(&G_ArchiveChannels)
+	err := DB_LoadChannels(G_ArchiveChannels)
 	if err != nil {
 		panic(err)
 	}
 	
-	GetManualArchiveChannel(&G_ArchiveChannels)
+	GetManualArchiveChannel(G_ArchiveChannels)
 	
 	NextTasksDatabaseCleanUp := time.Now().UTC().Unix()+10
 	NextVideosRefreshUpdate  := time.Now().UTC().Unix()+10
@@ -1221,12 +1221,14 @@ func InitDownloading() {
 	for true {
 		time.Sleep(1 * time.Second)
 		if time.Now().UTC().Unix() > NextTasksDatabaseCleanUp {
-			NextCleanUp := (60*30)   // Clean up old tasks every 30 minutes.
-			if NextCleanUp > G_Config.TaskLog_AutoDelete_Seconds {
-				NextCleanUp = G_Config.TaskLog_AutoDelete_Seconds
+			NextCleanUp := (60*20)   // Clean up old tasks every 20 minutes.
+			TaskLog_AutoDelete_Seconds := G_Config.TaskLog_AutoDelete_Seconds
+			if TaskLog_AutoDelete_Seconds > 0 && NextCleanUp > TaskLog_AutoDelete_Seconds {
+				NextCleanUp = TaskLog_AutoDelete_Seconds
 			}
-			if NextCleanUp > G_Config.TaskLog_List_AutoDelete_Seconds {
-				NextCleanUp = G_Config.TaskLog_List_AutoDelete_Seconds
+			TaskLog_List_AutoDelete_Seconds := G_Config.TaskLog_List_AutoDelete_Seconds
+			if TaskLog_List_AutoDelete_Seconds > 0 && NextCleanUp > TaskLog_List_AutoDelete_Seconds {
+				NextCleanUp = TaskLog_List_AutoDelete_Seconds
 			}
 			NextTasksDatabaseCleanUp = time.Now().UTC().Unix() + int64(NextCleanUp)
 			CleanUpTasksInDatabase()
@@ -1236,6 +1238,6 @@ func InitDownloading() {
 			go AutoRefreshOldUpdatedVideos()
 		}
 		
-		CheckChannels(&G_ArchiveChannels)
+		CheckChannels(G_ArchiveChannels)
 	}
 }

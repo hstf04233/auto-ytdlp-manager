@@ -798,7 +798,7 @@ func DB_PopulateCommandTaskInfo(Task *CommandTask) {
 	defer Task.Lock.Unlock()
 	if Task.FromChannelId != "" {
 		ChannelInfo := &TaskChannelInfo{}
-		AChannel := GetArchiveChannelFromId(&G_ArchiveChannels, Task.FromChannelId)
+		AChannel := GetArchiveChannelFromId(G_ArchiveChannels, Task.FromChannelId)
 		if AChannel != nil {
 			ChannelInfo.Name = AChannel.Name
 			ChannelInfo.Url  = AChannel.Url
