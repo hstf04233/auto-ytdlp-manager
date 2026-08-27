@@ -582,9 +582,12 @@ func CleanUpTasksInDatabase() {
 		return
 	}
 	
-	TasksList, err := DB_ListCommandTasks(-1, 0, ListCommandTasksQuery{
+	TasksList, err := DB_ListCommandTasks(500, 0, ListCommandTasksQuery{
 		Type: -1,
 		Status: -1,
+		
+		OrderBy: DB_CTASK_ORDERBY_EndTime,
+		OrderDirection: 1,
 	})
 	if err != nil {
 		L_Printf("CleanUpListingTasksInDatabase error: %v\n", err)

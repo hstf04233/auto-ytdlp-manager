@@ -21,7 +21,7 @@ var (
 	CURRENT_WORKING_DIRECTORY = ""
 )
 
-var PRINT_NETWORK_REQUESTS = true
+var PRINT_NETWORK_REQUESTS = false
 
 var HttpServer *http.Server
 
@@ -230,7 +230,7 @@ func main() {
 			break
 		}
 		
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(33 * time.Millisecond)
 	}
 	
 	// The program will exit now.
