@@ -1221,7 +1221,7 @@ func InitDownloading() {
 	for true {
 		time.Sleep(1 * time.Second)
 		if time.Now().UTC().Unix() > NextTasksDatabaseCleanUp {
-			NextCleanUp := (60*10)   // Clean up old tasks every 10 minutes.
+			NextCleanUp := (60*30)   // Clean up old tasks every 30 minutes.
 			if NextCleanUp > G_Config.TaskLog_AutoDelete_Seconds {
 				NextCleanUp = G_Config.TaskLog_AutoDelete_Seconds
 			}

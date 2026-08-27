@@ -91,7 +91,6 @@ func StartServer(ServerPort int) {
 }
 
 func OnProgramExit() {
-	st_Quit()
 	DB_Close()
 	AuthDB_Close()
 }
@@ -212,7 +211,7 @@ func main() {
 	ExitSignal := make(chan os.Signal, 1)
 	signal.Notify(ExitSignal, syscall.SIGINT, syscall.SIGTERM)
 	
-	StartSystray()
+	//StartSystray()
 	
 	for {
 		select {
