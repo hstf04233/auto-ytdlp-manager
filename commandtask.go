@@ -582,6 +582,7 @@ func CleanUpTasksInDatabase() {
 		return
 	}
 	
+	// TODO: Limit the amount of tasks it searches!
 	TasksList, err := DB_ListCommandTasks(-1, 0, ListCommandTasksQuery{
 		Type: -1,
 		Status: -1,
