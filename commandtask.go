@@ -582,7 +582,7 @@ func CleanUpTasksInDatabase() {
 		return
 	}
 	
-	TasksList, err := DB_ListCommandTasks(500, 0, ListCommandTasksQuery{
+	TasksList, err := DB_ListCommandTasks(-1, 0, ListCommandTasksQuery{
 		Type: -1,
 		Status: -1,
 		
@@ -620,7 +620,7 @@ func CleanUpTasksInDatabase() {
 		if DeleteThis {
 			err := DB_DeleteCommandTask(Task.Id)
 			if err != nil {
-				L_Printf("Could not delete task '%s', error: %v\n", err)
+				L_Printf("Could not delete task '%s', error: %v\n", Task.Id, err)
 				continue
 			}
 			DeleteCount += 1
