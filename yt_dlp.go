@@ -477,8 +477,13 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 		} else if strings.Contains(ErrOutput, "This live event will begin in a few moments.") ||
 				  strings.Contains(ErrOutput, "This live event will begin in") {
 			return fmt.Errorf("%s", ErrOutput)
-		} else if strings.Contains(ErrOutput, "Join this channel to get access to members-only content like this video") {
+		} else if strings.Contains(ErrOutput, "Join this channel to get access to members-only content like this video") ||
+		strings.Contains(ErrOutput, "members-only") {
 			Video.Availability = "members-only"
+			return fmt.Errorf("%s", ErrOutput)
+		} else if strings.Contains(ErrOutput, "Video unavailable") {
+			// This error occurs when you have provided cookies and the video is private... Why this happends I have no idea 🤬
+			Video.Availability = "unavailable"
 			return fmt.Errorf("%s", ErrOutput)
 		}
 		
