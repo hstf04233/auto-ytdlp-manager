@@ -213,12 +213,12 @@ func OpenConfig(ConfigPath string) error {
 		YtDlpConfigFile, err = os.OpenFile(YtDlpConfigPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
 		if err == nil {
 			YtDlpConfigFile.Write([]byte(`# Add yt-dlp commands here!
-			# See https://github.com/yt-dlp/yt-dlp#configuration on how to use yt-dlp configs.
-			
-			# Add cookies to yt-dlp with:
-			#--cookies "path/to/cookies.txt"
-			
-			`))
+# See https://github.com/yt-dlp/yt-dlp#configuration on how to use yt-dlp configs.
+
+# Add cookies to yt-dlp with:
+#--cookies "path/to/cookies.txt"
+
+`))
 			defer YtDlpConfigFile.Close()
 		}
 	} else if err == nil {
