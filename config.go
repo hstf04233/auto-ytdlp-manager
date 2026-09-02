@@ -192,7 +192,7 @@ func SaveConfig(Config *ProgramConfig, File *os.File) error {
 	JsonEncoder.SetEscapeHTML(false)  // DIE! (I disable this setting because it messes with the YtDlp_OutputTemplate)
 	JsonEncoder.SetIndent("", "\t")
 	
-	err = JsonEncoder.Encode(G_Config)
+	err = JsonEncoder.Encode(Config)
 	if err != nil {
 		return fmt.Errorf("Could not write config json, error %v\n", err)
 	}
