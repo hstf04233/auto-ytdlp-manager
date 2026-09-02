@@ -98,6 +98,8 @@ func StartServer(ServerPort int) {
 func OnProgramExit() {
 	DB_Close()
 	AuthDB_Close()
+	
+	systray.RemoveSystray()
 }
 
 var ProgramShouldExit = false

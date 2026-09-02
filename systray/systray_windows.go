@@ -10,8 +10,11 @@ import (
 	"github.com/gogpu/systray"
 )
 
+var G_Tray *systray.SystemTray
+
 func StartSystray(SystrayIconContent []byte) (bool, error) {
 	tray := systray.New()
+	G_Tray = tray
 	
 	ConsoleIsVisible := true
 	
@@ -45,4 +48,11 @@ func StartSystray(SystrayIconContent []byte) (bool, error) {
 	}
 	
 	return true, nil
+}
+
+func RemoveSystray() {
+	if G_Tray != nil {
+		G_Tray.Remove()
+		G_Tray = nil
+	}
 }
