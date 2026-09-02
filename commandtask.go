@@ -69,7 +69,7 @@ type CommandTask struct {
 }
 
 var ARCT_Lock sync.RWMutex
-var AllRunningCommandTasks map[string]*CommandTask
+var AllRunningCommandTasks = make(map[string]*CommandTask)
 
 func TruncateOutput(Output string) string {
 	if len(Output) > MAX_TASK_OUTPUT_LOG-30 {
@@ -591,7 +591,7 @@ func CleanUpTasksInDatabase() {
 		OrderDirection: 1,
 	})
 	if err != nil {
-		L_Printf("CleanUpListingTasksInDatabase error: %v\n", err)
+		L_Printf("CleanUpTasksInDatabase error: %v\n", err)
 		return
 	}
 	
@@ -607,6 +607,11 @@ func CleanUpTasksInDatabase() {
 	defer ARCT_Lock.RUnlock()
 	
 	for _, Task := range(TasksList) {
+		if _, ok := AllRunningCommandTasks[Task.Id]; ok {
+			continue  // This task is running! don't delete
+		}
+		Task.Lock.RLock()
+		defer Task.Lock.RUnlock()
 		DeleteThis := false
 		
 		if Task.Type == TASK_TYPE_LISTING {
@@ -627,8 +632,4 @@ func CleanUpTasksInDatabase() {
 			DeleteCount += 1
 		}
 	}
-}
-
-func init() {
-	AllRunningCommandTasks = make(map[string]*CommandTask)
 }

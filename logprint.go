@@ -24,12 +24,12 @@ func L_Printf(format string, a ... any) {
 	if logFile == nil {
 		return
 	}
-	go func() {
+	//go func() {
 		logSync.Lock()
 		MsgWithTime := fmt.Sprintf("[%s]: %s", TimeNow, Msg)
 		logFile.Write([]byte(MsgWithTime))
 		logSync.Unlock()
-	}()
+	//}()
 }
 
 func MoveCurrentLog() error {

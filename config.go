@@ -212,12 +212,12 @@ func OpenConfig(ConfigPath string) error {
 		YtDlpConfigFile, err = os.OpenFile(YtDlpConfigPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
 		if err == nil {
 			YtDlpConfigFile.Write([]byte(`# Add yt-dlp commands here!
-# See https://github.com/yt-dlp/yt-dlp#configuration on how to use yt-dlp configs.
-
-# Add cookies to yt-dlp with:
-#--cookies "path/to/cookies.txt"
-
-`))
+			# See https://github.com/yt-dlp/yt-dlp#configuration on how to use yt-dlp configs.
+			
+			# Add cookies to yt-dlp with:
+			#--cookies "path/to/cookies.txt"
+			
+			`))
 			defer YtDlpConfigFile.Close()
 		}
 	} else if err == nil {
@@ -226,7 +226,7 @@ func OpenConfig(ConfigPath string) error {
 	
 	ConfigFile, err := os.OpenFile(ConfigPath, os.O_RDWR, 0644)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
-		// The config doesn't exist! Write the default config.
+		// Config file doesn't exist! Write the default config.
 		NewConfigFile, err := os.OpenFile(ConfigPath, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
 		if err != nil {
 			return fmt.Errorf("Could not create default config file '%s' %v\n", ConfigPath, err)
@@ -234,6 +234,7 @@ func OpenConfig(ConfigPath string) error {
 		
 		err = SaveConfig(G_Config, NewConfigFile)
 		if err != nil {
+			NewConfigFile.Close()
 			return fmt.Errorf("Could not write config file, error %v\n", err)
 		}
 		
@@ -249,10 +250,12 @@ func OpenConfig(ConfigPath string) error {
 	
 	ConfigContent, err := io.ReadAll(ConfigFile)
 	if err != nil {
+		ConfigFile.Close()
 		return fmt.Errorf("Error when reading config file '%s' %v\n", ConfigPath, err)
 	}
 	err = json.Unmarshal(ConfigContent, &G_Config)
 	if err != nil {
+		ConfigFile.Close()
 		return fmt.Errorf("Error when decoding config file json '%s' %v\n", ConfigPath, err)
 	}
 	

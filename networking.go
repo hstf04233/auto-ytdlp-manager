@@ -179,6 +179,8 @@ func NewDynamicThrottledResponseWriter(w http.ResponseWriter, r *http.Request) *
 	
 	DTWInfo := GetDynThrottledWriterInfo(r)
 	DTWInfo.mutex.Lock()
+	defer DTWInfo.mutex.Unlock()
+	
 	DTWInfo.ActiveCount += 1
 	DTWInfo.RequestsCountBacklog += 1
 	DTWInfo.Writers = append(DTWInfo.Writers, NewThrottleWriter)
@@ -190,8 +192,6 @@ func NewDynamicThrottledResponseWriter(w http.ResponseWriter, r *http.Request) *
 	
 	// Set bytesUntilSleep immediately so there isn't a 50ms delay when something writes to it for the first time.
 	NewThrottleWriter.BytesUntilSleep = (NewThrottleWriter.kbps * 1024 * 50) / 1000
-	
-	DTWInfo.mutex.Unlock()
 	
 	return NewThrottleWriter
 }
@@ -214,15 +214,14 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 		
 		t.LastWriteTime = time.Now()
 		
-		t.mu.Unlock()
 		n, err := t.ResponseWriter.Write(ToWrite[:AllowedCount])
 		totalWritten += n
 		ToWrite = ToWrite[n:]
 		
 		if err != nil {
+			t.mu.Unlock()
 			return totalWritten, err
 		}
-		t.mu.Lock()
 		
 		if t.BytesUntilSleep > bytesPerTick {  // kbps could have changed!
 			t.BytesUntilSleep = bytesPerTick

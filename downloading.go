@@ -1140,7 +1140,7 @@ func AutoRefreshOldUpdatedVideos() {
 	THIS_MaxVideosToRefresh := 200
 	PageSize := 100
 	Page := 0
-	PageOffset := -0
+	PageOffset := 0
 	for {
 		// Get videos oldest to newest!
 		RefreshableVideos, err := DB_ListVideos(PageSize, (Page*PageSize)+PageOffset, ListVideosQuery{

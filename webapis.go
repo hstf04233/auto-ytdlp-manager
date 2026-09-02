@@ -374,10 +374,9 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoInfo) {
 	if Video.DownloadedFilename != "" {
 		Filepath, err := GetDownloadedVideoFilePath(Video, nil)
-		if err == nil {
+		if err != nil {
 			Video.VideoFileExists = false
-		}
-		if Filepath == "" {
+		} else if Filepath == "" {
 			// Video file was not found... Deleted?
 			Video.VideoFileExists = false
 		} else {
@@ -1500,7 +1499,7 @@ func ServeDBImage(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", ImageInfo.Filename))
-	w.Header().Set("Cache-Control", "Cache-Control: public, max-age=604800")  // 1 week
+	w.Header().Set("Cache-Control", "public, max-age=604800")  // 1 week
 	
 	Seeker := bytes.NewReader(ImageData)
 	

@@ -513,7 +513,7 @@ func IsUserRequestSignedByServer(r *http.Request, Queries []string) bool {
 
 func HashRawPassword(RawPassword string) string {
 	// Bcrypt only accepts 72 characters in a password.
-	// To get around this issue just use a sha512 hash instead!!
+	// To get around this issue we will use a base64 encoded sha512 hash trimmed to 72 characters!!
 	Sum := sha3.Sum512([]byte(RawPassword))
 	return base64.RawStdEncoding.EncodeToString(Sum[:64])[0:72]
 }
