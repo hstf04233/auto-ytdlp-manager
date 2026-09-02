@@ -11,6 +11,7 @@ import (
 	
 	"fmt"
 	"net/http"
+	"autoytdlpmanager/systray"
 )
 
 var (
@@ -103,6 +104,30 @@ var ProgramShouldExit = false
 
 func G_ExitProgram() {
 	ProgramShouldExit = true
+}
+
+func SetupSystray() {
+	IconFileName := "p_icon.png"
+	//IconFileIcoName := "p_icon.ico"
+	
+	if APPLICATION_VERSION_TYPE == "debug" {
+		IconFileName = "p_icon_debog.png"
+		//IconFileIcoName = "p_icon_debog.ico"
+	}
+	
+	IconPNGContent := ReadFileFromStatic(IconFileName)
+	
+	go func() {
+		WasRan, err := systray.StartSystray(IconPNGContent)
+		if err != nil {
+			L_Printf("Systray error: %v\n", err)
+			return
+		}
+		if WasRan {
+			// Systray has exited!
+			G_ExitProgram()
+		}
+	}()
 }
 
 func main() {
@@ -213,7 +238,7 @@ func main() {
 	ExitSignal := make(chan os.Signal, 1)
 	signal.Notify(ExitSignal, syscall.SIGINT, syscall.SIGTERM)
 	
-	//StartSystray()
+	SetupSystray()
 	
 	for {
 		select {
