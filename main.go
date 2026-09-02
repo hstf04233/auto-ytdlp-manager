@@ -208,8 +208,6 @@ func main() {
 	
 	go InitDownloading()
 	
-	// TODO: THIS IS TEMP! go yt_chat_Run("https://www.youtube.com/watch?v=G5oz2dQLi00", "./test-chat-output.json", nil)
-	
 	go StartServer(int(G_Config.ServerPort))
 	
 	ExitSignal := make(chan os.Signal, 1)

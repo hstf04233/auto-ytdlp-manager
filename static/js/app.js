@@ -509,7 +509,8 @@ const configSettings = [
   
   {element: "config-AllChannelsDisabled",      value: "AllChannels_Disabled",       type: "bool"},
   {element: "config-TaskLogAutoDeleteEnabled", value: "TaskLog_AutoDelete_Enabled", type: "bool"},
-  {element: "config-DownloadVideoThumbnails",  value: "Download_Video_Thumbnails",  type: "bool"},
+  {element: "config-DownloadVideoThumbnails", value: "Download_Video_Thumbnails",  type: "bool"},
+  {element: "config-DownloadLiveChat",        value: "Download_Live_Chat",         type: "bool"},
   
   {element: "config-TaskLogAutoDeleteSeconds",     value: "TaskLog_AutoDelete_Seconds",      type: "number"},
   {element: "config-TaskLogListAutoDeleteSeconds", value: "TaskLog_List_AutoDelete_Seconds", type: "number"},

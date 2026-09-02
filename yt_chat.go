@@ -411,7 +411,7 @@ func yt_chat_Run(VideoUrl string, OutputPath string, DownloadTask *CommandTask) 
 			nextContinuation = RetrieveLiveChatModeContinuation(segmentJson)
 			ThisChatContext.SegmentState = 1
 			if nextContinuation != "" {
-				CL_Logf(Task, "Loading 'Live chat' mode!\n")
+				CL_Logf(Task, "Switching to 'Live chat' mode\n")
 				ThisChatContext.ReloadContinuation = nextContinuation
 				ThisChatContext.SegmentId += 1
 				continue

@@ -371,6 +371,9 @@ func ytarchive_DownloadLive(CheckSettings ChannelCheckSettings, Video *VideoInfo
 			}
 		}()
 		go func() {
+			if !G_Config.Download_Live_Chat {
+				return
+			}
 			ChatJsonPath := fmt.Sprintf("%s.chat.json", filepath.Join(DownloadDir, FilenameWithoutExt))
 			err := yt_chat_Run(Video.Url, ChatJsonPath, DownloadTask)
 			if err != nil {

@@ -941,6 +941,7 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 		AutoRefresh_Videos_Seconds int `json:"AutoRefresh_Videos_Seconds"`
 		
 		Download_Video_Thumbnails *bool `json:"Download_Video_Thumbnails"`
+		Download_Live_Chat *bool `json:"Download_Live_Chat"`
 	}
 	Body.TaskLog_AutoDelete_Seconds = -1
 	Body.TaskLog_List_AutoDelete_Seconds = -1
@@ -1009,6 +1010,9 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if Body.Download_Video_Thumbnails != nil {
 		G_Config.Download_Video_Thumbnails = *Body.Download_Video_Thumbnails
+	}
+	if Body.Download_Live_Chat != nil {
+		G_Config.Download_Live_Chat = *Body.Download_Live_Chat
 	}
 	
 	if Body.YtDlp_Path != "" {
