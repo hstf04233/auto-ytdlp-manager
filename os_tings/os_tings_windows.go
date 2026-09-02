@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/natefinch/npipe" // Only used on Windows
+	"github.com/Microsoft/go-winio" // Only used on Windows
 	"golang.org/x/sys/windows"
 )
 
@@ -61,7 +61,7 @@ func GetPipeName(PipeName string) string {
 }
 
 func CreatePipe(PipeName string) (io.WriteCloser, error) {
-	listener, err := npipe.Listen(PipeName)
+	listener, err := winio.ListenPipe(PipeName, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,8 @@ func CreatePipe(PipeName string) (io.WriteCloser, error) {
 }
 
 func OpenPipe(PipeName string) (io.WriteCloser, error) {
-	return npipe.DialTimeout(PipeName, time.Second * 5)
+	timeout := 5 * time.Second
+	return winio.DialPipe(PipeName, &timeout)
 }
 
 func ToggleConsoleVisibility(show bool) {
