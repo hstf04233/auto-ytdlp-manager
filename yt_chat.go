@@ -333,11 +333,24 @@ func YTC_DownloadYTWebpage(VideoUrl string, VideoId string) (*YTChatContext, err
 	return ThisChatContext, nil
 }
 
-func yt_chat_Run(VideoUrl string, OutputPath string, Task *CommandTask) {
+func yt_chat_Run(VideoUrl string, OutputPath string, DownloadTask *CommandTask) error {
 	if VideoUrl == "" {
-		CL_Logf(Task, "No url inputed, exiting.")
-		return
+		L_Printf("No url inputed, exiting.")
+		return nil
 	}
+	
+	Task := CL_NewGenericTask()
+	Task.Type = TASK_TYPE_GENERIC
+	Task.FromVideoId = DownloadTask.FromVideoId
+	Task.FromChannelId = DownloadTask.FromChannelId
+	Task.Title = fmt.Sprintf("Live chat download: \"%s\"", VideoUrl)
+	DB_UpdateCommandTaskInfo(Task)
+	
+	defer func() {
+		if Task.Status == TASK_STATUS_RUNNING {
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
+		}
+	}()
 	
 	CL_Logf(Task, "Downloading yt live chat: %s\n", VideoUrl)
 	
@@ -346,46 +359,50 @@ func yt_chat_Run(VideoUrl string, OutputPath string, Task *CommandTask) {
 	matches := ytIdRegex.FindStringSubmatch(VideoUrl)
 	if len(matches) <= 0 {
 		CL_Logf(Task, "Invalid YouTube url: %s\n", VideoUrl)
-		return
+		return nil
 	}
 	videoId := matches[1]
-	CL_Logf(Task, "VideoId: %s\n", videoId)
+	CL_Logf(Task, "VideoId: %s\n\n", videoId)
 	
 	ThisChatContext, err := YTC_DownloadYTWebpage(VideoUrl, videoId)
 	if err != nil {
-		CL_Logf(Task, "Failed to retrieve webpage: %v\n", err)
-		return
+		CL_Logf(Task, "Failed to retrieve webpage, error: %v\n", err)
+		return err
 	}
 	
 	nextContinuation := ThisChatContext.ReloadContinuation
 	
-	ChatFile, err := os.Open(OutputPath)
+	ChatFile, err := os.OpenFile(OutputPath, os.O_RDWR, 0644)
 	if err != nil && errors.Is(err, os.ErrNotExist) {
 		ChatFile, err = os.Create(OutputPath)
 		if err != nil {
 			CL_Logf(Task, "Failed to create file \"%s\" error: %v\n", OutputPath, err)
-			return
+			return err
 		}
 	} else if err != nil {
 		CL_Logf(Task, "Failed to open file \"%s\" error: %v\n", OutputPath, err)
-		return
+		return err
 	}
 	defer ChatFile.Close()
 	
 	for {
+		if !CL_IsRunning(DownloadTask) || !CL_IsRunning(Task) {
+			continue
+		}
+		
 		// TODO: Add support for replay chats
 		segmentBody, err := DownloadChatSegment(nextContinuation, ThisChatContext)
 		if err != nil {
-			//L_Printf("An error occured when downloading segment %d: %v\n", ThisChatContext.SegmentId, err)
 			CL_Logf(Task, "An error occured when downloading segment %d: %v\n", ThisChatContext.SegmentId, err)
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
 			break
 		}
 		
 		segmentJson := map[string]interface{}{}
 		err = json.Unmarshal([]byte(segmentBody), &segmentJson)
 		if err != nil {
-			//L_Printf("Segment returned malformed json text, err: %v\n", err)
 			CL_Logf(Task, "Segment returned malformed json text, err: %v\n", err)
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
 			break
 		}
 		
@@ -406,6 +423,7 @@ func yt_chat_Run(VideoUrl string, OutputPath string, Task *CommandTask) {
 			err := WriteActions(actions, ChatFile)
 			if err != nil {
 				CL_Logf(Task, "Cannot write to file err: %v, ending...\n", err)
+				CL_FinishTask(Task, TASK_STATUS_FAILED)
 				break
 			}
 		}
@@ -418,17 +436,18 @@ func yt_chat_Run(VideoUrl string, OutputPath string, Task *CommandTask) {
 		
 		if nextContinuation == "" {
 			CL_Logf(Task, "Continuation ID is empty, ending...\n")
+			CL_FinishTask(Task, TASK_STATUS_FAILED)
 			break
 		}
 		
 		ThisChatContext.SegmentId += 1
 		
 		time.Sleep(time.Millisecond * YT_CHAT_UPDATE_MS)
-		if Task != nil && Task.Status != TASK_STATUS_RUNNING {
-			// This task has ended??
-			break
-		}
 	}
 	
+	if CL_IsRunning(DownloadTask) && Task.Status == TASK_STATUS_RUNNING {
+		CL_FinishTask(Task, TASK_STATUS_FINISHED)
+	}
 	
+	return nil
 }

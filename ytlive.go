@@ -370,6 +370,13 @@ func ytarchive_DownloadLive(CheckSettings ChannelCheckSettings, Video *VideoInfo
 				L_Printf("Failed to TurnYTLiveIntoM3U8LiveStream, error: %v\n", err)
 			}
 		}()
+		go func() {
+			ChatJsonPath := fmt.Sprintf("%s.chat.json", filepath.Join(DownloadDir, FilenameWithoutExt))
+			err := yt_chat_Run(Video.Url, ChatJsonPath, DownloadTask)
+			if err != nil {
+				L_Printf("yt_chat_Run error: %v\n", err)
+			}
+		}()
 	}
 	
 	err = Cmd.Wait()
