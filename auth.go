@@ -19,7 +19,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	//_ "github.com/mattn/go-sqlite3"
-	_ "modernc.org/sqlite"
+	//_ "modernc.org/sqlite"
+	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
 const AUTH_db_SQL_Header = `
@@ -141,7 +142,7 @@ func GetAuthSecretSaltHash() string {
 	}
 	
 	Row := G_AUTHDB.QueryRow(`
-	SELECT SecretSaltHash FROM Settings WHERE Id = "Global"
+	SELECT SecretSaltHash FROM Settings WHERE Id = 'Global'
 	`)
 	var SecretSaltHash string
 	err := Row.Scan(&SecretSaltHash)
@@ -759,7 +760,7 @@ func DoesAdminAccountExist() (bool, error) {
 
 
 func OpenAuthDB() error {
-	db, err := sql.Open("sqlite", AUTH_DB_FILENAME)
+	db, err := sql.Open("sqlite3", AUTH_DB_FILENAME)
 	if err != nil {
 		return fmt.Errorf("Failed to open auth database '%s' Error: %v\n", AUTH_DB_FILENAME, err)
 	}

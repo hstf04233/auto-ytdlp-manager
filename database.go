@@ -12,7 +12,7 @@ import (
 	"time"
 
 	//_ "github.com/mattn/go-sqlite3"
-	_ "modernc.org/sqlite"
+	_ "github.com/ncruces/go-sqlite3/driver"
 )
 
 const DATABASE_FILE       = "autoytdlpmanager.db"
@@ -794,6 +794,18 @@ func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	return nil
 }
 
+func ToSafeTime(t time.Time) time.Time {
+	if t.Year() < 0 {
+		//L_Printf("Year: 0??? Time was: %s\n", t.String())
+		return time.Time{}
+	} else if t.Year() > 9999 {
+		//L_Printf("Year: > 9999??? Time was: %s\n", t.String())
+		return time.Time{}
+	}
+	
+	return t
+}
+
 func DB_PopulateCommandTaskInfo(Task *CommandTask) {
 	Task.Lock.Lock()
 	defer Task.Lock.Unlock()
@@ -820,6 +832,10 @@ func DB_PopulateCommandTaskInfo(Task *CommandTask) {
 			Task.VideoInfo = VideoInfo
 		}
 	}
+	
+	Task.StartTime = ToSafeTime(Task.StartTime)
+	Task.UpdatedAt = ToSafeTime(Task.UpdatedAt)
+	Task.EndTime = ToSafeTime(Task.EndTime)
 }
 
 func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
@@ -1102,10 +1118,11 @@ func OpenDB() error {
 		DatabaseFilePath = DATABASE_FILE_DEBUG
 	}
 	
-	db, err := sql.Open("sqlite", DatabaseFilePath)
+	db, err := sql.Open("sqlite3", DatabaseFilePath)
 	if err != nil {
 		return fmt.Errorf("Failed to open database '%s' Error: %v\n", DatabaseFilePath, err)
 	}
+	//db.SetMaxOpenConns(1)
 	
 	DatabaseUpgrades := []string{
 		"ALTER TABLE Videos ADD COLUMN QueuedAction INTEGER NOT NULL DEFAULT 0",

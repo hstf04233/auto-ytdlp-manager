@@ -843,7 +843,7 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 	
 	TasksList, err := CL_ListCommandTasks(Limit, Offset, Query)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error when trying to list videos, err: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Error when trying to list tasks, err: %v", err), http.StatusInternalServerError)
 		return
 	}
 	
@@ -855,7 +855,7 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			TasksListStats = TasksListAll
 		} else if err != nil {
-			L_Printf("Failed to get tasks list for stats... Err: %v\n", TasksListAll)
+			L_Printf("Failed to get tasks list for stats... Err: %v\n", err)
 		}
 	}
 	
@@ -879,11 +879,14 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	err = json.NewEncoder(w).Encode(map[string]interface{}{
 		"count": len(TasksList),
 		"tasks": TasksList,
 		"stats": Stats,
 	})
+	if err != nil {
+		L_Printf("Error when encoding tasks to json! err: %v\n", err)
+	}
 }
 
 func API_GetTaskOutput(w http.ResponseWriter, r *http.Request) {

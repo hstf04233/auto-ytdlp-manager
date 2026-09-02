@@ -24,3 +24,11 @@ echo Done
 echo Building Linux arm64...
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager_arm64"
 echo Done
+
+
+# zip binaries into zip
+7z a -tzip ./builds/autoytdlpmanager_windows_amd64.zip "./builds/autoytdlpmanager.exe"
+7z a -tzip ./builds/autoytdlpmanager_windows_arm64.zip "./builds/autoytdlpmanager_arm64.exe"
+
+7z a -tzip ./builds/autoytdlpmanager_linux_amd64.zip "./builds/autoytdlpmanager"
+7z a -tzip ./builds/autoytdlpmanager_linux_arm64.zip "./builds/autoytdlpmanager_arm64"
