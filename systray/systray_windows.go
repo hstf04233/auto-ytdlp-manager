@@ -32,7 +32,7 @@ func StartSystray(SystrayIconContent []byte) (bool, error) {
 	tray.SetIcon(SystrayIconContent).
 	    SetTooltip("Auto yt-dlp Manager").
 	    SetMenu(menu)
-	tray.OnClick(func() {
+	tray.OnDoubleClick(func() {
 		if !ConsoleIsVisible {
 			ConsoleIsVisible = true
 			os_tings.ToggleConsoleVisibility(ConsoleIsVisible)
