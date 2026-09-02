@@ -387,7 +387,7 @@ func yt_chat_Run(VideoUrl string, OutputPath string, DownloadTask *CommandTask) 
 	
 	for {
 		if !CL_IsRunning(DownloadTask) || !CL_IsRunning(Task) {
-			continue
+			break
 		}
 		
 		// TODO: Add support for replay chats
