@@ -9,18 +9,18 @@ fi
 
 # Windows
 echo Building Windows amd64...
-CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager.exe"
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager.exe"
 echo Done
 
 echo Building Windows arm64...
-CGO_ENABLED=1 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager_arm64.exe"
+CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager_arm64.exe"
 echo Done
 
 # Linux
 echo Building Linux amd64...
-GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager"
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager"
 echo Done
 
 echo Building Linux arm64...
-GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager_arm64"
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o "./builds/autoytdlpmanager_arm64"
 echo Done

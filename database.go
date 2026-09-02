@@ -11,7 +11,8 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	//_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 const DATABASE_FILE       = "autoytdlpmanager.db"
@@ -1101,7 +1102,7 @@ func OpenDB() error {
 		DatabaseFilePath = DATABASE_FILE_DEBUG
 	}
 	
-	db, err := sql.Open("sqlite3", DatabaseFilePath)
+	db, err := sql.Open("sqlite", DatabaseFilePath)
 	if err != nil {
 		return fmt.Errorf("Failed to open database '%s' Error: %v\n", DatabaseFilePath, err)
 	}

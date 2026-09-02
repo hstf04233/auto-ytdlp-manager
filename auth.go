@@ -18,7 +18,8 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	_ "github.com/mattn/go-sqlite3"
+	//_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 const AUTH_db_SQL_Header = `
@@ -758,7 +759,7 @@ func DoesAdminAccountExist() (bool, error) {
 
 
 func OpenAuthDB() error {
-	db, err := sql.Open("sqlite3", AUTH_DB_FILENAME)
+	db, err := sql.Open("sqlite", AUTH_DB_FILENAME)
 	if err != nil {
 		return fmt.Errorf("Failed to open auth database '%s' Error: %v\n", AUTH_DB_FILENAME, err)
 	}
