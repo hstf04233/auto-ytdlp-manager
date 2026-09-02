@@ -1161,6 +1161,7 @@ func AutoRefreshOldUpdatedVideos() {
 			
 			if Video.Availability == "removed" {
 				// This video is removed. Don't auto refresh it 
+				continue
 			}
 			
 			if Task.Status != TASK_STATUS_RUNNING { return }
