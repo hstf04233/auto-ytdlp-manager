@@ -782,7 +782,7 @@ func OpenAuthDB() error {
 		
 		_, err := G_AUTHDB.Exec(`
 		INSERT OR REPLACE INTO Settings(Id, SecretSaltHash)
-		VALUES ("Global", ?)
+		VALUES ('Global', ?)
 		`, NewSaltHash)
 		if err != nil {
 			return fmt.Errorf("Could not set SecretSaltHash in auth database? error: %v", err)

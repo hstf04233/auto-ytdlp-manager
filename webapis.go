@@ -878,15 +878,17 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	
-	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(map[string]interface{}{
 		"count": len(TasksList),
 		"tasks": TasksList,
 		"stats": Stats,
 	})
 	if err != nil {
-		L_Printf("Error when encoding tasks to json! err: %v\n", err)
+		// L_Printf("Error when encoding tasks to json! err: %v\n", err)
+		http.Error(w, fmt.Sprintf("Error when trying to list tasks, err: %v", err), http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 }
 
 func API_GetTaskOutput(w http.ResponseWriter, r *http.Request) {
