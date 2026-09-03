@@ -114,7 +114,7 @@ type AuthSession struct {
 
 const RNGCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
 
-func GenerateRandomString(length int) []byte {
+func GenerateRandomBase64String(length int) []byte {
 	result := make([]byte, length)
 	numMax := big.NewInt(int64(len(RNGCharacters)))
 	for i := 0; i < length; i++ {
@@ -289,7 +289,7 @@ func CreateAuthSessionFromRequest(AUser *AuthUser, r *http.Request) (*AuthSessio
 	
 	Session := &AuthSession{}
 	Session.UserId = AUser.UserId
-	Session.TokenId = fmt.Sprintf("%012d|%s", AUser.UserId, GenerateRandomString(128))
+	Session.TokenId = fmt.Sprintf("%012d|%s", AUser.UserId, GenerateRandomBase64String(128))
 	
 	if SAVE_IP_ADDRESS_TO_AUTH_DATABASE {
 		Session.IpAddress = IpAddress
@@ -777,7 +777,7 @@ func OpenAuthDB() error {
 		// Create the secret salt!
 		
 		Key2Length := SRNG(64, 256)
-		NewSaltHash := fmt.Sprintf("TIME_CREATED:%d|%s,%s", time.Now().UnixMicro(), GenerateRandomString(512), GenerateRandomString(Key2Length))
+		NewSaltHash := fmt.Sprintf("TIME_CREATED:%d|%s,%s", time.Now().UnixMicro(), GenerateRandomBase64String(512), GenerateRandomBase64String(Key2Length))
 		G_SecretSaltHash = NewSaltHash
 		
 		_, err := G_AUTHDB.Exec(`

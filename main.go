@@ -234,6 +234,7 @@ func main() {
 	}
 	
 	go InitDownloading()
+	go InitWebApis()
 	
 	go StartServer(int(G_Config.ServerPort))
 	

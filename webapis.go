@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"path"
+	"fmt"
+	"os"
+	"bufio"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -386,7 +388,12 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 	
 	if !Video.VideoFileExists && Video.StreamedDirectory != "" && Video.Status == VIDEO_STATUS_DOWNLOADING {
 		// Video file doesn't exist... Share the m3u8 stream instead!
-		Video.VideoStreamUrl = fmt.Sprintf("/video-stream/%s/playlist.m3u8", Video.Id)
+		
+		ExpireTime := time.Now().UTC().Add(time.Second*60*60*24 * 7)  // m3u8 stream link will last 1 week...
+		VideoStreamUrl := GenerateSignedUserRequest(fmt.Sprintf("/video-stream/%s/playlist.m3u8", Video.Id), []SQuery{
+			{"expires", fmt.Sprintf("%d", ExpireTime.Unix())},
+		})
+		Video.VideoStreamUrl = VideoStreamUrl
 	}
 	
 	if !Video.VideoFileExists && Video.VideoStreamUrl == "" {
@@ -1386,7 +1393,8 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	if r.URL.Query().Get(AUTH_REQUEST_SIGN_QUERYNAME) != "" {
+	SignedKey := r.URL.Query().Get(AUTH_REQUEST_SIGN_QUERYNAME)
+	if SignedKey != "" {
 		IsSigned := IsUserRequestSignedByServer(r, []string{"expires_ms", "expires", "time_ms"})
 		if !IsSigned {
 			http.Error(w, "Forbidden - Unsigned or expired request", http.StatusForbidden)
@@ -1403,8 +1411,8 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	Path := r.URL.Path
-	Path = strings.TrimPrefix(Path, "/video-stream/")
+	RawPath := r.URL.Path
+	Path := strings.TrimPrefix(RawPath, "/video-stream/")
 	PathArgs := strings.Split(Path, "/")
 	if len(PathArgs) < 2 {
 		http.Error(w, "Invalid request path.", http.StatusBadRequest)
@@ -1458,6 +1466,25 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 	}
 	Filename := filepath.Base(FilePath)
 	
+	var WriteContent *[]byte = nil
+	
+	if strings.HasSuffix(Filename, ".m3u8") && SignedKey != "" {
+		// Extend 'expires'/'expires_ms' to the video segments!
+		ExtendedContent, err := ExtendedM3U8Sign(FilePath, strings.TrimSuffix(RawPath, RequestFile), r)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error when signing M3U8 content! '%v'...", err), http.StatusInternalServerError)
+			return
+		}
+		
+		WriteContent = &ExtendedContent
+	} else if strings.HasSuffix(Filename, ".ts") {
+		if SignedKey != "" {
+			w.Header().Set("Cache-Control", "public, max-age=120")  // 2 minutes
+		}
+		
+		w.Header().Set("Content-Type", "video/MP2T")
+	}
+	
 	if DownloadVal := r.URL.Query().Get("download"); DownloadVal != "" {
 		// User wants to download this file
 		DownloadVal = strings.ToLower(DownloadVal)
@@ -1470,10 +1497,75 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
 	}
 	
+	if WriteContent != nil {
+		w.Write(*WriteContent)
+		return
+	}
+	
 	ThrottledWriter := NewDynamicThrottledResponseWriter(w, r)
 	
 	http.ServeFile(ThrottledWriter, r, FilePath)
 	ThrottledWriter.Close()
+}
+
+var CachedM3U8SegmentSigns = NewCache(time.Second * 120)
+
+func ExtendedM3U8Sign(FilePath string, BasePath string, r *http.Request) ([]byte, error) {
+	/*
+	ShareLink := GenerateSignedUserRequest(fmt.Sprintf("/video-file/%s", RequestId), []SQuery{
+		{"expires", fmt.Sprintf("%d", ExpireTime.Unix())},
+	})
+	*/
+	expiresStr := r.URL.Query().Get("expires")
+	
+	File, err := os.Open(FilePath)
+	if err != nil {
+		return nil, err
+	}
+	
+	var NewContent bytes.Buffer
+	
+	scanner := bufio.NewScanner(File)
+	
+	CachedM3U8SegmentSigns.mutex.Lock()
+	defer CachedM3U8SegmentSigns.mutex.Unlock()
+	
+	for scanner.Scan() {
+		Line := scanner.Text()
+		if strings.HasPrefix(Line, "#") {
+			NewContent.WriteString(Line)
+			NewContent.Write([]byte("\n"))
+			continue
+		}
+		
+		// Segment
+		SegmentFileName := Line
+		
+		CacheName := fmt.Sprintf("%s/%s/%s", FilePath, SegmentFileName, expiresStr)
+		CachedSignedFile, Exists := CachedM3U8SegmentSigns.GetNoMutex(CacheName)
+		if Exists {
+			NewContent.WriteString(CachedSignedFile.(string))
+			NewContent.Write([]byte("\n"))
+			continue
+		}
+		
+		SignedFile := GenerateSignedUserRequest(fmt.Sprintf("%s%s", BasePath, SegmentFileName), []SQuery{
+			{"expires", expiresStr},
+		})
+		
+		SignedFile = strings.TrimPrefix(SignedFile, BasePath)
+		
+		NewContent.WriteString(SignedFile)
+		NewContent.Write([]byte("\n"))
+		
+		CachedM3U8SegmentSigns.SetNoMutex(CacheName, SignedFile)
+	}
+	
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	
+	return NewContent.Bytes(), nil
 }
 
 func ServeDBImage(w http.ResponseWriter, r *http.Request) {
@@ -1513,4 +1605,12 @@ func ServeDBImage(w http.ResponseWriter, r *http.Request) {
 	Seeker := bytes.NewReader(ImageData)
 	
 	http.ServeContent(w, r, ImageInfo.Filename, ImageInfo.UpdatedAt, Seeker)
+}
+
+
+func InitWebApis() {
+	for true {
+		time.Sleep(time.Second * 360)
+		CachedM3U8SegmentSigns.CleanUp()
+	}
 }
