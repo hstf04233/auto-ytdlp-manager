@@ -1,7 +1,9 @@
 package main
 
 import (
+	"autoytdlpmanager/os_tings"
 	"bytes"
+	"context"
 	"crypto/sha3"
 	"encoding/base64"
 	"fmt"
@@ -14,7 +16,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"autoytdlpmanager/os_tings"
 
 	"github.com/google/uuid"
 	//"os/exec"
@@ -454,8 +455,12 @@ func ConvertImageDataToJpg(ImageContent []byte) ([]byte, error) {
 	return JpegContent, nil
 }
 
+// FFmpeg command times out after 60 seconds.
 func RunFFmpegWithStdinStdout(Input []byte, args []string) ([]byte, error) {
-	cmd := exec.Command(Get_FFmpegPath(G_Config), args...)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 60)
+	defer cancel()
+	
+	cmd := exec.CommandContext(ctx, Get_FFmpegPath(G_Config), args...)
 	
 	cmd.Stdin = bytes.NewReader(Input)
 	
@@ -645,7 +650,7 @@ func CheckVideoAndDownload(CheckSettings ChannelCheckSettings, Video *VideoInfo,
 	switch Video.VideoType {
 	case VIDEO_TYPE_ISLIVE:
 		// TODO:
-		if Video.Url[0:23] == "https://www.youtube.com" {
+		if strings.HasPrefix(Video.Url, "https://www.youtube.com") {
 			// use ytarchive
 			CL_Logf(Task, "Downloading live stream: \"%s\" %s\n", Video.Title, Video.Url)
 			go DownloadYTLive(CheckSettings, Video, Task)

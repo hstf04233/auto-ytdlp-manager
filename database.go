@@ -254,6 +254,7 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer Rows.Close()
 	ChannelsList := []*ArchiveChannel{}
 	for Rows.Next() {
 		Channel := &ArchiveChannel{}

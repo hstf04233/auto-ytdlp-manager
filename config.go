@@ -254,7 +254,9 @@ func OpenConfig(ConfigPath string) error {
 		ConfigFile.Close()
 		return fmt.Errorf("Error when reading config file '%s' %v\n", ConfigPath, err)
 	}
+	G_Config.Mutex.Lock()
 	err = json.Unmarshal(ConfigContent, &G_Config)
+	G_Config.Mutex.Unlock()
 	if err != nil {
 		ConfigFile.Close()
 		return fmt.Errorf("Error when decoding config file json '%s' %v\n", ConfigPath, err)

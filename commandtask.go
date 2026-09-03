@@ -611,7 +611,7 @@ func CleanUpTasksInDatabase() {
 			continue  // This task is running! don't delete
 		}
 		Task.Lock.RLock()
-		defer Task.Lock.RUnlock()
+		TaskId := Task.Id
 		DeleteThis := false
 		
 		if Task.Type == TASK_TYPE_LISTING {
@@ -623,10 +623,12 @@ func CleanUpTasksInDatabase() {
 				DeleteThis = true
 			}
 		}
+		Task.Lock.RUnlock()
+		
 		if DeleteThis {
-			err := DB_DeleteCommandTask(Task.Id)
+			err := DB_DeleteCommandTask(TaskId)
 			if err != nil {
-				L_Printf("Could not delete task '%s', error: %v\n", Task.Id, err)
+				L_Printf("Could not delete task '%s', error: %v\n", TaskId, err)
 				continue
 			}
 			DeleteCount += 1

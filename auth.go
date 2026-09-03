@@ -537,7 +537,7 @@ func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
 		Username    string `json:"username"`
 		RawPassword string `json:"password"`
 	}
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -722,7 +722,7 @@ func AuthCreateUserRequest(w http.ResponseWriter, r *http.Request, UserRole int)
 		Username    string `json:"username"`
 		RawPassword string `json:"password"`
 	}
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

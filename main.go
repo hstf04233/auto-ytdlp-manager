@@ -261,6 +261,7 @@ func main() {
 	
 	// The program will exit now.
 	
+	// HttpServer.Shutdown kept tweaking out whenever there was a download request on a video file happening at the same time...
 	/*
 	err = HttpServer.Shutdown(context.Background())
 	if err != nil {

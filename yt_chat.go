@@ -243,7 +243,10 @@ func WriteActions(Actions []interface{}, ChatFile *os.File) error {
 	var actionsBuf strings.Builder
 	
 	for i:=0; i < len(Actions); i++ {
-		action := Actions[i].(map[string]interface{})
+		action, ok := Actions[i].(map[string]interface{})
+		if !ok {
+			continue
+		}
 		delete(action, "clickTrackingParams")
 		actionStr, err := json.Marshal(action)
 		if err != nil {

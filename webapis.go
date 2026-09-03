@@ -43,6 +43,9 @@ func Verify_API_RequestChannelBody(Body API_RequestChannelBody) (bool, string) {
 	if len(Body.Url) > API_MAX_URL_LENGTH {
 		return false, fmt.Sprintf("Url must be shorter than %d characters.", API_MAX_URL_LENGTH)
 	}
+	if strings.HasPrefix(strings.TrimSpace(Body.Url), "-") {
+		return false, "Invalid channel URL, must NOT start with '-' character."
+	}
 	if Body.DownloadDir != nil && len(*Body.DownloadDir) > 1024 {
 		return false, "DownloadDir must be shorter than 1024 characters."
 	}
@@ -63,7 +66,7 @@ func Verify_API_RequestChannelBody(Body API_RequestChannelBody) (bool, string) {
 func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 	var Body API_RequestChannelBody
 	Body.FullCheckInterval = -1
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -153,7 +156,7 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	
 	var Body API_RequestChannelBody
 	Set_API_RequestChannelBodyDefaults(&Body)
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -254,7 +257,7 @@ func API_CheckChannel(w http.ResponseWriter, r *http.Request) {
 	}
 	Body.ChannelType = -1
 	
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -426,7 +429,7 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 	}
 	Body.QualitySelect = -1
 	
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -657,7 +660,7 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 		Status *int `json:"status"`
 		RefreshState *bool `json:"refresh_state"`
 	}
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -959,7 +962,7 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 	Body.TaskLog_List_AutoDelete_Seconds = -1
 	Body.AutoRefresh_Videos_Seconds = -1
 	
-	dec := json.NewDecoder(r.Body)
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
