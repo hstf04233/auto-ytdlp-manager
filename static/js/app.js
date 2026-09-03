@@ -204,19 +204,41 @@ function showPage(page, dontSaveHistory) {
 }
 
 // ========== Sidebar Toggle ==========
+function setSidebarCollapsed(collapsed) {
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebarToggle');
+  if (!sidebar) return;
+
+  sidebar.classList.toggle('collapsed', collapsed);
+  document.body.classList.toggle('sidebar-collapsed', collapsed);
+
+  if (toggleBtn) {
+    toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+  }
+
+  try {
+    localStorage.setItem('sidebarCollapsed', String(collapsed));
+  } catch (e) { /* storage unavailable (private mode, etc.) */ }
+}
+
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('collapsed');
-  document.body.classList.toggle('sidebar-collapsed');
-  
-  localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+  if (!sidebar) return;
+  setSidebarCollapsed(!sidebar.classList.contains('collapsed'));
 }
 
 (function() {
-  const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  let collapsed = false;
+  try {
+    collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  } catch (e) { /* storage unavailable */ }
   if (collapsed) {
-    document.getElementById('sidebar').classList.add('collapsed');
-    document.body.classList.add('sidebar-collapsed');
+    setSidebarCollapsed(true);
+  } else {
+    const toggleBtn = document.getElementById('sidebarToggle');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-expanded', 'true');
+    }
   }
 })();
 
@@ -609,6 +631,7 @@ function renderConfig(config) {
   const ApplicationVersionEl = document.getElementById("side-bar-application-version");
   if (ApplicationVersionEl) {
     ApplicationVersionEl.textContent = config.application_version;
+    ApplicationVersionEl.title = config.application_version;
   }
   
   for (const cfg of configSettings) {
@@ -2138,6 +2161,7 @@ async function loadUser() {
     const userAccountEl = document.getElementById("side-bar-user-account")
     if (userAccountEl) {
       userAccountEl.textContent = loggedInUser.username
+      userAccountEl.title = loggedInUser.username
     }
   } catch (err) {
     showToast(`Failed to get logged in user... error: ${err.message}`, "error")

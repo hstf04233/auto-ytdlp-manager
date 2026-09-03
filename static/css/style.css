@@ -14,7 +14,8 @@
   --danger: #e74c3c;
   --info: #3498db;
   --border: #2a2a4a;
-  --sidebar-width: 220px;
+  --sidebar-width: 250px;
+  --sidebar-collapsed-width: 60px;
 }
 
 body {
@@ -42,14 +43,15 @@ a:hover {
   width: var(--sidebar-width);
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
-  padding: 20px 0;
+  padding: 16px 0 12px;
   position: fixed;
   top: 0;
   left: 0;
   height: 100vh;
+  overflow-x: hidden;
   overflow-y: auto;
   z-index: 100;
-  
+
   display: flex;
   flex-direction: column;
   transition: width 0.2s ease;
@@ -57,21 +59,22 @@ a:hover {
 
 /* Sidebar Toggle */
 .sidebar-toggle {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
-  margin: 0 12px 12px 12px;
+  flex: 0 0 36px;
+  margin: 0;
   padding: 0;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-secondary);
   font-size: 1.1rem;
+  line-height: 1;
   cursor: pointer;
-  text-align: center;
-  line-height: 34px;
-  transition: all 0.2s;
-  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
 }
 
 .sidebar-toggle:hover {
@@ -79,78 +82,69 @@ a:hover {
   color: var(--text-primary);
 }
 
+.sidebar-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .sidebar-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px 0 12px;
+  gap: 8px;
+  padding: 0 10px 12px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  /* Padding (unlike justify-content/margins-auto) interpolates, so the
+     collapsed 10px->12px nudge below glides in sync with the width. */
+  transition: padding 0.2s ease;
 }
 
 .sidebar h1 {
+  margin: 0;
   padding: 0;
-  font-size: 1.2rem;
+  border: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 1.05rem;
+  line-height: 36px;
   color: var(--accent);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 10px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .sidebar.collapsed {
-  width: 50px;
+  width: var(--sidebar-collapsed-width);
 }
 
+/* NOTE: the toggle stays left-edge-anchored in both states. Any discrete
+   centering (justify-content:center, margin:auto) snaps the toggle to the
+   middle of the still-wide bar the instant collapse starts. Instead the
+   header padding eases 10px->12px in sync with the width, gliding the toggle
+   from x=10 to x=12 -- exactly centered in the 60px collapsed bar. */
 .sidebar.collapsed .sidebar-header {
-  padding: 0 2px 10px 2px;
-}
-
-.sidebar.collapsed .sidebar-toggle {
-  margin: 0 4px 10px 4px;
-  width: 42px;
-  line-height: 40px;
+  padding: 0 12px 12px;
 }
 
 .sidebar.collapsed h1 {
   display: none;
 }
 
-.sidebar.collapsed nav a {
-  justify-content: center;
-  padding: 12px 0;
-}
-
-.sidebar.collapsed nav a span:last-child {
+/* NOTE: intentional: collapsed nav links keep the SAME padding/justification
+   as expanded so icons never slide mid-animation. The icon sits at x=20 in
+   both states (symmetric 20px padding, indicator is layout-free box-shadow),
+   i.e. exactly centered in the 60px collapsed bar. */
+.sidebar.collapsed nav a .nav-label {
   display: none;
-}
-
-.sidebar.collapsed nav a span:first-child {
-  display: inline;
 }
 
 .sidebar.collapsed hr {
   margin: 10px 8px;
 }
 
-.sidebar.collapsed .sidebar-bottom {
-  display: none;
-}
-
-.sidebar-bottom {
-  margin-top: auto;
-}
-.sidebar-bottom label {
-  word-break: break-all;
-  margin-left: 20px;
-  color: var(--text-secondary);
-}
-
-.sidebar h1 {
-  padding: 0 20px 20px;
-  font-size: 1.2rem;
-  color: var(--accent);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 10px;
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar nav a {
@@ -160,8 +154,25 @@ a:hover {
   padding: 12px 20px;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: all 0.2s;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
   font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  /* Inset shadow instead of border-left: same look, but takes no layout
+     space, so the active indicator never shifts the icon and the icon stays
+     exactly centered when collapsed (see note above). */
+  box-shadow: inset 3px 0 0 transparent;
+}
+
+.sidebar nav a .nav-icon {
+  flex: 0 0 20px;
+  width: 20px;
+  text-align: center;
+}
+
+.sidebar nav a .nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar nav a:hover,
@@ -171,21 +182,83 @@ a:hover {
 }
 
 .sidebar nav a.active {
-  border-left: 3px solid var(--accent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.sidebar nav hr {
+  margin: 10px 20px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  /* Animate (rather than snap) to the collapsed margin in sync with width. */
+  transition: margin 0.2s ease;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 12px 20px 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-bottom label {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  /* Never wrap: during expand/collapse the bar passes through narrow widths
+     where break-all wrapping explodes into many lines for a few frames.
+     Ellipsis clips cleanly instead. Full text still visible via title attr. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.sidebar-bottom .btn {
+  width: 100%;
+  min-height: 36px;
+  white-space: nowrap;
+  overflow: hidden;
+  /* Morph (rather than snap) between full-width and collapsed icon button. */
+  transition: width 0.2s ease;
+}
+
+.sidebar-bottom .logout-icon {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-bottom {
+  padding: 12px 0 0;
+  align-items: center;
+}
+
+.sidebar.collapsed .sidebar-bottom label,
+.sidebar.collapsed .sidebar-bottom hr {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-bottom .btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-bottom .logout-label {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-bottom .logout-icon {
+  display: inline;
 }
 
 hr {
   margin-top: 10px;
   margin-bottom: 10px;
-  
-  border: 0;
-  border-top: 1px solid var(--border);
-}
 
-.sidebar nav hr {
-  margin-top: 10px;
-  margin-bottom: 10px;
-  
   border: 0;
   border-top: 1px solid var(--border);
 }
@@ -196,11 +269,12 @@ hr {
   flex: 1;
   padding: 30px;
   min-height: 100vh;
+  min-width: 0;
   transition: margin-left 0.2s ease;
 }
 
 body.sidebar-collapsed .main-content {
-  margin-left: 50px;
+  margin-left: var(--sidebar-collapsed-width);
 }
 
 .page { display: none; }
@@ -1444,5 +1518,8 @@ form hr {
   }
   .chat-messages-container {
     height: 500px;
+  }
+  .main-content {
+    padding: 16px;
   }
 }

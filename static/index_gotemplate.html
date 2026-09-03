@@ -10,34 +10,34 @@
 <body>
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">&#9776;</button>
-      <h1>Auto yt-dlp Manager</h1>
+      <button type="button" class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar" aria-expanded="true" aria-controls="sidebar">&#9776;</button>
+      <h1 title="Auto yt-dlp Manager">Auto yt-dlp Manager</h1>
     </div>
-    <nav>
+    <nav aria-label="Main navigation">
       <a href="/channels" data-page="channels">
-        <span>&#9776;</span> <span>Channels</span>
+        <span class="nav-icon" aria-hidden="true">#</span> <span class="nav-label">Channels</span>
       </a>
       <a href="/videos" data-page="videos">
-        <span>&#9654;</span> <span>Videos</span>
+        <span class="nav-icon" aria-hidden="true">&#9654;</span> <span class="nav-label">Videos</span>
       </a>
       <a href="/tasks" data-page="tasks">
-        <span>&#9733;</span> <span>Tasks</span>
+        <span class="nav-icon" aria-hidden="true">&#9733;</span> <span class="nav-label">Tasks</span>
       </a>
       <!--
         <a href="/chat" data-page="chat">
-          <span>&#128172;</span> <span>Chat</span>
+          <span class="nav-icon" aria-hidden="true">&#128172;</span> <span class="nav-label">Chat</span>
         </a>
       -->
       <hr>
       <a href="/config" data-page="config">
-        <span>&#9881;</span> <span>Config</span>
+        <span class="nav-icon" aria-hidden="true">&#9881;</span> <span class="nav-label">Config</span>
       </a>
     </nav>
-    
+
     <div class="sidebar-bottom">
       <label id="side-bar-user-account"></label>
-      <button class="btn btn-danger btn-sm" onclick="event.preventDefault(); logout();">
-        <span>Log out</span>
+      <button type="button" class="btn btn-danger btn-sm" onclick="event.preventDefault(); logout();" title="Log out">
+        <span class="logout-icon" aria-hidden="true">&#9094;</span><span class="logout-label">Log out</span>
       </button>
       <hr>
       <label id="side-bar-application-version">...</label>
