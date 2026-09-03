@@ -23,7 +23,12 @@ func OpenFileWithoutLocking(FilePath string) (*os.File, error) {
 
 func GetPipeName(PipeName string) string {
 	// It's a unix system
-	return filepath.Join("/tmp", PipeName)
+	TempDir := "/tmp"
+	TMPDIR := os.Getenv("TMPDIR")
+	if TMPDIR != "" {
+		TempDir = TMPDIR
+	}
+	return filepath.Join(TempDir, PipeName)
 }
 
 func CreatePipe(PipeName string) (io.WriteCloser, error) {
