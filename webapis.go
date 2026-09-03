@@ -1522,6 +1522,7 @@ func ExtendedM3U8Sign(FilePath string, BasePath string, r *http.Request) ([]byte
 	if err != nil {
 		return nil, err
 	}
+	defer File.Close()
 	
 	var NewContent bytes.Buffer
 	
