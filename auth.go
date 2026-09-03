@@ -595,7 +595,7 @@ func AuthLoginRequest(w http.ResponseWriter, r *http.Request) {
 			Expires:  NewSession.ExpireAt,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   true,
+			Secure:   !IsIpAddressLocal(GetIpAddressFromRequest(r)),
 			SameSite: http.SameSiteStrictMode,
 		})
 		w.Header().Set("Content-Type", "application/json")
@@ -620,7 +620,7 @@ func AuthLogoutRequest(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Unix(0, 0),  // Expire the cookie NOW!!!
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   !IsIpAddressLocal(GetIpAddressFromRequest(r)),
 		SameSite: http.SameSiteStrictMode,
 	})
 	
