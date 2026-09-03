@@ -138,7 +138,7 @@ func Get_ytarchive_VideoAndAudioDownloadFiles(State ytarchive_State) (ytarchive_
 func ReadFileAndWriteToPipe(PipeName string, InputFile *os.File, DownloadTask *CommandTask, Task *CommandTask) {
 	VideoPipe, err := os_tings.CreatePipe(PipeName)
 	if err != nil {
-		L_Printf("Failed to create pipe: '%s': %v", PipeName, err)
+		L_Printf("Failed to create pipe: '%s': %v\n", PipeName, err)
 		return
 	}
 	defer VideoPipe.Close()
