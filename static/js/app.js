@@ -203,6 +203,23 @@ function showPage(page, dontSaveHistory) {
   }
 }
 
+// ========== Sidebar Toggle ==========
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('collapsed');
+  document.body.classList.toggle('sidebar-collapsed');
+  
+  localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('collapsed'));
+}
+
+(function() {
+  const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+  if (collapsed) {
+    document.getElementById('sidebar').classList.add('collapsed');
+    document.body.classList.add('sidebar-collapsed');
+  }
+})();
+
 // ========== Navigation ==========
 document.querySelectorAll('.sidebar nav a').forEach(link => {
   link.addEventListener('click', e => {

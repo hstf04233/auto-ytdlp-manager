@@ -24,10 +24,12 @@ func OpenFileWithoutLocking(FilePath string) (*os.File, error) {
 func GetPipeName(PipeName string) string {
 	// It's a unix system
 	TempDir := "/tmp"
-	TMPDIR := os.Getenv("TMPDIR")
+	
+	TMPDIR := os.Getenv("TMPDIR")  // Termux temp directory.
 	if TMPDIR != "" {
 		TempDir = TMPDIR
 	}
+	
 	return filepath.Join(TempDir, PipeName)
 }
 

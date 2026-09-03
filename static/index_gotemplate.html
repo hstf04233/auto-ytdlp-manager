@@ -8,8 +8,11 @@
   <link rel="stylesheet" href="/static/{{ .StyleCssPath }}">
 </head>
 <body>
-  <div class="sidebar">
-    <h1>Auto yt-dlp Manager</h1>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle sidebar">&#9776;</button>
+      <h1>Auto yt-dlp Manager</h1>
+    </div>
     <nav>
       <a href="/channels" data-page="channels">
         <span>&#9776;</span> <span>Channels</span>
