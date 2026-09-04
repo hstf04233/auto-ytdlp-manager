@@ -79,10 +79,6 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	} else if path == "" || path == "/" {
 		path = "index.html"
 		NeedsLogin = true
-		
-	} else if path == "logout" {
-		AuthLogoutRequest(w, r)
-		return
 	} else if strings.HasPrefix(path, "login") {
 		path = "login.html"
 	} else {
