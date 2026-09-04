@@ -277,6 +277,17 @@ body.sidebar-collapsed .main-content {
   margin-left: var(--sidebar-collapsed-width);
 }
 
+/* Applied briefly on load while the saved sidebar state is restored, so a
+   refresh with a collapsed sidebar doesn't visibly animate it closing. */
+body.no-transition .sidebar,
+body.no-transition .main-content,
+body.no-transition .sidebar-header,
+body.no-transition .sidebar nav a,
+body.no-transition .sidebar nav hr,
+body.no-transition .sidebar-bottom .btn {
+  transition: none !important;
+}
+
 .page { display: none; }
 .page.active { display: block; }
 

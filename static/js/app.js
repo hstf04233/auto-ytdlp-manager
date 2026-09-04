@@ -239,9 +239,17 @@ function toggleSidebar() {
   try {
     stored = localStorage.getItem('sidebarCollapsed');
   } catch (e) { /* storage unavailable */ }
-  // Auto-collapse on mobile unless the user already picked a state.
-  if (stored === 'true' || (stored === null && isMobileViewport())) {
-    setSidebarCollapsed(true, stored !== null);
+  // Mobile always starts collapsed (the expanded sidebar is an overlay
+  // drawer, never a useful initial state) without persisting it, so the
+  // desktop preference is untouched. Desktop honors the saved preference.
+  const isMobile = isMobileViewport();
+  if (isMobile || stored === 'true') {
+    // Restoring state, not toggling: kill transitions so refresh doesn't
+    // visibly animate the sidebar closing, then re-enable them.
+    document.body.classList.add('no-transition');
+    setSidebarCollapsed(true, !isMobile);
+    void document.body.offsetWidth; // flush styles while transitions are off
+    document.body.classList.remove('no-transition');
   } else {
     const toggleBtn = document.getElementById('sidebarToggle');
     if (toggleBtn) {
