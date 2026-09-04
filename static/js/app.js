@@ -211,7 +211,7 @@ function showPage(page, dontSaveHistory) {
 
 // ========== Sidebar Toggle ==========
 function isMobileViewport() {
-  return window.matchMedia('(max-width: 768px)').matches;
+  return window.matchMedia('(max-width: 800px)').matches;
 }
 
 function setSidebarCollapsed(collapsed, save = true) {
