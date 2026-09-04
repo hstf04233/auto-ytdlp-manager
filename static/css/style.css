@@ -1524,7 +1524,7 @@ form hr {
   border-radius: 3px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 800px) {
   .chat-layout {
     flex-direction: column;
     height: auto;
