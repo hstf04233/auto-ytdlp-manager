@@ -204,7 +204,7 @@ async function openVideoDetailsModal(videoId) {
   document.getElementById('videoDetailsActions').innerHTML = `
     ${
       videoInfo.videofile_exists ?
-    `<a href="/video-file/${escHtml(videoInfo.id)}?download=true" target="_blank" class="btn btn-secondary btn-sm" title="Download video file">Download Video</a>` :
+    `<a href="/video-file/${escHtml(videoInfo.id)}?download=true" target="_blank" class="btn btn-secondary btn-sm" title="Download video file">Download Video File</a>` :
     ''
     }
     ${
@@ -507,6 +507,7 @@ function videoCardHTML(v) {
     <div class="card video-card" id="video-${v.id}">
       <div class="video-thumb">
         <img class="video-thumb-img" src="${thumbnailUrl}" alt="" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg'">
+        ${v.refresh_state ? `<span class="video-refresh-spinner" title="Metadata is being refreshed..." aria-label="Metadata is being refreshed..."></span>` : ''}
         <span class="video-duration" title="Video duration">${durationText}</span>
       </div>
       <div class="video-info">
@@ -554,6 +555,20 @@ function renderUpdateVideo(v) {
   if (thumbImg) {
     const thumbnailUrl = getThumbnail(v);
     if (thumbImg.getAttribute('src') !== thumbnailUrl) thumbImg.setAttribute('src', thumbnailUrl);
+  }
+  const isRefreshing = !!v.refresh_state;
+  const spinner = qs('.video-refresh-spinner');
+  if (isRefreshing && !spinner) {
+    const thumb = qs('.video-thumb');
+    if (thumb) {
+      const el = document.createElement('span');
+      el.className = 'video-refresh-spinner';
+      el.setAttribute('title', 'Metadata is being refreshed...');
+      el.setAttribute('aria-label', 'Metadata is being refreshed...');
+      thumb.appendChild(el);
+    }
+  } else if (!isRefreshing && spinner) {
+    spinner.remove();
   }
   setText(qs('.video-duration'), videoDurationText(v));
   

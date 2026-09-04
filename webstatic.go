@@ -199,7 +199,7 @@ func _webstatic_GenerateExecutedHtmlTemplate(HtmlFilePath string, Data any, Out 
 	if err != nil {
 		errMsg := fmt.Sprintf("ERROR: Could not read '%s' !!!!!! PLEASE MAKE SURE YOU BUILT THE PROGRAM CORRECTLY!!!!\n", HtmlFilePath)
 		L_Printf("%s", errMsg)
-		return err
+		return fmt.Errorf("%s", errMsg)
 	}
 	
 	var ExecutedHtmlBuffer bytes.Buffer
@@ -208,7 +208,7 @@ func _webstatic_GenerateExecutedHtmlTemplate(HtmlFilePath string, Data any, Out 
 	if err != nil {
 		errMsg := fmt.Sprintf("ERROR: Could not parse template file '%s' !!!!!! \n", HtmlFilePath)
 		L_Printf("%s", errMsg)
-		return err
+		return fmt.Errorf("%s", errMsg)
 	}
 	
 	*Out = ExecutedHtmlBuffer.Bytes()
@@ -221,17 +221,6 @@ func init() {
 	for _, FilePath := range(__FilesToManifest) {
 		_webstatic_AddToManifest(FilePath)
 	}
-	
-	
-	/*
-		"js/core.js",
-		"js/format.js",
-		"js/config.js",
-		"js/channels.js",
-		"js/videos.js",
-		"js/tasks.js",
-		"js/main.js",
-	*/
 	
 	IndexHtmlData := struct{
 		CoreJsPath     string

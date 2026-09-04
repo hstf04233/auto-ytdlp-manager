@@ -112,15 +112,15 @@ type AuthSession struct {
 	CreatedAt time.Time
 }
 
-const RNGCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+const Base64Characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
 
 func GenerateRandomBase64String(length int) []byte {
 	result := make([]byte, length)
-	numMax := big.NewInt(int64(len(RNGCharacters)))
+	numMax := big.NewInt(int64(len(Base64Characters)))
 	for i := 0; i < length; i++ {
 		num, _ := rand.Int(rand.Reader, numMax)
 		
-		result[i] = RNGCharacters[num.Int64()]
+		result[i] = Base64Characters[num.Int64()]
 	}
 	
 	return result
@@ -438,7 +438,7 @@ func GenerateSignedUserRequest(LocalUrl string, Queries []SQuery) string {
 	
 	Path := LocalUrl
 	
-	// I am using sha224 instead of sha256 because I want a short hash in the url
+	// I am using sha224 instead of sha256 because I want a shorter hash in the url
 	Hash := sha3.New224()
 	Hash.Write([]byte(LocalUrl))
 	Hash.Write([]byte(SecretSaltHash))
