@@ -158,12 +158,11 @@ function closeStatusDropdown() {
 }
 
 function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
+  if (typeof closeVideoMenu === 'function') closeVideoMenu();
   if (statusDropdownIsActive) {
     closeStatusDropdown();
     return;
   }
-  const videoData = currentVideos.find(x => x.id === videoId);
-  
   statusDropdownIsActive = true;
   const rect = buttonEl.getBoundingClientRect();
   const dropdown = document.createElement('div');
@@ -177,12 +176,7 @@ function toggleStatusDropdown(videoId, currentStatus, buttonEl) {
     //[2, 'Downloaded'],
     //[3, 'Failed'],
     [4, "Set to 'Ignored' (Cancel download, if downloading.)"],
-    //[-100, "Download this video"],
   ];
-  
-  if (videoData && videoData.status != 2 && videoData.status != 1) {
-    statuses.push([-100, "Download this video"]);
-  }
   
   dropdown.innerHTML = statuses.map(([val, label]) =>
     `<div class="status-option ${val === currentStatus ? 'active' : ''}" data-video-id="${videoId}" data-new-status="${val}">${label}</div>`

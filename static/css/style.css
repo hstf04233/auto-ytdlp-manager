@@ -633,10 +633,63 @@ body.no-transition .sidebar-bottom .btn {
   flex-shrink: 0;
 }
 
+.video-menu-wrap {
+  display: inline-flex;
+}
+
+.video-menu-btn {
+  min-width: 38px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.video-menu-dropdown {
+  position: fixed;
+  z-index: 1500;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 180px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  user-select: none;
+}
+
+.video-menu-item {
+  display: block;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: background 0.15s;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.video-menu-item:hover {
+  background: var(--bg-card);
+}
+
+.video-menu-item.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.video-menu-item-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.video-menu-item-danger:hover {
+  background: var(--danger);
+  color: white;
+}
+
 /* Hooks for the soft (in-place) video card updater in videos.js.
    Wrappers must not participate in layout, so a patched card looks
    exactly like a freshly rendered one (no extra flex gaps). */
-.video-status-wrap, .video-type-wrap, .video-file-wrap {
+.video-status-wrap, .video-type-wrap {
   display: contents;
 }
 /* The tasks line is always in the DOM as an update hook; hide it when

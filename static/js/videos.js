@@ -398,16 +398,110 @@ function videoUploaderInnerHTML(v) {
 
 function videoFileInnerHTML(v) {
   if (!v.videofile_exists) return '';
-  return `<a href="/video-file/${escHtml(v.id)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video file">Video File</a>`;
+  return `<a href="/video-file/${escHtml(v.id)}" target="_blank" class="video-menu-item" data-action="video-file" title="Open video file">Open video file</a>`;
+}
+
+function videoMenuButtonHTML(v) {
+  return `<button class="btn btn-secondary btn-sm video-menu-btn" onclick="event.stopPropagation();toggleVideoMenu('${v.id}', this)" title="More actions">...</button>`;
+}
+
+function hideAllVideoMenus() {
+  document.querySelectorAll('.video-menu-dropdown').forEach(el => el.remove());
+}
+
+let _videoMenuListenerActive = false;
+let _videoMenuOpenFor = null;
+
+function closeVideoMenu() {
+  hideAllVideoMenus();
+  _videoMenuOpenFor = null;
+  // Note: document listeners stay registered (guarded by
+  // _videoMenuListenerActive) so reopening doesn't stack duplicates.
+}
+
+function toggleVideoMenu(videoId, buttonEl) {
+  // Toggling the same video's menu closes it.
+  if (_videoMenuOpenFor === videoId) {
+    closeVideoMenu();
+    return;
+  }
+  closeVideoMenu();
+  if (typeof closeStatusDropdown === 'function') closeStatusDropdown();
+
+  const v = (typeof currentVideos !== 'undefined' && currentVideos) ? currentVideos.find(x => x.id === videoId) : null;
+  const videofileExists = v ? !!v.videofile_exists : false;
+  const refreshing = v ? !!v.refresh_state : false;
+  const canDownload = v ? (v.status != 2 && v.status != 1) : false;
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'video-menu-dropdown';
+  dropdown.dataset.videoId = videoId;
+
+  const refreshTitle = refreshing ? 'Refreshing...' : 'Refresh metadata';
+  const refreshLabel = refreshing ? 'Refreshing...' : 'Refresh';
+  dropdown.innerHTML = `
+    ${videofileExists ? videoFileInnerHTML(v) : ''}
+    ${canDownload ? `<div class="video-menu-item" data-action="download" title="Download this video">Download this video</div>` : ''}
+    <div class="video-menu-item ${refreshing ? 'is-disabled' : ''}" data-action="refresh" title="${refreshTitle}">${refreshLabel}</div>
+    <div class="video-menu-item video-menu-item-danger" data-action="delete" title="Deleting a video does not remove the video file.">Delete</div>
+  `;
+
+  dropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const item = e.target.closest('.video-menu-item');
+    if (!item) return;
+    const action = item.dataset.action;
+    if (action === 'video-file') {
+      // Let the <a target="_blank"> navigate, just close the menu.
+      closeVideoMenu();
+      return;
+    }
+    if (action === 'download') {
+      closeVideoMenu();
+      if (typeof changeVideoStatus === 'function') changeVideoStatus(videoId, -100);
+      return;
+    }
+    if (action === 'refresh') {
+      if (refreshing) return;
+      closeVideoMenu();
+      refreshVideoInfo(videoId);
+      return;
+    }
+    if (action === 'delete') {
+      closeVideoMenu();
+      deleteVideo(videoId);
+      return;
+    }
+  });
+
+  document.body.appendChild(dropdown);
+  const rect = buttonEl.getBoundingClientRect();
+  const menuWidth = 180;
+  dropdown.style.top = (rect.bottom + 4) + 'px';
+  dropdown.style.left = Math.max(8, rect.right - menuWidth) + 'px';
+  // Keep the menu on-screen: flip above the button when it would
+  // overflow the bottom edge.
+  const menuRect = dropdown.getBoundingClientRect();
+  if (menuRect.bottom > window.innerHeight - 8) {
+    dropdown.style.top = Math.max(8, rect.top - menuRect.height - 4) + 'px';
+  }
+  if (menuRect.right > window.innerWidth - 8) {
+    dropdown.style.left = Math.max(8, window.innerWidth - menuRect.width - 8) + 'px';
+  }
+
+  _videoMenuOpenFor = videoId;
+  if (!_videoMenuListenerActive) {
+    document.addEventListener('click', closeVideoMenu);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeVideoMenu(); });
+    _videoMenuListenerActive = true;
+  }
 }
 
 function videoCardHTML(v) {
   var thumbnailUrl = getThumbnail(v);
   var durationText = videoDurationText(v);
-  
+
   const channel = getChannelFromId(v.from_channel);
-  const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
-  const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
   
   return `
     <div class="card video-card" id="video-${v.id}">
@@ -432,10 +526,8 @@ function videoCardHTML(v) {
       <div class="video-actions">
         <span class="video-status-wrap" data-status="${v.status}">${videoStatusBadge(v.id, v.status)}</span>
         <span class="video-type-wrap" data-type="${v.video_type !== undefined ? v.video_type : ''}">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}</span>
-        <span class="video-file-wrap" data-present="${v.videofile_exists ? '1' : '0'}">${videoFileInnerHTML(v)}</span>
-        <button class="btn btn-secondary btn-sm video-refresh-btn" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
-          <a class="btn btn-secondary btn-sm video-details-btn" href="/video/${v.id}" onclick="event.preventDefault(); openVideoDetailsFromList('${v.id}');">Details</a>
-        <button class="btn btn-danger btn-sm video-delete-btn" title="Deleting a video does not remove the video file." onclick="deleteVideo('${v.id}')">Delete</button>
+        <a class="btn btn-secondary btn-sm video-details-btn" href="/video/${v.id}" onclick="event.preventDefault(); openVideoDetailsFromList('${v.id}');">Details</a>
+        <span class="video-menu-wrap" data-present="${v.videofile_exists ? '1' : '0'}" data-refreshing="${v.refresh_state ? '1' : '0'}">${videoMenuButtonHTML(v)}</span>
       </div>
     </div>
   `;
@@ -525,28 +617,28 @@ function renderUpdateVideo(v) {
       typeWrap.innerHTML = v.video_type !== undefined ? videoTypeBadge(v.video_type) : '';
     }
   }
-  const fileWrap = qs('.video-file-wrap');
-  if (fileWrap) {
+  const menuWrap = qs('.video-menu-wrap');
+  if (menuWrap) {
     const filePresent = v.videofile_exists ? '1' : '0';
-    if ((fileWrap.dataset.present || '0') !== filePresent) {
-      fileWrap.dataset.present = filePresent;
-      fileWrap.innerHTML = videoFileInnerHTML(v);
+    const refreshing = v.refresh_state ? '1' : '0';
+    if ((menuWrap.dataset.present || '0') !== filePresent) menuWrap.dataset.present = filePresent;
+    if ((menuWrap.dataset.refreshing || '0') !== refreshing) menuWrap.dataset.refreshing = refreshing;
+    // The dropdown is built fresh from currentVideos on open, so a stale
+    // open menu just needs closing when its data changed.
+    const openMenu = document.querySelector('.video-menu-dropdown');
+    if (openMenu && openMenu.dataset.videoId === v.id) {
+      const openFileItem = openMenu.querySelector('[data-action="video-file"]');
+      const openRefreshItem = openMenu.querySelector('[data-action="refresh"]');
+      const openDownloadItem = openMenu.querySelector('[data-action="download"]');
+      const fileChanged = !!openFileItem !== !!v.videofile_exists;
+      const refreshChanged = !!openRefreshItem &&
+        ((openRefreshItem.textContent.trim() === 'Refreshing...') !== !!v.refresh_state);
+      const canDownload = (v.status != 2 && v.status != 1);
+      const downloadChanged = !!openDownloadItem !== canDownload;
+      if (fileChanged || refreshChanged || downloadChanged) closeVideoMenu();
     }
   }
-  const refreshBtn = qs('.video-refresh-btn');
-  if (refreshBtn) {
-    if (v.refresh_state) {
-      refreshBtn.setAttribute('disabled', '');
-      refreshBtn.setAttribute('style', 'opacity:0.5;cursor:not-allowed');
-    } else {
-      refreshBtn.removeAttribute('disabled');
-      refreshBtn.removeAttribute('style');
-    }
-    setText(refreshBtn, v.refresh_state ? 'Refreshing...' : 'Refresh');
-    const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
-    if (refreshBtn.getAttribute('title') !== refreshTitle) refreshBtn.setAttribute('title', refreshTitle);
-  }
-  
+
   return true;
 }
 
