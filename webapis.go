@@ -1322,10 +1322,8 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if !IsAuthorized {
-		if !IsIpAddressLocal(GetIpAddressFromRequest(r)) {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 	
 	if IsRequestExpired(w, r) {
@@ -1404,10 +1402,8 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else if !IsAuthorized {
-		if !IsIpAddressLocal(GetIpAddressFromRequest(r)) {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
 	}
 	
 	if IsRequestExpired(w, r) {
