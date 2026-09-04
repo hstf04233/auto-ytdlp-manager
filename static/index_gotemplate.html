@@ -116,6 +116,21 @@
       
       <div class="pagination" id="videoPagination-top"></div>
 
+      <div class="bulk-bar" id="videoBulkBar" hidden>
+        <span class="bulk-count" id="videoBulkCount">0 selected</span>
+        <div class="bulk-group">
+          <button class="btn btn-secondary btn-sm" id="videoBulkPageBtn" onclick="toggleSelectVideoPage()">Select page</button>
+          <button class="btn btn-secondary btn-sm" id="videoBulkClearBtn" onclick="clearVideoSelection()" title="Deselect all videos">&times; Clear</button>
+        </div>
+        <span class="bulk-sep"></span>
+        <div class="bulk-group">
+          <button class="btn btn-secondary btn-sm" id="videoBulkRefreshBtn" onclick="bulkRefreshSelected()" title="Refresh metadata for selected videos">Refresh</button>
+          <button class="btn btn-secondary btn-sm" id="videoBulkDownloadBtn" onclick="bulkDownloadSelected()" title="Download selected videos">Download</button>
+          <button class="btn btn-secondary btn-sm" id="videoBulkStatusBtn" onclick="event.stopPropagation();toggleBulkStatusDropdown(this)" title="Set status for selected videos">Set status...</button>
+          <button class="btn btn-danger btn-sm" id="videoBulkDeleteBtn" onclick="bulkDeleteSelected()" title="Delete selected videos">Delete</button>
+        </div>
+      </div>
+
       <div id="videosList">
         <div class="loading">Loading videos...</div>
       </div>

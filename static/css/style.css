@@ -662,6 +662,103 @@ body.no-transition .sidebar-bottom .btn {
   flex-shrink: 0;
 }
 
+/* Bulk selection bar (videos tab): hidden until >=1 video selected. */
+.bulk-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 10px;
+  z-index: 500;
+  background: rgba(26, 26, 46, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 15px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.bulk-bar[hidden] {
+  display: none;
+}
+
+.bulk-count {
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #fff;
+  background: var(--accent);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+.bulk-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bulk-sep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 24px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+/* Selection checkbox overlays the thumbnail corner. */
+.video-thumb .video-select-checkbox {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, transform 0.15s;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
+}
+
+.video-card:hover .video-select-checkbox,
+.video-card:focus-within .video-select-checkbox,
+.video-select-checkbox:checked,
+.video-select-checkbox:focus-visible {
+  opacity: 1;
+}
+
+/* Nothing selected yet: keep cards clean, reveal the checkbox on hover/focus. */
+#videosList:not(.has-selection) .video-select-checkbox {
+  opacity: 0;
+}
+
+#videosList:not(.has-selection) .video-card:hover .video-select-checkbox,
+#videosList:not(.has-selection) .video-card:focus-within .video-select-checkbox,
+#videosList:not(.has-selection) .video-select-checkbox:checked,
+#videosList:not(.has-selection) .video-select-checkbox:focus-visible {
+  opacity: 1;
+}
+
+/* Touch screens have no hover: always show the checkboxes. */
+@media (hover: none) {
+  #videosList:not(.has-selection) .video-select-checkbox {
+    opacity: 0.55;
+  }
+}
+
+.video-select-checkbox:checked {
+  transform: scale(1.05);
+}
+
+.video-card.is-selected {
+  border-color: var(--accent);
+  background: rgba(233, 69, 96, 0.06);
+}
+
 .video-menu-wrap {
   display: inline-flex;
 }

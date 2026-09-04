@@ -427,6 +427,7 @@ function toggleVideoMenu(videoId, buttonEl) {
   }
   closeVideoMenu();
   if (typeof closeStatusDropdown === 'function') closeStatusDropdown();
+  if (typeof closeBulkStatusDropdown === 'function') closeBulkStatusDropdown();
 
   const v = (typeof currentVideos !== 'undefined' && currentVideos) ? currentVideos.find(x => x.id === videoId) : null;
   const videofileExists = v ? !!v.videofile_exists : false;
@@ -497,16 +498,240 @@ function toggleVideoMenu(videoId, buttonEl) {
   }
 }
 
+// ========== Videos bulk selection ==========
+// Persists across page/filter changes (ids only); bulk actions run the
+// existing single-video API requests sequentially (no bulk endpoint yet).
+let selectedVideoIds = new Set();
+let bulkActionRunning = false;
+
+function syncVideoCardSelected(videoId, selected) {
+  const card = document.getElementById(`video-${videoId}`);
+  if (!card) return;
+  card.classList.toggle('is-selected', selected);
+  const cb = card.querySelector('.video-select-checkbox');
+  if (cb && cb.checked !== selected) cb.checked = selected;
+}
+
+function toggleVideoSelection(videoId, checked) {
+  if (checked) {
+    selectedVideoIds.add(videoId);
+  } else {
+    selectedVideoIds.delete(videoId);
+  }
+  syncVideoCardSelected(videoId, checked);
+  updateBulkBar();
+}
+
+function clearVideoSelection() {
+  const ids = [...selectedVideoIds];
+  selectedVideoIds.clear();
+  // Update visible cards in place (no full rebuild).
+  for (const id of ids) syncVideoCardSelected(id, false);
+  updateBulkBar();
+}
+
+function toggleSelectVideoPage() {
+  const pageIds = currentVideos.map(v => v.id);
+  const allSelected = pageIds.length > 0 && pageIds.every(id => selectedVideoIds.has(id));
+  for (const id of pageIds) {
+    if (allSelected) {
+      selectedVideoIds.delete(id);
+    } else {
+      selectedVideoIds.add(id);
+    }
+    syncVideoCardSelected(id, !allSelected);
+  }
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const bar = document.getElementById('videoBulkBar');
+  if (!bar) return;
+  const count = selectedVideoIds.size;
+  bar.hidden = count === 0;
+  const list = document.getElementById('videosList');
+  if (list) list.classList.toggle('has-selection', count > 0);
+  const countEl = document.getElementById('videoBulkCount');
+  if (countEl) countEl.textContent = count === 1 ? '1 selected' : `${count} selected`;
+  const pageIds = currentVideos.map(v => v.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every(id => selectedVideoIds.has(id));
+  const pageBtn = document.getElementById('videoBulkPageBtn');
+  if (pageBtn) {
+    pageBtn.textContent = allPageSelected ? 'Deselect page' : `Select page (${pageIds.length})`;
+    pageBtn.disabled = bulkActionRunning || pageIds.length === 0;
+  }
+  const btns = ['videoBulkClearBtn', 'videoBulkRefreshBtn', 'videoBulkDownloadBtn', 'videoBulkStatusBtn', 'videoBulkDeleteBtn'];
+  for (const id of btns) {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = bulkActionRunning;
+  }
+}
+
+let _bulkStatusOpen = false;
+let _bulkStatusListenerActive = false;
+
+function closeBulkStatusDropdown() {
+  document.querySelectorAll('.bulk-status-dropdown').forEach(el => el.remove());
+  _bulkStatusOpen = false;
+  // Note: document listeners stay registered (guarded by
+  // _bulkStatusListenerActive) so reopening doesn't stack duplicates.
+}
+
+function toggleBulkStatusDropdown(buttonEl) {
+  if (_bulkStatusOpen) {
+    closeBulkStatusDropdown();
+    return;
+  }
+  closeBulkStatusDropdown();
+  if (typeof closeVideoMenu === 'function') closeVideoMenu();
+  if (typeof closeStatusDropdown === 'function') closeStatusDropdown();
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'video-menu-dropdown bulk-status-dropdown';
+  dropdown.innerHTML = `
+    <div class="video-menu-item" data-status="0" title="Set selected videos to Queued">Queued</div>
+    <div class="video-menu-item" data-status="4" title="Set selected videos to Ignored">Ignored</div>
+  `;
+
+  dropdown.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const item = e.target.closest('.video-menu-item');
+    if (!item) return;
+    closeBulkStatusDropdown();
+    bulkSetStatusSelected(item.dataset.status);
+  });
+
+  document.body.appendChild(dropdown);
+  const rect = buttonEl.getBoundingClientRect();
+  dropdown.style.top = (rect.bottom + 4) + 'px';
+  dropdown.style.left = rect.left + 'px';
+  // Keep the menu on-screen: flip above the button when it would
+  // overflow the bottom edge.
+  const menuRect = dropdown.getBoundingClientRect();
+  if (menuRect.bottom > window.innerHeight - 8) {
+    dropdown.style.top = Math.max(8, rect.top - menuRect.height - 4) + 'px';
+  }
+  if (menuRect.right > window.innerWidth - 8) {
+    dropdown.style.left = Math.max(8, window.innerWidth - menuRect.width - 8) + 'px';
+  }
+
+  _bulkStatusOpen = true;
+  if (!_bulkStatusListenerActive) {
+    document.addEventListener('click', closeBulkStatusDropdown);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeBulkStatusDropdown(); });
+    _bulkStatusListenerActive = true;
+  }
+}
+
+async function bulkRefreshSelected() {
+  const ids = [...selectedVideoIds];
+  if (ids.length === 0 || bulkActionRunning) return;
+  bulkActionRunning = true;
+  updateBulkBar();
+  let ok = 0, failed = 0;
+  for (const id of ids) {
+    try {
+      await API.patch(`/api/videos/${encodeURIComponent(id)}`, { refresh_state: true });
+      ok++;
+    } catch (err) {
+      failed++;
+    }
+  }
+  bulkActionRunning = false;
+  showToast(failed ? `Bulk refresh: ${ok} ok, ${failed} failed` : `Bulk refresh started for ${ok} video(s)`, failed ? 'error' : 'success');
+  loadVideos();
+}
+
+async function bulkDeleteSelected() {
+  const ids = [...selectedVideoIds];
+  if (ids.length === 0 || bulkActionRunning) return;
+  if (!confirm(`Delete ${ids.length} selected video(s)? (This does not remove video files.)`)) return;
+  firstTimeDeleteVideo = false;
+  bulkActionRunning = true;
+  updateBulkBar();
+  let ok = 0, failed = 0;
+  for (const id of ids) {
+    try {
+      await API.del(`/api/videos/${encodeURIComponent(id)}`);
+      selectedVideoIds.delete(id);
+      ok++;
+    } catch (err) {
+      failed++;
+    }
+  }
+  bulkActionRunning = false;
+  showToast(failed ? `Bulk delete: ${ok} deleted, ${failed} failed` : `Deleted ${ok} video(s)`, failed ? 'error' : 'success');
+  loadVideos();
+}
+
+async function bulkSetStatusSelected(status) {
+  const ids = [...selectedVideoIds];
+  if (ids.length === 0 || bulkActionRunning) return;
+  bulkActionRunning = true;
+  updateBulkBar();
+  let ok = 0, failed = 0;
+  for (const id of ids) {
+    try {
+      await API.patch(`/api/videos/${encodeURIComponent(id)}`, { status: parseInt(status) });
+      ok++;
+    } catch (err) {
+      failed++;
+    }
+  }
+  bulkActionRunning = false;
+  showToast(failed ? `Bulk status: ${ok} ok, ${failed} failed` : `Status changed for ${ok} video(s)`, failed ? 'error' : 'success');
+  loadVideos();
+}
+
+async function bulkDownloadSelected() {
+  const ids = [...selectedVideoIds];
+  if (ids.length === 0 || bulkActionRunning) return;
+  bulkActionRunning = true;
+  updateBulkBar();
+  let ok = 0, failed = 0, skipped = 0;
+  for (const id of ids) {
+    try {
+      // Selection can span pages, so fall back to fetching videos that
+      // aren't in the current page.
+      let videoData = currentVideos.find(x => x.id === id);
+      if (!videoData) videoData = await API.get(`/api/videos/${encodeURIComponent(id)}`);
+      if (!videoData || videoData.status == 2 || videoData.status == 1) {
+        skipped++;
+        continue;
+      }
+      let body = {
+        download_url: videoData.url,
+        type: -2,
+        target_channel_id: videoData.from_channel,
+      };
+      const qualitySelect = getQualityFromResolution(videoData.resolution);
+      if (qualitySelect > 0) body.quality_select = qualitySelect;
+      await API.post(`/api/add-videos?no_wait=true&queue_video_id=${encodeURIComponent(id)}`, body);
+      ok++;
+    } catch (err) {
+      failed++;
+    }
+  }
+  bulkActionRunning = false;
+  const parts = [`${ok} queued`];
+  if (skipped) parts.push(`${skipped} skipped (already downloading/downloaded)`);
+  if (failed) parts.push(`${failed} failed`);
+  showToast(`Bulk download: ${parts.join(', ')}`, failed ? 'error' : 'success');
+  loadVideos();
+}
+
 function videoCardHTML(v) {
   var thumbnailUrl = getThumbnail(v);
   var durationText = videoDurationText(v);
 
   const channel = getChannelFromId(v.from_channel);
   
+  const isSelected = selectedVideoIds.has(v.id);
   return `
-    <div class="card video-card" id="video-${v.id}">
+    <div class="card video-card${isSelected ? ' is-selected' : ''}" id="video-${v.id}">
       <div class="video-thumb">
         <img class="video-thumb-img" src="${thumbnailUrl}" alt="" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg'">
+        <input type="checkbox" class="video-select-checkbox" data-video-id="${v.id}" title="Select video" onclick="event.stopPropagation()" onchange="toggleVideoSelection('${v.id}', this.checked)" ${isSelected ? 'checked' : ''}>
         ${v.refresh_state ? `<span class="video-refresh-spinner" title="Metadata is being refreshed..." aria-label="Metadata is being refreshed..."></span>` : ''}
         <span class="video-duration" title="Video duration">${durationText}</span>
       </div>
@@ -539,10 +764,12 @@ function renderVideos() {
 
   if (currentVideos.length === 0) {
     container.innerHTML = '<div class="loading">No videos found.</div>';
+    updateBulkBar();
     return;
   }
 
   container.innerHTML = currentVideos.map(videoCardHTML).join('');
+  updateBulkBar();
 }
 
 function renderUpdateVideo(v) {
@@ -550,6 +777,10 @@ function renderUpdateVideo(v) {
   if (!card) return false;
   const qs = (sel) => card.querySelector(sel);
   const setText = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
+  const selectCb = qs('.video-select-checkbox');
+  const shouldCheck = selectedVideoIds.has(v.id);
+  if (selectCb && selectCb.checked !== shouldCheck) selectCb.checked = shouldCheck;
+  card.classList.toggle('is-selected', shouldCheck);
   
   const thumbImg = qs('.video-thumb-img');
   if (thumbImg) {
