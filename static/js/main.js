@@ -29,6 +29,16 @@ setupModalClickExit("addVideosModal", closeAddVideosModal)
 
 window.addEventListener('popstate', function (e) {
   const tab = window.location.pathname.replace(/^\//, '') || '';
+  if (tab.startsWith('video/')) {
+    // Stepped (back/forward) into a video: open the modal without pushing
+    // another history entry. showPage handles the video/ branch itself.
+    showPage(tab + window.location.search, true);
+    return;
+  }
+  // Stepped away from a video URL (e.g. Back out of the details modal):
+  // tear the modal down without touching history, then render the page.
+  // Safe to call when no modal is open.
+  closeVideoDetailsModal(true);
   showPage(tab + window.location.search, true);
 
   updateVideosTabTitle()

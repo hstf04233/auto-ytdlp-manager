@@ -134,9 +134,9 @@ async function openVideoDetailsModal(videoId) {
   };
   if (!videoInfo) {
     // showToast(`Failed to copy shared video file, error: ${err.message}`, "error");
-    
-    document.getElementById('videoDetailsModal').classList.remove('active');
-    document.body.classList.remove('modal-active');
+
+    // Reuses the close path so a failed open also restores the previous URL.
+    closeVideoDetailsModal();
     return
   }
   
@@ -217,33 +217,71 @@ async function openVideoDetailsModal(videoId) {
   `;
 }
 
-function closeVideoDetailsModal() {
+let videoModalPushed = false;
+let videoModalReturnUrl = '/videos';
+
+// Opened from the videos list (Details button): push /video/{id} so the URL
+// reflects the modal, and closing restores the exact list behind it.
+function openVideoDetailsFromList(videoId) {
+  // Remember the list URL in case there is no usable history to go back to
+  // (e.g. the modal URL gets reloaded or shared).
+  try {
+    videoModalReturnUrl = buildVideosUrl();
+  } catch (e) {
+    videoModalReturnUrl = '/videos';
+  }
+  history.pushState({}, '', `/video/${encodeURIComponent(videoId)}`);
+  videoModalPushed = true;
+  lastPageOpen = `video/${videoId}`;
+  return openVideoDetailsModal(videoId);
+}
+
+function closeVideoDetailsModal(skipHistory) {
   if (currentHls) {
     currentHls.detachMedia();
     currentHls.destroy();
     currentHls = null;
   }
-  
+
   let modalVideoPreview = document.getElementById('modal-video-preview');
   if (modalVideoPreview) {
     // Remove any video playing
-    
+
     const videoElement = modalVideoPreview.querySelector("video");
     if (videoElement) {
       videoElement.pause();
-      
+
       videoElement.removeAttribute('src');
       videoElement.src = '';
       while (videoElement.firstChild) {
         videoElement.removeChild(videoElement.firstChild);
       }
     }
-    
+
     modalVideoPreview.innerHTML = "";
   }
-  
+
   document.getElementById('videoDetailsModal').classList.remove('active');
   document.body.classList.remove('modal-active');
+
+  const wasPushed = videoModalPushed;
+  videoModalPushed = false;
+  // skipHistory is for popstate: the history navigation already happened,
+  // the modal just needs tearing down.
+  if (skipHistory) return;
+  if (wasPushed) {
+    // Back to the exact list (filters + page) we came from; the popstate
+    // handler re-renders it.
+    history.back();
+    return;
+  }
+  if (window.location.pathname.startsWith('/video/')) {
+    // Opened without a usable history entry (direct load / forward-nav):
+    // fall back to the videos list instead of leaving the app.
+    const returnUrl = videoModalReturnUrl || '/videos';
+    window.history.replaceState(null, '', returnUrl);
+    showPage(returnUrl.replace(/^\//, ''), true);
+  }
 }
 
 // ========== Videos ==========
@@ -396,7 +434,7 @@ function videoCardHTML(v) {
         <span class="video-type-wrap" data-type="${v.video_type !== undefined ? v.video_type : ''}">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}</span>
         <span class="video-file-wrap" data-present="${v.videofile_exists ? '1' : '0'}">${videoFileInnerHTML(v)}</span>
         <button class="btn btn-secondary btn-sm video-refresh-btn" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
-        <a class="btn btn-secondary btn-sm video-details-btn" href="/video/${v.id}" onclick="event.preventDefault(); openVideoDetailsModal('${v.id}');">Details</a>
+          <a class="btn btn-secondary btn-sm video-details-btn" href="/video/${v.id}" onclick="event.preventDefault(); openVideoDetailsFromList('${v.id}');">Details</a>
         <button class="btn btn-danger btn-sm video-delete-btn" title="Deleting a video does not remove the video file." onclick="deleteVideo('${v.id}')">Delete</button>
       </div>
     </div>
@@ -613,9 +651,19 @@ function buildVideosUrl(state) {
   return query ? `/videos?${query}` : '/videos';
 }
 
-function syncVideosUrl() {
+function syncVideosUrl(push) {
   if (lastPageOpen !== 'videos') return;
-  window.history.replaceState(null, '', buildVideosUrl());
+  const url = buildVideosUrl();
+  if (push) {
+    // History point for page-index changes only (filters/search stay
+    // replace-only so typing doesn't spam history). The same-URL guard
+    // keeps e.g. double-clicks from stacking duplicate entries.
+    if (window.location.pathname + window.location.search !== url) {
+      history.pushState({}, '', url);
+    }
+    return;
+  }
+  window.history.replaceState(null, '', url);
 }
 
 function applyVideosUrlParamsToUI(urlParams) {
@@ -686,9 +734,9 @@ function renderVideoPagination() {
   lastVideosCount = videoTotalCount;
   
   const cbsId = _registerPgCbs({
-    prev: () => { if (!areVideosLoading && videoPage > 0) { videoPage--; syncVideosUrl(); loadVideos(); } },
-    next: () => { if (!areVideosLoading) { videoPage++; syncVideosUrl(); loadVideos(); } },
-    page: (p) => { if (!areVideosLoading) { videoPage = p; syncVideosUrl(); loadVideos(); } },
+    prev: () => { if (!areVideosLoading && videoPage > 0) { videoPage--; syncVideosUrl(true); loadVideos(); } },
+    next: () => { if (!areVideosLoading) { videoPage++; syncVideosUrl(true); loadVideos(); } },
+    page: (p) => { if (!areVideosLoading && p !== videoPage) { videoPage = p; syncVideosUrl(true); loadVideos(); } },
   });
   
   const paginationHtml = buildPaginationHTML({
