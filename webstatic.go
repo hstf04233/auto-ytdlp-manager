@@ -32,7 +32,15 @@ var WebStatic_INDEX_HTML []byte
 var WebStatic_LOGIN_HTML []byte
 
 var __FilesToManifest = []string{
-	"js/app.js",
+	//"js/app.js",
+	"js/core.js",
+	"js/format.js",
+	"js/config.js",
+	"js/channels.js",
+	"js/videos.js",
+	"js/tasks.js",
+	"js/main.js",
+	
 	"js/login_app.js",
 	"js/chat.js",
 	
@@ -214,14 +222,39 @@ func init() {
 		_webstatic_AddToManifest(FilePath)
 	}
 	
+	
+	/*
+		"js/core.js",
+		"js/format.js",
+		"js/config.js",
+		"js/channels.js",
+		"js/videos.js",
+		"js/tasks.js",
+		"js/main.js",
+	*/
+	
 	IndexHtmlData := struct{
-		AppJsPath       string
+		CoreJsPath     string
+		FormatJsPath   string
+		ConfigJsPath   string
+		ChannelsJsPath string
+		VideosJsPath   string
+		TasksJsPath    string
+		MainJsPath     string
+		
 		ChatJsPath      string
 		LoginAppJsPath  string
 		
 		StyleCssPath string
 	}{
-		AppJsPath:      webstatic_GetCacheBustedAsset("js/app.js"),
+		CoreJsPath: webstatic_GetCacheBustedAsset("js/core.js"),
+		FormatJsPath: webstatic_GetCacheBustedAsset("js/format.js"),
+		ConfigJsPath: webstatic_GetCacheBustedAsset("js/config.js"),
+		ChannelsJsPath: webstatic_GetCacheBustedAsset("js/channels.js"),
+		VideosJsPath: webstatic_GetCacheBustedAsset("js/videos.js"),
+		TasksJsPath: webstatic_GetCacheBustedAsset("js/tasks.js"),
+		MainJsPath: webstatic_GetCacheBustedAsset("js/main.js"),
+		
 		ChatJsPath:     webstatic_GetCacheBustedAsset("js/chat.js"),
 		LoginAppJsPath: webstatic_GetCacheBustedAsset("js/login_app.js"),
 		
