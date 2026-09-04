@@ -48,6 +48,10 @@ a:hover {
   top: 0;
   left: 0;
   height: 100vh;
+  /* Dynamic viewport: 100vh extends behind the mobile browser toolbar,
+     hiding bottom-anchored content (logout, version). dvh tracks what's
+     actually visible; older browsers ignore it and keep the fallback. */
+  height: 100dvh;
   overflow-x: hidden;
   overflow-y: auto;
   z-index: 100;
@@ -269,6 +273,7 @@ hr {
   flex: 1;
   padding: 30px;
   min-height: 100vh;
+  min-height: 100dvh;
   min-width: 0;
   transition: margin-left 0.2s ease;
 }
@@ -1543,6 +1548,8 @@ form hr {
   /* Expanded sidebar floats over content instead of squishing it. */
   .sidebar {
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+    /* Clear the iPhone home indicator / gesture bar area. */
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 
   /* Belt & braces: never allow page-level horizontal scrolling. */
