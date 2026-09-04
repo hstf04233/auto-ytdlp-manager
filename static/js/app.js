@@ -87,6 +87,16 @@ let videoTotalCount = 0;
 let videoStats = {};
 const VIDEO_PAGE_SIZE = 20;
 
+// Defaults for the videos tab. URL params matching these defaults are omitted
+// to keep the URL short (no bloated url).
+const VIDEO_FILTER_DEFAULTS = {
+  channel: '',
+  search: '',
+  status: '',
+  orderBy: 'release_date',
+  orderDir: '-1',
+};
+
 let lastPageOpen = ''
 let _pgCallbacks = {}
 let _pgId = 0
@@ -152,16 +162,12 @@ function showPage(page, dontSaveHistory) {
   const urlParams = new URLSearchParams(url.search);
   
   if (basePage === 'videos') {
-    if (urlParams.has("channel")) {
-      let channelId = urlParams.get("channel");
-      document.getElementById('videoChannelFilter').value = channelId;
-    } else {
-      document.getElementById('videoChannelFilter').value = '';
-    }
-    
+    applyVideosUrlParamsToUI(urlParams);
+    videoSearchFilterUpdate(true);
+
     updateVideosTabTitle();
     title = '';   // Won't set title if blank.
-    
+
     if (!areVideosLoading) {
       loadVideos();
     }
@@ -1325,31 +1331,42 @@ async function saveChannel(e) {
 async function loadVideos() {
   areVideosLoading = true;
   try {
-    const statusFilter = document.getElementById('videoStatusFilter').value;
-    const channelFilter = document.getElementById('videoChannelFilter').value;
-    const orderBy = document.getElementById('videoOrderBy').value;
-    const orderDir = document.getElementById('videoOrderDirection').value;
-    
-    let url = `/api/videos?limit=${VIDEO_PAGE_SIZE}&page=${videoPage}`;
-    if (statusFilter !== '') {
-      url += `&status=${statusFilter}`;
+    // Retry once if ?page= in the URL was out of range (e.g. shared link).
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const statusFilter = document.getElementById('videoStatusFilter').value;
+      const channelFilter = document.getElementById('videoChannelFilter').value;
+      const orderBy = document.getElementById('videoOrderBy').value;
+      const orderDir = document.getElementById('videoOrderDirection').value;
+
+      let url = `/api/videos?limit=${VIDEO_PAGE_SIZE}&page=${videoPage}`;
+      if (statusFilter !== '') {
+        url += `&status=${statusFilter}`;
+      }
+      if (channelFilter !== '') {
+        url += `&from_channel=${channelFilter}`;
+      }
+      if (orderBy) {
+        url += `&order_by=${orderBy}`;
+      }
+      url += `&order_direction=${orderDir}`;
+      const search = document.getElementById('videoSearch').value;
+      if (search !== '') {
+        url += `&search_query=${encodeURIComponent(search)}`;
+      }
+
+      const data = await API.get(url);
+      currentVideos = data.videos || data;
+      videoStats = data.stats || {};
+      videoTotalCount = videoStats.total || currentVideos.length;
+
+      const totalPages = Math.ceil(videoTotalCount / VIDEO_PAGE_SIZE) || 1;
+      if (videoPage >= totalPages && videoPage > 0) {
+        videoPage = Math.max(0, totalPages - 1);
+        syncVideosUrl();
+        continue;   // refetch the clamped page
+      }
+      break;
     }
-    if (channelFilter !== '') {
-      url += `&from_channel=${channelFilter}`;
-    }
-    if (orderBy) {
-      url += `&order_by=${orderBy}`;
-    }
-    url += `&order_direction=${orderDir}`;
-    const search = document.getElementById('videoSearch').value;
-    if (search !== '') {
-      url += `&search_query=${encodeURIComponent(search)}`;
-    }
-    
-    const data = await API.get(url);
-    currentVideos = data.videos || data;
-    videoStats = data.stats || {};
-    videoTotalCount = videoStats.total || currentVideos.length;
     renderVideos();
     renderVideoPagination();
     updateVideoStats();
@@ -1360,19 +1377,9 @@ async function loadVideos() {
 }
 
 function filterVideosTabByChannel(channelId) {
-  const videoChannelFilterEl = document.getElementById('videoChannelFilter');
-  
-  const optionExists = Array.from(videoChannelFilterEl.options).some(opt => opt.value === channelId);
-  
-  if (!optionExists) {
-    const newOption = new Option(channelId, channelId);
-    newOption.hidden = true;
-    videoChannelFilterEl.add(newOption);
-  }
-  
-  videoChannelFilterEl.value = channelId;
-  videoPage = 0;
-  
+  ensureVideoChannelOption(channelId);
+  document.getElementById('videoChannelFilter').value = channelId;
+
   onVideoFilterChange();
 }
 
@@ -1456,8 +1463,9 @@ function clearVideoFilters(dontLoadVideos) {
   //document.getElementById('videoChannelFilter').value = '';
   document.getElementById('videoOrderBy').value = 'release_date';
   document.getElementById('videoOrderDirection').value = '-1';
-  videoSearchFilterUpdate();
+  videoSearchFilterUpdate(true);
   videoPage = 0;
+  syncVideosUrl();
   if (!areVideosLoading && !dontLoadVideos) {
     loadVideos();
   } else if (!dontLoadVideos) {
@@ -1485,6 +1493,99 @@ function clearVideoSearch() {
   videoSearchFilterUpdate();
 }
 
+// ========== Videos URL state ==========
+// Keeps page + filters in the URL (e.g. /videos?page=2&status=2).
+// Params matching VIDEO_FILTER_DEFAULTS (and page 1) are omitted
+// so the URL stays short.
+
+function ensureVideoChannelOption(channelId) {
+  if (!channelId) return;
+  const videoChannelFilterEl = document.getElementById('videoChannelFilter');
+  if (!videoChannelFilterEl) return;
+  const optionExists = Array.from(videoChannelFilterEl.options).some(opt => opt.value === channelId);
+  if (!optionExists) {
+    const newOption = new Option(channelId, channelId);
+    newOption.hidden = true;
+    videoChannelFilterEl.add(newOption);
+  }
+}
+
+function getVideoFilterStateFromUI() {
+  return {
+    channel:  document.getElementById('videoChannelFilter').value,
+    search:   document.getElementById('videoSearch').value,
+    status:   document.getElementById('videoStatusFilter').value,
+    orderBy:  document.getElementById('videoOrderBy').value,
+    orderDir: document.getElementById('videoOrderDirection').value,
+    page:     videoPage,
+  };
+}
+
+function buildVideosUrl(state) {
+  const s = state || getVideoFilterStateFromUI();
+  const params = new URLSearchParams();
+  if (s.channel && s.channel !== VIDEO_FILTER_DEFAULTS.channel) {
+    params.set('channel', s.channel);
+  }
+  if (s.search && s.search.trim() !== '') {
+    params.set('search', s.search);
+  }
+  if (s.status && s.status !== VIDEO_FILTER_DEFAULTS.status) {
+    params.set('status', s.status);
+  }
+  if (s.orderBy && s.orderBy !== VIDEO_FILTER_DEFAULTS.orderBy) {
+    params.set('order_by', s.orderBy);
+  }
+  if (s.orderDir && s.orderDir !== VIDEO_FILTER_DEFAULTS.orderDir) {
+    params.set('order_direction', s.orderDir);
+  }
+  if (s.page && s.page > 0) {
+    // URL is 1-indexed for humans, videoPage is 0-indexed internally.
+    params.set('page', String(s.page + 1));
+  }
+  const query = params.toString();
+  return query ? `/videos?${query}` : '/videos';
+}
+
+function syncVideosUrl() {
+  if (lastPageOpen !== 'videos') return;
+  window.history.replaceState(null, '', buildVideosUrl());
+}
+
+function applyVideosUrlParamsToUI(urlParams) {
+  const validStatuses = new Set(['', '0', '1', '2', '3', '4']);
+  const validOrderBy = new Set(['release_date', 'added_at', 'updated_at', 'file_size']);
+  const validOrderDir = new Set(['-1', '1']);
+
+  const channelId = urlParams.get('channel') || VIDEO_FILTER_DEFAULTS.channel;
+  ensureVideoChannelOption(channelId);
+  document.getElementById('videoChannelFilter').value = channelId;
+
+  const search = urlParams.get('search') || VIDEO_FILTER_DEFAULTS.search;
+  document.getElementById('videoSearch').value = search;
+
+  const status = urlParams.get('status') ?? VIDEO_FILTER_DEFAULTS.status;
+  document.getElementById('videoStatusFilter').value = validStatuses.has(status) ? status : VIDEO_FILTER_DEFAULTS.status;
+
+  const orderBy = urlParams.get('order_by') || VIDEO_FILTER_DEFAULTS.orderBy;
+  document.getElementById('videoOrderBy').value = validOrderBy.has(orderBy) ? orderBy : VIDEO_FILTER_DEFAULTS.orderBy;
+
+  const orderDir = urlParams.get('order_direction') || VIDEO_FILTER_DEFAULTS.orderDir;
+  document.getElementById('videoOrderDirection').value = validOrderDir.has(orderDir) ? orderDir : VIDEO_FILTER_DEFAULTS.orderDir;
+
+  let page = 0;
+  if (urlParams.has('page')) {
+    const parsed = parseInt(urlParams.get('page'), 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      // URL is 1-indexed, internal videoPage is 0-indexed.
+      page = parsed - 1;
+    } else {
+      page = 0;
+    }
+  }
+  videoPage = page;
+}
+
 function updateVideosTabTitle() {
   if (lastPageOpen != "videos") return;
   
@@ -1499,15 +1600,11 @@ function updateVideosTabTitle() {
 }
 
 function onVideoFilterChange() {
-  const channelId = document.getElementById('videoChannelFilter').value
-  if (channelId) {
-    window.history.replaceState(null, "", `/videos?channel=${channelId}`);
-  } else {
-    window.history.replaceState(null, "", `/videos`);
-  }
-  updateVideosTabTitle();
-  
+  // Filters changed -> back to first page (drops any stale ?page=N).
   videoPage = 0;
+  syncVideosUrl();
+  updateVideosTabTitle();
+
   loadVideos();
 }
 
@@ -1523,9 +1620,9 @@ function renderVideoPagination() {
   lastVideosCount = videoTotalCount;
   
   const cbsId = _registerPgCbs({
-    prev: () => { if (!areVideosLoading && videoPage > 0) { videoPage--; loadVideos(); } },
-    next: () => { if (!areVideosLoading) { videoPage++; loadVideos(); } },
-    page: (p) => { if (!areVideosLoading) { videoPage = p; loadVideos(); } },
+    prev: () => { if (!areVideosLoading && videoPage > 0) { videoPage--; syncVideosUrl(); loadVideos(); } },
+    next: () => { if (!areVideosLoading) { videoPage++; syncVideosUrl(); loadVideos(); } },
+    page: (p) => { if (!areVideosLoading) { videoPage = p; syncVideosUrl(); loadVideos(); } },
   });
   
   const paginationHtml = buildPaginationHTML({
@@ -1770,11 +1867,12 @@ function gotoTasksPageAndFilterChannel(channelId) {
 }
 function gotoVideosPageAndFilterChannel(channelId) {
   clearVideoFilters(true);
-  
+
+  ensureVideoChannelOption(channelId);
   videoPage = 0;
   document.getElementById('videoChannelFilter').value = channelId;
-  
-  showPage(`videos?channel=${channelId}`);
+
+  showPage(`videos?channel=${encodeURIComponent(channelId)}`);
   loadVideos();
   renderVideoPagination();
 }
@@ -2115,10 +2213,7 @@ function stopRealtimePolling() {
 }
 
 function navigateToChannel(channelId) {
-  document.getElementById('videoChannelFilter').value = channelId;
-  videoPage = 0;
-  loadVideos();
-  showPage('videos');
+  gotoVideosPageAndFilterChannel(channelId);
 }
 
 function escHtml(str) {
@@ -2153,8 +2248,8 @@ setupModalClickExit("addVideosModal", closeAddVideosModal)
 
 window.addEventListener('popstate', function (e) {
   const tab = window.location.pathname.replace(/^\//, '') || '';
-  showPage(tab, true);
-  
+  showPage(tab + window.location.search, true);
+
   updateVideosTabTitle()
 });
 
@@ -2245,7 +2340,8 @@ async function init() {
     if (videoSearchDidUpdate) {
       videoSearchDidUpdate = false;
       videoPage = 0;
-      
+      syncVideosUrl();
+
       loadVideos();
     }
   }, 300);
