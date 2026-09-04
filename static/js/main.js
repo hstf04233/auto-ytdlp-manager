@@ -101,15 +101,15 @@ async function init() {
     }
   }, 200);
   
-  // Auto refresh videos every 10s
+  // Auto refresh videos every 10s (soft: patches cards in place, no rebuild flicker)
   setInterval(() => {
     if (areVideosLoading || document.hidden) {
       return;
     }
-    
+
     const videosPage = document.getElementById('page-videos');
     if (videosPage.classList.contains('active')) {
-      loadVideos();
+      loadVideos(true);
     }
   }, 10_000);
   
@@ -147,7 +147,7 @@ document.addEventListener("visibilitychange", () => {
     
     const videosPage = document.getElementById('page-videos');
     if (!areVideosLoading && videosPage.classList.contains('active')) {
-      loadVideos();
+      loadVideos(true);
     }
     
     const tasksPage = document.getElementById('page-tasks');

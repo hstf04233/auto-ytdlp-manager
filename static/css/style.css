@@ -633,6 +633,18 @@ body.no-transition .sidebar-bottom .btn {
   flex-shrink: 0;
 }
 
+/* Hooks for the soft (in-place) video card updater in videos.js.
+   Wrappers must not participate in layout, so a patched card looks
+   exactly like a freshly rendered one (no extra flex gaps). */
+.video-status-wrap, .video-type-wrap, .video-file-wrap {
+  display: contents;
+}
+/* The tasks line is always in the DOM as an update hook; hide it when
+   it has no content so it takes up no space (as before). */
+.video-tasks-line:empty {
+  display: none;
+}
+
 /* Modal */
 .modal-overlay {
   display: none;

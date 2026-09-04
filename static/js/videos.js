@@ -247,7 +247,11 @@ function closeVideoDetailsModal() {
 }
 
 // ========== Videos ==========
-async function loadVideos() {
+let lastVideosSig = null;
+function videosSig(videos) {
+  return videos.map(v => v.id).join(',');
+}
+async function loadVideos(softUpdateOnly) {
   areVideosLoading = true;
   try {
     // Retry once if ?page= in the URL was out of range (e.g. shared link).
@@ -286,7 +290,15 @@ async function loadVideos() {
       }
       break;
     }
-    renderVideos();
+    const sig = videosSig(currentVideos);
+    if (softUpdateOnly && sig === lastVideosSig) {
+      // Same videos in the same order: patch the existing cards in place
+      // instead of rebuilding the whole list (no flicker, keeps focus/scroll).
+      softRenderVideos();
+    } else {
+      renderVideos();
+      lastVideosSig = sig;
+    }
     renderVideoPagination();
     updateVideoStats();
   } catch (err) {
@@ -302,6 +314,95 @@ function filterVideosTabByChannel(channelId) {
   onVideoFilterChange();
 }
 
+function videoDurationText(v) {
+  if (v.video_type == 2 && (v.duration <= 1)) {  // VIDEO_TYPE_ISLIVE
+    return "LIVE";
+  }
+  return formatDuration(v.duration);
+}
+
+function videoAddedLineText(v) {
+  return `Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)} ${v.filesize ? formatBytesSize(v.filesize) : ''}`;
+}
+
+function videoTasksSig(v) {
+  return `${v.tasks_count || 0}|${v.active_task || ''}`;
+}
+
+function videoTasksInnerHTML(v) {
+  if (!(v.tasks_count > 0 || v.active_task)) return '';
+  
+  let tasksButtonText = "View Logs"
+  if (v.active_task) {
+    tasksButtonText = `View Active Task + Logs[${v.tasks_count-1}]`
+  } else if (v.tasks_count > 1) {
+    tasksButtonText = `View Logs[${v.tasks_count}]`
+  }
+  let tasksButtonOnClick = `
+    event.preventDefault();
+    gotoTasksPageAndFilterVideo('${v.id}');
+  `
+  if (v.active_task) {
+    tasksButtonOnClick = `
+      event.preventDefault();
+      gotoTasksPageAndFilterVideo('${v.id}');
+      selectTask('${v.active_task}')
+    `
+  }
+  
+  return `<a href="/tasks?video=${v.id}" onclick="${tasksButtonOnClick}">${tasksButtonText}</a>`;
+}
+
+function videoUploaderInnerHTML(v) {
+  if (!v.uploader) return '';
+  return `Uploader: <a href="${escHtml(v.uploader_url)}" target="_blank">${escHtml(v.uploader)}</a>`;
+}
+
+function videoFileInnerHTML(v) {
+  if (!v.videofile_exists) return '';
+  return `<a href="/video-file/${escHtml(v.id)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video file">Video File</a>`;
+}
+
+function videoCardHTML(v) {
+  var thumbnailUrl = getThumbnail(v);
+  var durationText = videoDurationText(v);
+  
+  const channel = getChannelFromId(v.from_channel);
+  const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
+  const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
+  
+  return `
+    <div class="card video-card" id="video-${v.id}">
+      <div class="video-thumb">
+        <img class="video-thumb-img" src="${thumbnailUrl}" alt="" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg'">
+        <span class="video-duration" title="Video duration">${durationText}</span>
+      </div>
+      <div class="video-info">
+        <h3 class="video-title">
+          <span class="video-title-text" title="${escHtml(v.title)}">${escHtml(v.title)}</span>
+          <a class="video-link" href="${escHtml(v.url)}" target="_blank">[VideoLink]</a>
+        </h3>
+        <p class="video-channel-line">From: <a class="video-channel-link" title="Filter by this channel" href="/videos?channel=${v.from_channel}" onclick="event.preventDefault();filterVideosTabByChannel('${v.from_channel}');">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a>
+        <span class="video-uploader-part" data-sig="${encodeURIComponent(v.uploader || '')}|${encodeURIComponent(v.uploader_url || '')}">${videoUploaderInnerHTML(v)}</span>
+        </p>
+        <p class="video-release-line">Released: ${formatDateAndTime(v.release_date)}</p>
+        <p class="video-availability-line">${escHtml(v.availability)}</p>
+        <p class="video-added-line">${videoAddedLineText(v)}</p>
+        
+        <p class="video-tasks-line" data-sig="${videoTasksSig(v)}">${videoTasksInnerHTML(v)}</p>
+      </div>
+      <div class="video-actions">
+        <span class="video-status-wrap" data-status="${v.status}">${videoStatusBadge(v.id, v.status)}</span>
+        <span class="video-type-wrap" data-type="${v.video_type !== undefined ? v.video_type : ''}">${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}</span>
+        <span class="video-file-wrap" data-present="${v.videofile_exists ? '1' : '0'}">${videoFileInnerHTML(v)}</span>
+        <button class="btn btn-secondary btn-sm video-refresh-btn" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
+        <a class="btn btn-secondary btn-sm video-details-btn" href="/video/${v.id}" onclick="event.preventDefault(); openVideoDetailsModal('${v.id}');">Details</a>
+        <button class="btn btn-danger btn-sm video-delete-btn" title="Deleting a video does not remove the video file." onclick="deleteVideo('${v.id}')">Delete</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderVideos() {
   const container = document.getElementById('videosList');
 
@@ -310,70 +411,116 @@ function renderVideos() {
     return;
   }
 
-  container.innerHTML = currentVideos.map(v => {
-    var thumbnailUrl = getThumbnail(v);
-    var durationText = formatDuration(v.duration)
-    if (v.video_type == 2 && (v.duration <= 1)) {  // VIDEO_TYPE_ISLIVE
-      durationText = "LIVE"
+  container.innerHTML = currentVideos.map(videoCardHTML).join('');
+}
+
+function renderUpdateVideo(v) {
+  const card = document.getElementById(`video-${v.id}`);
+  if (!card) return false;
+  const qs = (sel) => card.querySelector(sel);
+  const setText = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
+  
+  const thumbImg = qs('.video-thumb-img');
+  if (thumbImg) {
+    const thumbnailUrl = getThumbnail(v);
+    if (thumbImg.getAttribute('src') !== thumbnailUrl) thumbImg.setAttribute('src', thumbnailUrl);
+  }
+  setText(qs('.video-duration'), videoDurationText(v));
+  
+  const titleEl = qs('.video-title-text');
+  if (titleEl) {
+    setText(titleEl, v.title || '');
+    if (titleEl.getAttribute('title') !== (v.title || '')) titleEl.setAttribute('title', v.title || '');
+  }
+  const videoLink = qs('.video-link');
+  if (videoLink && videoLink.getAttribute('href') !== v.url) videoLink.setAttribute('href', v.url);
+  
+  const channel = getChannelFromId(v.from_channel);
+  const channelLink = qs('.video-channel-link');
+  if (channelLink) {
+    setText(channelLink, channel ? channel.name : 'Unknown Channel');
+    const channelHref = `/videos?channel=${v.from_channel}`;
+    if (channelLink.getAttribute('href') !== channelHref) channelLink.setAttribute('href', channelHref);
+    const channelOnClick = `event.preventDefault();filterVideosTabByChannel('${v.from_channel}');`;
+    if (channelLink.getAttribute('onclick') !== channelOnClick) channelLink.setAttribute('onclick', channelOnClick);
+  }
+  const uploaderPart = qs('.video-uploader-part');
+  if (uploaderPart) {
+    // encodeURIComponent keeps the attribute quote-safe (uploader names
+    // may contain quotes, which escHtml does not escape for attributes).
+    const uploaderSig = `${encodeURIComponent(v.uploader || '')}|${encodeURIComponent(v.uploader_url || '')}`;
+    if ((uploaderPart.dataset.sig || '') !== uploaderSig) {
+      uploaderPart.dataset.sig = uploaderSig;
+      uploaderPart.innerHTML = videoUploaderInnerHTML(v);
     }
-    
-    const channel = getChannelFromId(v.from_channel);
-    const refreshDisabled = v.refresh_state ? 'disabled style="opacity:0.5;cursor:not-allowed"' : '';
+  }
+  setText(qs('.video-release-line'), `Released: ${formatDateAndTime(v.release_date)}`);
+  setText(qs('.video-availability-line'), v.availability || '');
+  setText(qs('.video-added-line'), videoAddedLineText(v));
+  
+  const tasksLine = qs('.video-tasks-line');
+  if (tasksLine) {
+    const tasksSig = videoTasksSig(v);
+    if ((tasksLine.dataset.sig || '') !== tasksSig) {
+      tasksLine.dataset.sig = tasksSig;
+      tasksLine.innerHTML = videoTasksInnerHTML(v);
+    }
+  }
+  
+  // Don't yank the status badge while its dropdown is open for this video.
+  let dropdownVideoId = null;
+  const openDropdownOption = document.querySelector('.status-dropdown .status-option');
+  if (openDropdownOption) dropdownVideoId = openDropdownOption.dataset.videoId;
+  
+  const statusWrap = qs('.video-status-wrap');
+  if (statusWrap && dropdownVideoId !== v.id) {
+    if (String(statusWrap.dataset.status) !== String(v.status)) {
+      statusWrap.dataset.status = v.status;
+      statusWrap.innerHTML = videoStatusBadge(v.id, v.status);
+    }
+  }
+  const typeWrap = qs('.video-type-wrap');
+  if (typeWrap) {
+    const typeSig = v.video_type !== undefined ? String(v.video_type) : '';
+    if ((typeWrap.dataset.type || '') !== typeSig) {
+      typeWrap.dataset.type = typeSig;
+      typeWrap.innerHTML = v.video_type !== undefined ? videoTypeBadge(v.video_type) : '';
+    }
+  }
+  const fileWrap = qs('.video-file-wrap');
+  if (fileWrap) {
+    const filePresent = v.videofile_exists ? '1' : '0';
+    if ((fileWrap.dataset.present || '0') !== filePresent) {
+      fileWrap.dataset.present = filePresent;
+      fileWrap.innerHTML = videoFileInnerHTML(v);
+    }
+  }
+  const refreshBtn = qs('.video-refresh-btn');
+  if (refreshBtn) {
+    if (v.refresh_state) {
+      refreshBtn.setAttribute('disabled', '');
+      refreshBtn.setAttribute('style', 'opacity:0.5;cursor:not-allowed');
+    } else {
+      refreshBtn.removeAttribute('disabled');
+      refreshBtn.removeAttribute('style');
+    }
+    setText(refreshBtn, v.refresh_state ? 'Refreshing...' : 'Refresh');
     const refreshTitle = v.refresh_state ? 'Refreshing...' : 'Refresh metadata';
-    
-    let tasksButtonText = "View Logs"
-    if (v.active_task) {
-      tasksButtonText = `View Active Task + Logs[${v.tasks_count-1}]`
-    } else if (v.tasks_count > 1) {
-      tasksButtonText = `View Logs[${v.tasks_count}]`
+    if (refreshBtn.getAttribute('title') !== refreshTitle) refreshBtn.setAttribute('title', refreshTitle);
+  }
+  
+  return true;
+}
+
+function softRenderVideos() {
+  for (const v of currentVideos) {
+    if (!renderUpdateVideo(v)) {
+      // Card missing (shouldn't happen when the id list matches):
+      // fall back to a full rebuild to stay in sync.
+      renderVideos();
+      return;
     }
-    let tasksButtonOnClick = `
-      event.preventDefault();
-      gotoTasksPageAndFilterVideo('${v.id}');
-    `
-    if (v.active_task) {
-      tasksButtonOnClick = `
-        event.preventDefault();
-        gotoTasksPageAndFilterVideo('${v.id}');
-        selectTask('${v.active_task}')
-      `
-    }
-    
-    return `
-      <div class="card video-card">
-        <div class="video-thumb">
-          <img src="${thumbnailUrl}" alt="" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg'">
-          <span class="video-duration" title="Video duration">${durationText}</span>
-        </div>
-        <div class="video-info">
-          <h3 class="video-title">
-            <span title="${escHtml(v.title)}">${escHtml(v.title)}</span>
-            <a href="${escHtml(v.url)}" target="_blank">[VideoLink]</a>
-          </h3>
-          <p>From: <a title="Filter by this channel" href="/videos?channel=${v.from_channel}" onclick="event.preventDefault();filterVideosTabByChannel('${v.from_channel}');">${channel ? escHtml(channel.name) : 'Unknown Channel'}</a>
-          ${v.uploader ? `Uploader: <a href="${escHtml(v.uploader_url)}" target="_blank">${escHtml(v.uploader)}</a>` : ''}
-          </p>
-          <p>Released: ${formatDateAndTime(v.release_date)}</p>
-          <p>${escHtml(v.availability)}</p>
-          <p>Added ${formatRelative(v.added_at)} \u00b7 Updated ${formatRelative(v.updated_at)} ${v.filesize ? formatBytesSize(v.filesize) : ''}</p>
-          
-          ${(v.tasks_count > 0 || v.active_task) ? `<p><a href="/tasks?video=${v.id}" onclick="${tasksButtonOnClick}">${tasksButtonText}</a></p>` : ''}
-        </div>
-        <div class="video-actions">
-          ${videoStatusBadge(v.id, v.status)}
-          ${v.video_type !== undefined ? videoTypeBadge(v.video_type) : ''}
-          ${
-            v.videofile_exists ?
-            `<a href="/video-file/${escHtml(v.id)}" target="_blank" class="btn btn-secondary btn-sm" title="Open video file">Video File</a>` :
-            ''
-          }
-          <button class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${v.id}')" title="${refreshTitle}">${v.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
-          <a class="btn btn-secondary btn-sm" href="/video/${v.id}" onclick="event.preventDefault(); openVideoDetailsModal('${v.id}');">Details</a>
-          <button class="btn btn-danger btn-sm" title="Deleting a video does not remove the video file." onclick="deleteVideo('${v.id}')">Delete</button>
-        </div>
-      </div>
-    `;
-  }).join('');
+  }
 }
 
 function clearVideoFilters(dontLoadVideos) {
