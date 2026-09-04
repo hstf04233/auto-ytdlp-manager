@@ -163,6 +163,8 @@ func GetAuthUserFromUserId(UserId uint64) (*AuthUser, error) {
 	`, UserId)
 	
 	AUser := &AuthUser{}
+	
+	var rawCreatedAt, rawUpdatedAt any
 	err := AUserRow.Scan(
 		&AUser.UserId,
 		&AUser.Username,
@@ -171,8 +173,8 @@ func GetAuthUserFromUserId(UserId uint64) (*AuthUser, error) {
 		
 		&AUser.Role,
 		
-		&AUser.CreatedAt,
-		&AUser.UpdatedAt,
+		&rawCreatedAt,
+		&rawUpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -180,6 +182,8 @@ func GetAuthUserFromUserId(UserId uint64) (*AuthUser, error) {
 		}
 		return nil, fmt.Errorf("Failed to find user, error: %v\n", err)
 	}
+	AUser.CreatedAt = parseDBTime(rawCreatedAt)
+	AUser.UpdatedAt = parseDBTime(rawUpdatedAt)
 	
 	return AUser, nil
 }
@@ -234,14 +238,16 @@ func GetAuthSessionFromSessionToken(Token string) (*AuthSession, error) {
 	`, Token)
 	
 	Session := &AuthSession{}
+	
+	var rawExpireAt, rawCreatedAt any
 	err := SessionRow.Scan(
 		&Session.TokenId,
 		&Session.UserId,
 		
 		&Session.CreatedFromLocalIp,
 		
-		&Session.ExpireAt,
-		&Session.CreatedAt,
+		&rawExpireAt,
+		&rawCreatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -249,6 +255,8 @@ func GetAuthSessionFromSessionToken(Token string) (*AuthSession, error) {
 		}
 		return nil, fmt.Errorf("Failed to find session from database, error: %v\n", err)
 	}
+	Session.ExpireAt = parseDBTime(rawExpireAt)
+	Session.CreatedAt = parseDBTime(rawCreatedAt)
 	
 	return Session, nil
 }

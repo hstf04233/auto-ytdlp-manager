@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"strconv"
 	"sync"
 	"time"
 
@@ -188,6 +189,26 @@ type DB_Image struct {
 
 var GDB *sql.DB
 var VideoDBLock sync.RWMutex
+
+func parseDBTime(v any) time.Time {
+	switch t:=v.(type){
+	case nil: return time.Time{}
+	case time.Time: return t
+	case []byte: return parseDBTime(string(t))
+	case string:
+		if t=="" {return time.Time{}}
+		for _,l:=range []string{time.RFC3339Nano,time.RFC3339,
+			"2006-01-02 15:04:05.999999999-07:00","2006-01-02 15:04:05.999999999",
+			"2006-01-02 15:04:05","2006-01-02T15:04:05.999999999Z07:00",
+			"2006-01-02T15:04:05Z07:00","2006-01-02"}{
+			if p,err:=time.Parse(l,t);err==nil {return p}
+		}
+		if f,err:=strconv.ParseFloat(t,64);err==nil {return time.Unix(int64(f),0).UTC()}
+	case int64: return time.Unix(t,0).UTC()
+	case float64: return time.Unix(int64(t),0).UTC()
+	}
+	return time.Time{}
+}
 
 // Add or update archive channel.
 func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
@@ -440,6 +461,8 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	VideoType,
 	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
 	`, VideoId)
+	
+	var rawAddedAt, rawUpdatedAt any
 	err := VideoRow.Scan(
 		&VideoInfo.FromChannel,
 		&VideoInfo.Id,
@@ -464,8 +487,8 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		
 		&VideoInfo.VideoType,
 		
-		&VideoInfo.AddedAt,
-		&VideoInfo.UpdatedAt,
+		&rawAddedAt,
+		&rawUpdatedAt,
 		&VideoInfo.RefreshState,
 	)
 	if err != nil {
@@ -474,6 +497,8 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		}
 		return nil, err
 	}
+	VideoInfo.AddedAt = parseDBTime(rawAddedAt)
+	VideoInfo.UpdatedAt = parseDBTime(rawUpdatedAt)
 	
 	return VideoInfo, nil
 }
@@ -567,8 +592,7 @@ func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, 
 func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, error) {
 	Args := []interface{}{}
 	
-	Statement := `
-	SELECT Id, Title, Description, Availability, UploaderName, Status FROM Videos`
+	Statement := `SELECT Id, Title, Description, Availability, UploaderName, Status FROM Videos`
 	
 	QLimit := Limit
 	QOffset := Offset
@@ -848,6 +872,7 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 	StartTime, EndTime, UpdatedAt FROM CommandTasks WHERE Id = ?
 	`, TaskId)
 	
+	var rawStartTime, rawEndTime, rawUpdatedAt any
 	err := TaskRow.Scan(
 		&CommandTask.Id,
 		&CommandTask.Title,
@@ -860,9 +885,9 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 		&CommandTask.RunArgs,
 		&CommandTask.Output,
 		
-		&CommandTask.StartTime,
-		&CommandTask.EndTime,
-		&CommandTask.UpdatedAt,
+		&rawStartTime,
+		&rawEndTime,
+		&rawUpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -870,6 +895,10 @@ func DB_GetCommandTask(TaskId string) (*CommandTask, error) {
 		}
 		return nil, err
 	}
+	CommandTask.StartTime = parseDBTime(rawStartTime)
+	CommandTask.EndTime = parseDBTime(rawEndTime)
+	CommandTask.UpdatedAt = parseDBTime(rawUpdatedAt)
+	
 	DB_PopulateCommandTaskInfo(CommandTask)
 	
 	return CommandTask, nil
@@ -1000,6 +1029,8 @@ func DB_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]
 		CommandTask := &CommandTask{
 			Lock: &sync.RWMutex{},
 		}
+		
+		var rawStartTime, rawEndTime, rawUpdatedAt any
 		err := Rows.Scan(
 			&CommandTask.Id,
 			&CommandTask.Title,
@@ -1010,13 +1041,16 @@ func DB_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]
 			
 			&CommandTask.RunArgs,
 			
-			&CommandTask.StartTime,
-			&CommandTask.EndTime,
-			&CommandTask.UpdatedAt,
+			&rawStartTime,
+			&rawEndTime,
+			&rawUpdatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+		CommandTask.StartTime = parseDBTime(rawStartTime)
+		CommandTask.EndTime = parseDBTime(rawEndTime)
+		CommandTask.UpdatedAt = parseDBTime(rawUpdatedAt)
 		
 		DB_PopulateCommandTaskInfo(CommandTask)
 		
@@ -1059,6 +1093,8 @@ func DB_GetImageInfo(ImageId string) (*DB_Image, error) {
 	VideoRow := GDB.QueryRow(`
 	SELECT Id, Sha256Hash, Filename, Type, OriginUrl, AddedAt, UpdatedAt FROM Images WHERE Id = ?
 	`, ImageId)
+	
+	var rawAddedAt, rawUpdatedAt any
 	err := VideoRow.Scan(
 		&ImageInfo.Id,
 		&ImageInfo.Sha256Hash,
@@ -1067,8 +1103,8 @@ func DB_GetImageInfo(ImageId string) (*DB_Image, error) {
 		&ImageInfo.Type,
 		&ImageInfo.OriginUrl,
 		
-		&ImageInfo.AddedAt,
-		&ImageInfo.UpdatedAt,
+		&rawAddedAt,
+		&rawUpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -1076,6 +1112,8 @@ func DB_GetImageInfo(ImageId string) (*DB_Image, error) {
 		}
 		return nil, err
 	}
+	ImageInfo.AddedAt = parseDBTime(rawAddedAt)
+	ImageInfo.UpdatedAt = parseDBTime(rawUpdatedAt)
 	
 	return ImageInfo, nil
 }
