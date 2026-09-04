@@ -90,10 +90,33 @@ function getThumbnail(videoInfo) {
   if (videoInfo.origin_thumbnail_url) {
     return videoInfo.origin_thumbnail_url
   }
-  
+
   // This video contains no thumbnail url?
   // Default to youtube's thumbnail url and hope it's correct...
   return `https://img.youtube.com/vi/${videoInfo.id}/mqdefault.jpg`
+}
+
+const VIDEO_THUMB_FALLBACK = '/static/images/NoThumbnail_bw.jpg';
+
+// One-shot fallback that survives soft updates (see renderUpdateVideo).
+// Records the failure on dataset so the 10s soft poll doesn't clobber
+// the fallback with the same broken URL again (onerror was nulled before,
+// so the second failure rendered as a blank broken-image icon).
+function handleVideoThumbError(img) {
+  if (!img) return;
+  if (img.getAttribute('src') === VIDEO_THUMB_FALLBACK || img.dataset.thumbFailed === '1') return;
+  img.dataset.thumbFailed = '1';
+  img.setAttribute('src', VIDEO_THUMB_FALLBACK);
+}
+
+function setVideoThumbImg(img, thumbnailUrl) {
+  if (!img) return;
+  // URL unchanged: keep current src as-is so a fallback isn't reset to
+  // the same broken URL (which would blank out since onerror already fired).
+  if (img.dataset.thumb === thumbnailUrl) return;
+  img.dataset.thumb = thumbnailUrl;
+  delete img.dataset.thumbFailed;
+  img.setAttribute('src', thumbnailUrl);
 }
 
 async function copySharedVideoFile(videoId) {
@@ -166,7 +189,7 @@ async function openVideoDetailsModal(videoId) {
   
   document.getElementById('videoDetailsContent').innerHTML = `
     <div class="vd-preview" id="modal-video-preview">
-      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg';"
+      <img src="${escHtml(thumbnailUrl)}" alt="" onclick="${videoPreviewOnClick}" onerror="handleVideoThumbError(this)"
         ${videoIsPlayable ? ` style="cursor: pointer;" title="Click to play video"` : ''}>
         ${videoIsPlayable ? `<span>&#9654;</span>` : ''}
       </img>
@@ -730,7 +753,7 @@ function videoCardHTML(v) {
   return `
     <div class="card video-card${isSelected ? ' is-selected' : ''}" id="video-${v.id}">
       <div class="video-thumb">
-        <img class="video-thumb-img" src="${thumbnailUrl}" alt="" onerror="this.onerror=null; this.src='/static/images/NoThumbnail_bw.jpg'">
+        <img class="video-thumb-img" src="${thumbnailUrl}" data-thumb="${escHtml(thumbnailUrl)}" alt="" onerror="handleVideoThumbError(this)">
         <input type="checkbox" class="video-select-checkbox" data-video-id="${v.id}" title="Select video" onclick="event.stopPropagation()" onchange="toggleVideoSelection('${v.id}', this.checked)" ${isSelected ? 'checked' : ''}>
         ${v.refresh_state ? `<span class="video-refresh-spinner" title="Metadata is being refreshed..." aria-label="Metadata is being refreshed..."></span>` : ''}
         <span class="video-duration" title="Video duration">${durationText}</span>
@@ -784,8 +807,7 @@ function renderUpdateVideo(v) {
   
   const thumbImg = qs('.video-thumb-img');
   if (thumbImg) {
-    const thumbnailUrl = getThumbnail(v);
-    if (thumbImg.getAttribute('src') !== thumbnailUrl) thumbImg.setAttribute('src', thumbnailUrl);
+    setVideoThumbImg(thumbImg, getThumbnail(v));
   }
   const isRefreshing = !!v.refresh_state;
   const spinner = qs('.video-refresh-spinner');
