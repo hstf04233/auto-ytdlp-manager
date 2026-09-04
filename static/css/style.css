@@ -1521,5 +1521,127 @@ form hr {
   }
   .main-content {
     padding: 16px;
+    /* On mobile the sidebar is a collapsed icon bar (or an overlay drawer
+       when expanded), so content always assumes the collapsed width. */
+    margin-left: var(--sidebar-collapsed-width);
+  }
+  body.sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+  }
+
+  /* Expanded sidebar floats over content instead of squishing it. */
+  .sidebar {
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Belt & braces: never allow page-level horizontal scrolling. */
+  html, body {
+    overflow-x: hidden;
+    overflow-x: clip;
+  }
+
+  .card {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* ---------- Channels: stack info over wrapped action buttons ---------- */
+  .channel-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .channel-info {
+    min-width: 0;
+  }
+  .video-actions {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  /* ---------- Videos: 2-col stats, vertical video cards ---------- */
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .stat-card {
+    padding: 12px 10px;
+  }
+  .stat-card .stat-value {
+    font-size: 1.5rem;
+  }
+  .video-card {
+    flex-direction: column;
+  }
+  .video-thumb {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    aspect-ratio: 16 / 9;
+  }
+  .video-thumb img {
+    object-fit: cover;
+  }
+  .video-title {
+    flex-wrap: wrap;
+  }
+
+  /* ---------- Tasks: stack list over output, no side-by-side squeeze ---------- */
+  .task-layout {
+    flex-direction: column;
+  }
+  .task-list-container {
+    flex: none;
+    width: 100%;
+    max-height: 45vh;
+  }
+  .task-output-container {
+    position: static;
+    min-width: 0;
+    width: 100%;
+    max-height: 60vh;
+    min-height: 250px;
+  }
+  .terminal-body {
+    font-size: 0.85rem;
+    overflow-x: auto;
+  }
+
+  /* ---------- Config / forms: stack label over input ---------- */
+  .form-group {
+    flex-direction: column;
+    align-items: stretch;
+    white-space: normal;
+    gap: 6px;
+  }
+  .form-group label {
+    margin-right: 0;
+  }
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  .config-actions {
+    flex-wrap: wrap;
+  }
+  .filter-bar select,
+  .filter-bar input {
+    max-width: 100%;
+  }
+
+  /* ---------- Modals ---------- */
+  .modal {
+    padding: 20px;
+  }
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+
+  .toast {
+    max-width: calc(100vw - 40px);
   }
 }

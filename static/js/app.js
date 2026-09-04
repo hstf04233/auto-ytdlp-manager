@@ -204,7 +204,11 @@ function showPage(page, dontSaveHistory) {
 }
 
 // ========== Sidebar Toggle ==========
-function setSidebarCollapsed(collapsed) {
+function isMobileViewport() {
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
+function setSidebarCollapsed(collapsed, save = true) {
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('sidebarToggle');
   if (!sidebar) return;
@@ -216,6 +220,9 @@ function setSidebarCollapsed(collapsed) {
     toggleBtn.setAttribute('aria-expanded', String(!collapsed));
   }
 
+  // Transient (auto-applied) states are not persisted, so e.g. an automatic
+  // mobile collapse never leaks into the desktop preference.
+  if (!save) return;
   try {
     localStorage.setItem('sidebarCollapsed', String(collapsed));
   } catch (e) { /* storage unavailable (private mode, etc.) */ }
@@ -228,12 +235,13 @@ function toggleSidebar() {
 }
 
 (function() {
-  let collapsed = false;
+  let stored = null;
   try {
-    collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    stored = localStorage.getItem('sidebarCollapsed');
   } catch (e) { /* storage unavailable */ }
-  if (collapsed) {
-    setSidebarCollapsed(true);
+  // Auto-collapse on mobile unless the user already picked a state.
+  if (stored === 'true' || (stored === null && isMobileViewport())) {
+    setSidebarCollapsed(true, stored !== null);
   } else {
     const toggleBtn = document.getElementById('sidebarToggle');
     if (toggleBtn) {
@@ -248,6 +256,10 @@ document.querySelectorAll('.sidebar nav a').forEach(link => {
     e.preventDefault();
     const page = link.dataset.page;
     showPage(page)
+    // On mobile the expanded sidebar overlays content: get out of the way.
+    if (isMobileViewport()) {
+      setSidebarCollapsed(true, false);
+    }
   });
 });
 
@@ -1979,9 +1991,17 @@ function selectTask(id) {
   
   // Start polling for real-time output
   startRealtimePolling();
-  
+
   // Also load the full output from the task list
   loadFullTaskOutput(id);
+
+  // On mobile the output panel sits below the list: bring it into view.
+  if (isMobileViewport()) {
+    const panel = document.getElementById('taskOutputPanel');
+    if (panel) {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
 }
 
 async function loadFullTaskOutput(taskId) {
@@ -2161,7 +2181,7 @@ async function loadUser() {
     const userAccountEl = document.getElementById("side-bar-user-account")
     if (userAccountEl) {
       userAccountEl.textContent = loggedInUser.username
-      userAccountEl.title = loggedInUser.username
+      userAccountEl.title = `Logged in as: ${loggedInUser.username}`
     }
   } catch (err) {
     showToast(`Failed to get logged in user... error: ${err.message}`, "error")
