@@ -1461,13 +1461,22 @@ func ServeVideoStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	FilePath := filepath.Join(StreamedDirectory, filepath.Clean(RequestFile))
-	
-	if !DoesFileExist(FilePath) {
-		http.Error(w, fmt.Sprintf("Could not find file '%s'...", VideoInfo.DownloadedFilename), http.StatusNotFound)
+	Root, err := os.OpenRoot(StreamedDirectory)
+	if err != nil {
+		http.Error(w, "Error when opening root directory...", http.StatusInternalServerError)
 		return
 	}
-	Filename := filepath.Base(FilePath)
+	defer Root.Close()
+	
+	File, err := Root.Open(RequestFile)  // Check if file exists in directory. (Prevents path traversal!!!)
+	if err != nil {
+		http.Error(w, "Could not find requested file...", http.StatusNotFound)
+		return
+	}
+	defer File.Close()
+	
+	FilePath := filepath.Join(StreamedDirectory, filepath.Clean(RequestFile))
+	Filename := RequestFile
 	
 	var WriteContent *[]byte = nil
 	
