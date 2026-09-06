@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/sha3"
+	"crypto/sha3"
 )
 
 //go:embed static/*
