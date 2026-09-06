@@ -731,8 +731,8 @@ func API_BulkUpdateVideos(w http.ResponseWriter, r *http.Request) {
 	for _, VidRequest := range(Body) {
 		VideoId := VidRequest.VideoId
 		if VideoId == "" || len(VideoId) > API_MAX_REQUEST_ID { continue }
-		if _, ok := AlreadyUpdated[VideoId]; ok { continue }  // Don't update the same video over and over again...
 		
+		if _, ok := AlreadyUpdated[VideoId]; ok { continue }  // Don't update the same video over and over again...
 		AlreadyUpdated[VideoId] = true
 		
 		err := API_UpdateVideo_imp(VideoId, VidRequest.Content)
@@ -745,8 +745,8 @@ func API_BulkUpdateVideos(w http.ResponseWriter, r *http.Request) {
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(struct{
-		Total int 
-		Successes int
+		Total     int `json:"total"`
+		Successes int `json:"successes"`
 	}{Total: Total, Successes: Successes})
 }
 
@@ -777,6 +777,57 @@ func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
 	
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte("{\"Success\":true}"))
+}
+
+func API_BulkDeleteVideos(w http.ResponseWriter, r *http.Request) {
+	var Body []string  // Array of video ids to delete.
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err := dec.Decode(&Body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	Total := len(Body)
+	Successes := 0
+	
+	DeletedVideoIds := []string{}
+	AlreadyDeleted := make(map[string]bool)
+	for _, VideoId := range(Body) {
+		if VideoId == "" || len(VideoId) > API_MAX_REQUEST_ID { continue }
+		
+		if _, ok := AlreadyDeleted[VideoId]; ok { continue }  // Don't delete the same video over and over again...
+		AlreadyDeleted[VideoId] = true
+		
+		VideoInfo, err := DB_GetVideo(VideoId)
+		if err != nil {
+			L_Printf("[Bulk Delete] Error when checking if video exists: %v !", err)
+			continue
+		}
+		if VideoInfo == nil {
+			L_Printf("[Bulk Delete] Video: \"%s\" not found.", VideoId)
+			continue
+		}
+		err = DB_DeleteVideo(VideoInfo)
+		if err != nil {
+			L_Printf("[Bulk Delete] Error when deleting video: %v !", err)
+			continue
+		}
+		Successes += 1
+		DeletedVideoIds = append(DeletedVideoIds, VideoId)
+		
+		CL_CancelTasksForVideo(VideoInfo.Id, TASK_TYPE_DOWNLOAD)
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct{
+		Total     int `json:"total"`
+		Successes int `json:"successes"`
+		DeletedVideos []string `json:"deleted_video_ids"`
+	}{
+		Total: Total,
+		Successes: Successes,
+		DeletedVideos: DeletedVideoIds,
+	})
 }
 
 func API_ShareVideoFile(w http.ResponseWriter, r *http.Request) {
@@ -1287,6 +1338,12 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		}
 		// DELETE api/videos/{video_id} will delete a video
 		API_DeleteVideo(w, r)
+	} else if (strings.HasPrefix(Path, "bulk-delete-videos")) && Method == "DELETE" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
+		API_BulkDeleteVideos(w, r)
 	} else if (strings.HasPrefix(Path, "add-videos")) && Method == "POST" {
 		if !IsAdminAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)

@@ -54,10 +54,13 @@ const API = {
     }
     return res.json();
   },
-  async del(url) {
-    const res = await fetch(url, {
-      method: 'DELETE',
-    });
+  async del(url, body) {
+    const opts = { method: 'DELETE' };
+    if (body !== undefined) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(url, opts);
     if (!res.ok) {
       const text = await res.text();
       console.log(`API DELETE ${truncateString(url, 128)}: ${res.status} - ${text}`);
