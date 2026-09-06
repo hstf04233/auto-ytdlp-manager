@@ -781,6 +781,57 @@ func DB_AddVideoHistoryPoint(HistoryPoint *VideoInfoHistory) error {
 	return nil
 }
 
+func DB_GetVideoHistoryPoints(VideoId string) ([]VideoInfoHistory, error) {
+	Rows, err := GDB.Query(`SELECT
+	HId, Revision,
+	Id,
+	
+	Title, Description, Availability, URL,
+	Thumbnail, StoredThumbnail, Duration,
+	
+	UploaderUrl, UploaderName,
+	VideoType,
+	
+	AddedAt, UpdatedAt FROM VideoHistory WHERE Id=? ORDER BY RevisionNumber ASC`, VideoId)
+	if err != nil {
+		return nil, err
+	}
+	defer Rows.Close()
+	
+	HistoryPoints := []VideoInfoHistory{}
+	for Rows.Next() {
+		HistoryPoint := VideoInfoHistory{}
+		
+		var rawAddedAt, rawUpdatedAt any
+		err := Rows.Scan(
+			&HistoryPoint.HId, &HistoryPoint.RevisionNumber,
+			&HistoryPoint.Id,
+			&HistoryPoint.Title,
+			&HistoryPoint.Description,
+			&HistoryPoint.Availability,
+			&HistoryPoint.Url,
+			
+			&HistoryPoint.OriginThumbnail,
+			&HistoryPoint.Thumbnail,
+			&HistoryPoint.Duration,
+			&HistoryPoint.UploaderUrl, &HistoryPoint.UploaderName,
+			&HistoryPoint.VideoType,
+			
+			&rawAddedAt,
+			&rawUpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		HistoryPoint.AddedAt = parseDBTime(rawAddedAt)
+		HistoryPoint.UpdatedAt = parseDBTime(rawUpdatedAt)
+		
+		HistoryPoints = append(HistoryPoints, HistoryPoint)
+	}
+	
+	return HistoryPoints, nil
+}
+
 
 func DB_UpdateCommandTaskInfo(Task *CommandTask) error {
 	Task.Lock.Lock()

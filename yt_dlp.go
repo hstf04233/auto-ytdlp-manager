@@ -59,13 +59,13 @@ type VideoInfo struct {
 }
 
 type VideoInfoHistory struct {
-	HId int    // Id in database.
+	HId            int `json:"-"`    // Id in database.
 	RevisionNumber int `json:"revision_number"`
 	
 	Title        *string `json:"title"`
 	Description  *string `json:"description,omitempty"`
-	Url          string `json:"url"`
-	Id           string `json:"id"`
+	Url          string  `json:"url"`
+	Id           string  `json:"id"`
 	Availability *string `json:"availability"`
 	
 	OriginThumbnail *string `json:"origin_thumbnail_url"`
