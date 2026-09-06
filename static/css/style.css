@@ -892,6 +892,11 @@ body.no-transition .sidebar-bottom .btn {
 
 .modal-overlay.active {
   display: flex;
+  /* Mobile fix: body { overflow: hidden } stops the mouse wheel but NOT touch
+     swipes (the gesture chains through the overlay to the body behind it).
+     touch-action:none eats backdrop swipes so the background can't scroll,
+     while .modal below re-allows panning for its own content. */
+  touch-action: none;
 }
 
 .modal {
@@ -904,6 +909,10 @@ body.no-transition .sidebar-bottom .btn {
   max-width: 850px;
   max-height: 90vh;
   overflow-y: auto;
+  /* Pan inside the modal (incl. horizontal scrollers like task output),
+     but don't let the gesture chain out to the body behind the overlay. */
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
 }
 
 .modal h2 {
