@@ -477,12 +477,17 @@ async function openVideoHistoryModal(videoId) {
 }
 
 function closeVideoHistoryModal() {
-  document.getElementById('videoHistoryModal').classList.remove('active');
   // The history modal opens on top of the details modal: only release the
   // body scroll-lock when nothing else is still open.
   if (!document.getElementById('videoDetailsModal').classList.contains('active')) {
     document.body.classList.remove('modal-active');
   }
+  
+  if (document.getElementById('videoHistoryModal').classList.contains('active')) {
+    document.getElementById('videoHistoryModal').classList.remove('active');
+    return true;
+  }
+  return false;
 }
 
 // ========== Videos ==========

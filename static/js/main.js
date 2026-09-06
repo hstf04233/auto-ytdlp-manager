@@ -47,7 +47,10 @@ window.addEventListener('popstate', function (e) {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    closeVideoHistoryModal();
+    if (closeVideoHistoryModal()) {
+      // We just closed the video history modal. This modal is special because it can render ontop of the video details modal!
+      return
+    }
     closeVideoDetailsModal();
     closeChannelModal();
     closeAddVideosModal();
