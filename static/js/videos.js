@@ -522,8 +522,9 @@ function toggleVideoMenu(videoId, buttonEl) {
 }
 
 // ========== Videos bulk selection ==========
-// Persists across page/filter changes (ids only); bulk actions run the
-// existing single-video API requests sequentially (no bulk endpoint yet).
+// Persists across page/filter changes (ids only). Refresh + status use
+// PATCH /api/bulk-update-videos in one request; delete + download have no
+// bulk endpoint yet so they still run single-video requests sequentially.
 let selectedVideoIds = new Set();
 let bulkActionRunning = false;
 
@@ -651,17 +652,17 @@ async function bulkRefreshSelected() {
   if (ids.length === 0 || bulkActionRunning) return;
   bulkActionRunning = true;
   updateBulkBar();
-  let ok = 0, failed = 0;
-  for (const id of ids) {
-    try {
-      await API.patch(`/api/videos/${encodeURIComponent(id)}`, { refresh_state: true });
-      ok++;
-    } catch (err) {
-      failed++;
-    }
+  try {
+    // Note: the Go response struct has no json tags, so the keys are
+    // capitalized ("Total"/"Successes").
+    const res = await API.patch('/api/bulk-update-videos',
+      ids.map(id => ({ video_id: id, content: { refresh_state: true } })));
+    const ok = res.Successes || 0, total = res.Total || ids.length;
+    showToast(total - ok ? `Bulk refresh: ${ok} of ${total} updated` : `Bulk refresh started for ${ok} video(s)`, total - ok ? 'error' : 'success');
+  } catch (err) {
+    showToast(`Bulk refresh failed: ${err.message}`, 'error');
   }
   bulkActionRunning = false;
-  showToast(failed ? `Bulk refresh: ${ok} ok, ${failed} failed` : `Bulk refresh started for ${ok} video(s)`, failed ? 'error' : 'success');
   loadVideos();
 }
 
@@ -692,17 +693,17 @@ async function bulkSetStatusSelected(status) {
   if (ids.length === 0 || bulkActionRunning) return;
   bulkActionRunning = true;
   updateBulkBar();
-  let ok = 0, failed = 0;
-  for (const id of ids) {
-    try {
-      await API.patch(`/api/videos/${encodeURIComponent(id)}`, { status: parseInt(status) });
-      ok++;
-    } catch (err) {
-      failed++;
-    }
+  try {
+    // Note: the Go response struct has no json tags, so the keys are
+    // capitalized ("Total"/"Successes").
+    const res = await API.patch('/api/bulk-update-videos',
+      ids.map(id => ({ video_id: id, content: { status: parseInt(status) } })));
+    const ok = res.Successes || 0, total = res.Total || ids.length;
+    showToast(total - ok ? `Bulk status: ${ok} of ${total} updated` : `Status changed for ${ok} video(s)`, total - ok ? 'error' : 'success');
+  } catch (err) {
+    showToast(`Bulk status change failed: ${err.message}`, 'error');
   }
   bulkActionRunning = false;
-  showToast(failed ? `Bulk status: ${ok} ok, ${failed} failed` : `Status changed for ${ok} video(s)`, failed ? 'error' : 'success');
   loadVideos();
 }
 

@@ -633,6 +633,46 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type API_VideoUpdateBody struct {
+	Status *int `json:"status"`
+	RefreshState *bool `json:"refresh_state"`
+}
+
+func API_UpdateVideo_imp(VideoId string, UpdateSettings API_VideoUpdateBody) error {
+	VideoInfo, err := DB_GetVideo(VideoId)
+	if err != nil {
+		return fmt.Errorf("Error when getting video: %v !", err)
+	}
+	if VideoInfo == nil {
+		return fmt.Errorf("Video not found.")
+	}
+	
+	if UpdateSettings.Status != nil && *UpdateSettings.Status >= 0 && *UpdateSettings.Status <= 10 {
+		DB_UpdateVideoStatus(VideoInfo, *UpdateSettings.Status)
+		if VideoInfo.Status == VIDEO_STATUS_IGNORED {
+			DB_UpdateVideoQueuedAction(VideoInfo, VIDEO_QACTION_NONE)
+		}
+		if VideoInfo.Status == VIDEO_STATUS_IGNORED || VideoInfo.Status == VIDEO_STATUS_QUEUED {
+			// Cancel all download tasks for this video
+			CL_CancelTasksForVideo(VideoInfo.Id, TASK_TYPE_DOWNLOAD)
+		}
+	}
+	
+	if UpdateSettings.RefreshState != nil {
+		if *UpdateSettings.RefreshState {
+			DB_UpdateVideoRefreshState(VideoInfo, 1)
+		} else {
+			DB_UpdateVideoRefreshState(VideoInfo, 0)
+		}
+		
+		AChannel := GetArchiveChannelFromId(G_ArchiveChannels, VideoInfo.FromChannel)
+		if AChannel != nil {
+			AChannel.NeedsRefreshing = true
+		}
+	}
+	
+	return nil
+}
 
 func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 	//RequestId := path.Base(r.URL.Path)
@@ -656,42 +696,58 @@ func API_UpdateVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	var Body struct{
-		Status *int `json:"status"`
-		RefreshState *bool `json:"refresh_state"`
-	}
+	var Body API_VideoUpdateBody
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err := dec.Decode(&Body); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	
-	if Body.Status != nil && *Body.Status >= 0 && *Body.Status <= 10 {
-		DB_UpdateVideoStatus(VideoInfo, *Body.Status)
-		if VideoInfo.Status == VIDEO_STATUS_IGNORED {
-			DB_UpdateVideoQueuedAction(VideoInfo, VIDEO_QACTION_NONE)
-		}
-		if VideoInfo.Status == VIDEO_STATUS_IGNORED || VideoInfo.Status == VIDEO_STATUS_QUEUED {
-			// Cancel all download tasks for this video
-			CL_CancelTasksForVideo(VideoInfo.Id, TASK_TYPE_DOWNLOAD)
-		}
-	}
-	
-	if Body.RefreshState != nil {
-		if *Body.RefreshState {
-			DB_UpdateVideoRefreshState(VideoInfo, 1)
-		} else {
-			DB_UpdateVideoRefreshState(VideoInfo, 0)
-		}
-		
-		AChannel := GetArchiveChannelFromId(G_ArchiveChannels, VideoInfo.FromChannel)
-		if AChannel != nil {
-			AChannel.NeedsRefreshing = true
-		}
+	err = API_UpdateVideo_imp(RequestId, Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(VideoInfo)
+}
+
+func API_BulkUpdateVideos(w http.ResponseWriter, r *http.Request) {
+	var Body []struct{
+		VideoId string `json:"video_id"`
+		Content API_VideoUpdateBody `json:"content"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<22))
+	if err := dec.Decode(&Body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	Total := len(Body)
+	Successes := 0
+	
+	AlreadyUpdated := make(map[string]bool)
+	for _, VidRequest := range(Body) {
+		VideoId := VidRequest.VideoId
+		if VideoId == "" || len(VideoId) > API_MAX_REQUEST_ID { continue }
+		if _, ok := AlreadyUpdated[VideoId]; ok { continue }  // Don't update the same video over and over again...
+		
+		AlreadyUpdated[VideoId] = true
+		
+		err := API_UpdateVideo_imp(VideoId, VidRequest.Content)
+		if err != nil {
+			L_Printf("Bulk update for video: \"%s\" Failed because: %v\n", VideoId, err)
+		} else {
+			Successes += 1
+		}
+	}
+	
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct{
+		Total int 
+		Successes int
+	}{Total: Total, Successes: Successes})
 }
 
 func API_DeleteVideo(w http.ResponseWriter, r *http.Request) {
@@ -1218,6 +1274,12 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		}
 		// You can set status, refresh_state
 		API_UpdateVideo(w, r)
+	} else if (strings.HasPrefix(Path, "bulk-update-videos")) && Method == "PATCH" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
+		API_BulkUpdateVideos(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "DELETE" {
 		if !IsAdminAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
