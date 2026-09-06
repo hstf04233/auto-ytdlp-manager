@@ -830,6 +830,25 @@ func API_BulkDeleteVideos(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func API_GetVideoHistory(w http.ResponseWriter, r *http.Request) {
+	RequestId := strings.TrimPrefix(r.URL.Path, "videos/")
+	if len(RequestId) > API_MAX_REQUEST_ID {
+		http.Error(w, "Invalid video id.", http.StatusBadRequest)
+		return
+	}
+	
+	VideoInfo, err := DB_GetVideo(RequestId)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when checking if video exists: %v !", err), http.StatusInternalServerError)
+		return
+	}
+	if VideoInfo == nil {
+		http.Error(w, "Video not found.", http.StatusNotFound)
+		return
+	}
+	// TODO:
+}
+
 func API_ShareVideoFile(w http.ResponseWriter, r *http.Request) {
 	// This is an authenticated request if called from ServeApi !
 	
@@ -1350,6 +1369,13 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		API_AddVideos(w, r)
+	} else if (strings.HasPrefix(Path, "video-history/")) && Method == "GET" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
+		// DELETE api/videos/{video_id} will delete a video
+		API_GetVideoHistory(w, r)
 	} else if (strings.HasPrefix(Path, "share-video-file/")) && Method == "GET" {
 		if !IsAdminAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)

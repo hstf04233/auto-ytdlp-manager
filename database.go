@@ -1186,7 +1186,7 @@ func OpenDB() error {
 		
 		"ALTER TABLE Images ADD COLUMN Sha256Hash TEXT NOT NULL DEFAULT ''",
 		
-		// v0.21
+		// v0.30
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

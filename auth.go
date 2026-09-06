@@ -804,7 +804,7 @@ func OpenAuthDB() error {
 		"ALTER TABLE Sessions ADD COLUMN IpAddress TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE Sessions ADD COLUMN UserAgent TEXT NOT NULL DEFAULT ''",
 		
-		// v0.21
+		// v0.30
 		"ALTER TABLE Sessions ADD COLUMN CreatedFromLocalIp BOOLEAN NOT NULL DEFAULT FALSE",
 	}
 	
