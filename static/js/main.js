@@ -25,6 +25,7 @@ function setupModalClickExit(modalId, callback) {
 }
 setupModalClickExit("channelModal", closeChannelModal)
 setupModalClickExit("videoDetailsModal", closeVideoDetailsModal)
+setupModalClickExit("videoHistoryModal", closeVideoHistoryModal)
 setupModalClickExit("addVideosModal", closeAddVideosModal)
 
 window.addEventListener('popstate', function (e) {
@@ -46,6 +47,7 @@ window.addEventListener('popstate', function (e) {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    closeVideoHistoryModal();
     closeVideoDetailsModal();
     closeChannelModal();
     closeAddVideosModal();

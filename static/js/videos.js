@@ -236,6 +236,7 @@ async function openVideoDetailsModal(videoId) {
     ''
     }
     <button type="button" class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${videoInfo.id}');closeVideoDetailsModal();" title="${refreshTitle}">${videoInfo.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="openVideoHistoryModal('${videoInfo.id}')" title="View change history for this video">History</button>
     <button type="button" class="btn btn-danger btn-sm" onclick="deleteVideo('${videoInfo.id}');closeVideoDetailsModal();">Delete</button>
   `;
 }
@@ -304,6 +305,183 @@ function closeVideoDetailsModal(skipHistory) {
     const returnUrl = videoModalReturnUrl || '/videos';
     window.history.replaceState(null, '', returnUrl);
     showPage(returnUrl.replace(/^\//, ''), true);
+  }
+}
+
+// ========== Video history ==========
+// A history point stores the OLD values (the state before the change), and
+// only for fields that changed at that step:
+//   Title/Description/Availability/OriginThumbnail/StoredThumbnail: a string
+//     means "changed, this was the old value"; null/missing = unchanged.
+//   Duration/VideoType: -1 = unchanged, otherwise the old value.
+//   AddedAt = when this old state became current; UpdatedAt = when the
+//     change was detected (i.e. this state's validity window).
+// Url is always recorded but never diffed, and uploader/release_date are
+// never recorded at all, so those always resolve to the current video.
+//
+// Filling a blank field is therefore ALWAYS a forward search: if point i
+// leaves a field unset, the field didn't change at step i, so its value at
+// point i equals the value right after step i -- the next set value at some
+// point j > i, or the current video's value when no later point sets it.
+// (Searching backwards would be WRONG: e.g. title A ->(pt0) B ->(pt1,
+// availability-only change) B ->(pt2) C stores titles [A, <blank>, B]; a
+// backwards lookup for point 1 finds "A", but the title during state 1 was
+// "B". The forward search finds it correctly.)
+function histGet(point, kind) {
+  switch (kind) {
+    case 'title':
+      return (typeof point.title === 'string') ? point.title : undefined;
+    case 'description':
+      return (point.description !== undefined && point.description !== null) ? point.description : undefined;
+    case 'availability':
+      return (typeof point.availability === 'string') ? point.availability : undefined;
+    case 'duration':
+      return (typeof point.duration === 'number' && point.duration >= 0) ? point.duration : undefined;
+    case 'video_type':
+      return (typeof point.video_type === 'number' && point.video_type >= 0) ? point.video_type : undefined;
+    case 'thumbnail':
+      return (typeof point.origin_thumbnail_url === 'string' || typeof point.stored_thumbnail === 'string')
+        ? { origin: point.origin_thumbnail_url || '', stored: point.stored_thumbnail || '' }
+        : undefined;
+    default:
+      return undefined;
+  }
+}
+
+// Value of a field at point `index` (the state before change `index`).
+function histResolve(points, index, kind, currentFallback) {
+  for (let j = index; j < points.length; j++) {
+    const val = histGet(points[j], kind);
+    if (val !== undefined) return val;
+  }
+  return currentFallback;
+}
+
+function histCurrentValue(current, kind) {
+  if (!current) return undefined;
+  switch (kind) {
+    case 'title': return current.title;
+    case 'description': return current.description;
+    case 'availability': return current.availability;
+    case 'duration': return current.duration;
+    case 'video_type': return current.video_type;
+    case 'thumbnail': return { origin: current.origin_thumbnail_url || '', stored: current.stored_thumbnail || '' };
+    default: return undefined;
+  }
+}
+
+function histText(s, maxLen) {
+  if (s === null || s === undefined || s === '') return '<span class="vh-empty">\u2014</span>';
+  s = String(s);
+  const short = s.length > maxLen ? s.slice(0, maxLen) + '\u2026' : s;
+  return `<span title="${escHtml(s)}">${escHtml(short)}</span>`;
+}
+
+// Thumbnail URL priority mirrors getThumbnail: stored image first, then the
+// origin URL, then YouTube's default for the video id.
+function histThumbUrl(thumb, videoId) {
+  if (thumb && thumb.stored) return `/db-image/${thumb.stored}`;
+  if (thumb && thumb.origin) return thumb.origin;
+  if (videoId) return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+  return VIDEO_THUMB_FALLBACK;
+}
+
+function histDisplayValue(kind, val, videoId) {
+  if (val === undefined || val === null) return '<span class="vh-empty">\u2014</span>';
+  switch (kind) {
+    case 'duration':
+      return escHtml(formatDuration(val));
+    case 'video_type':
+      return videoTypeBadge(val);
+    case 'description':
+      return `<span class="vh-desc">${histText(val, 300)}</span>`;
+    case 'thumbnail': {
+      const url = histThumbUrl(val, videoId);
+      return `<img class="vh-thumb-img" src="${escHtml(url)}" alt="Thumbnail" title="${escHtml(url)}" loading="lazy" onerror="this.onerror=null;this.src='${VIDEO_THUMB_FALLBACK}'">`;
+    }
+    default:
+      return histText(val, 160);
+  }
+}
+
+const HIST_FIELDS = [
+  { kind: 'title', label: 'Title' },
+  { kind: 'description', label: 'Description' },
+  { kind: 'availability', label: 'Availability' },
+  { kind: 'duration', label: 'Duration' },
+  { kind: 'video_type', label: 'Video Type' },
+  { kind: 'thumbnail', label: 'Thumbnail' },
+];
+
+function videoHistoryHTML(points, current) {
+  if (!points || points.length === 0) {
+    return '<div class="loading">No history recorded for this video yet.</div>';
+  }
+
+  let html = '<div class="vh-timeline">';
+
+  // Live values first.
+  html += '<div class="vh-entry vh-current"><div class="vh-head"><span class="vh-rev">Current state</span><span class="vh-time">live</span></div>';
+  const currentId = current ? current.id : undefined;
+  for (const f of HIST_FIELDS) {
+    html += `<div class="vh-change vh-single"><span class="vh-label">${f.label}</span><span class="vh-new">${histDisplayValue(f.kind, histCurrentValue(current, f.kind), currentId)}</span></div>`;
+  }
+  html += '</div>';
+
+  // Changes, newest first. Point i holds the OLD values; the NEW value of a
+  // changed field is whatever comes right after step i.
+  for (let i = points.length - 1; i >= 0; i--) {
+    const p = points[i];
+    const changed = HIST_FIELDS.filter(f => histGet(p, f.kind) !== undefined);
+    html += `<div class="vh-entry"><div class="vh-head"><span class="vh-rev">Revision ${p.revision_number}</span><span class="vh-time" title="${escHtml(formatDateAndTime(p.updated_at))}">${escHtml(formatRelative(p.updated_at))}</span></div>`;
+    if (p.added_at && p.updated_at) {
+      html += `<div class="vh-valid">This state was valid from ${escHtml(formatDateAndTime(p.added_at))} until ${escHtml(formatDateAndTime(p.updated_at))}.</div>`;
+    }
+    if (changed.length === 0) {
+      html += '<div class="vh-valid">No field changes recorded.</div>';
+    }
+    for (const f of changed) {
+      const oldVal = histGet(p, f.kind);
+      const newVal = histResolve(points, i + 1, f.kind, histCurrentValue(current, f.kind));
+      const vid = p.id || currentId;
+      html += `<div class="vh-change"><span class="vh-label">${f.label}</span><span class="vh-old">${histDisplayValue(f.kind, oldVal, vid)}</span><span class="vh-arrow">&rarr;</span><span class="vh-new">${histDisplayValue(f.kind, newVal, vid)}</span></div>`;
+    }
+    html += '</div>';
+  }
+
+  return html + '</div>';
+}
+
+async function openVideoHistoryModal(videoId) {
+  const modal = document.getElementById('videoHistoryModal');
+  const content = document.getElementById('videoHistoryContent');
+  const titleEl = document.getElementById('videoHistoryTitle');
+  modal.classList.add('active');
+  document.body.classList.add('modal-active');
+  content.innerHTML = '<div class="loading">Loading history...</div>';
+  if (titleEl) titleEl.textContent = 'Video History';
+  try {
+    // Reuse the details modal's video when it's the same one to save a request.
+    let current = (typeof currentVideoDetails !== 'undefined' && currentVideoDetails && currentVideoDetails.id === videoId)
+      ? currentVideoDetails : null;
+    const histPromise = API.get(`/api/video-history/${encodeURIComponent(videoId)}`);
+    const videoPromise = current ? Promise.resolve(null) : API.get(`/api/videos/${encodeURIComponent(videoId)}`);
+    const [histRes, videoRes] = await Promise.all([histPromise, videoPromise]);
+    if (videoRes) current = videoRes;
+    const points = (histRes && histRes.points) || [];
+    if (titleEl) titleEl.textContent = `History: ${current && current.title ? current.title : videoId}`;
+    content.innerHTML = videoHistoryHTML(points, current);
+  } catch (err) {
+    content.innerHTML = `<div class="loading">Failed to load history: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function closeVideoHistoryModal() {
+  document.getElementById('videoHistoryModal').classList.remove('active');
+  // The history modal opens on top of the details modal: only release the
+  // body scroll-lock when nothing else is still open.
+  if (!document.getElementById('videoDetailsModal').classList.contains('active')) {
+    document.body.classList.remove('modal-active');
   }
 }
 
@@ -466,6 +644,7 @@ function toggleVideoMenu(videoId, buttonEl) {
   dropdown.innerHTML = `
     ${videofileExists ? videoFileInnerHTML(v) : ''}
     ${canDownload ? `<div class="video-menu-item" data-action="download" title="Download this video">Download this video</div>` : ''}
+    <div class="video-menu-item" data-action="history" title="View change history for this video">View history</div>
     <div class="video-menu-item ${refreshing ? 'is-disabled' : ''}" data-action="refresh" title="${refreshTitle}">${refreshLabel}</div>
     <div class="video-menu-item video-menu-item-danger" data-action="delete" title="Deleting a video does not remove the video file.">Delete</div>
   `;
@@ -483,6 +662,11 @@ function toggleVideoMenu(videoId, buttonEl) {
     if (action === 'download') {
       closeVideoMenu();
       if (typeof changeVideoStatus === 'function') changeVideoStatus(videoId, -100);
+      return;
+    }
+    if (action === 'history') {
+      closeVideoMenu();
+      openVideoHistoryModal(videoId);
       return;
     }
     if (action === 'refresh') {

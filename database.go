@@ -792,7 +792,7 @@ func DB_GetVideoHistoryPoints(VideoId string) ([]VideoInfoHistory, error) {
 	UploaderUrl, UploaderName,
 	VideoType,
 	
-	AddedAt, UpdatedAt FROM VideoHistory WHERE Id=? ORDER BY RevisionNumber ASC`, VideoId)
+	AddedAt, UpdatedAt FROM VideoHistory WHERE Id=? ORDER BY Revision ASC`, VideoId)
 	if err != nil {
 		return nil, err
 	}

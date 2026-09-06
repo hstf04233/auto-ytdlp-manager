@@ -1770,6 +1770,114 @@ form hr {
   border-radius: 3px;
 }
 
+/* ========== Video History Timeline ========== */
+.vh-timeline {
+  position: relative;
+  margin: 6px 0 0 8px;
+  padding-left: 18px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vh-entry {
+  position: relative;
+}
+
+.vh-entry::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bg-input);
+  border: 2px solid var(--accent);
+}
+
+.vh-entry.vh-current::before {
+  background: var(--accent);
+}
+
+.vh-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.vh-rev {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.vh-time,
+.vh-valid {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.vh-change {
+  display: grid;
+  grid-template-columns: 90px 1fr 20px 1fr;
+  gap: 6px;
+  align-items: start;
+  font-size: 0.82rem;
+  margin-top: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  word-break: break-word;
+}
+
+.vh-change.vh-single {
+  grid-template-columns: 90px 1fr;
+}
+
+.vh-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.vh-old {
+  color: var(--text-secondary);
+}
+
+.vh-new {
+  color: var(--text-primary);
+}
+
+.vh-arrow {
+  text-align: center;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.vh-empty {
+  color: var(--text-secondary);
+}
+
+.vh-thumb-img {
+  width: 120px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.vh-desc {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 @media (max-width: 800px) {
   .chat-layout {
     flex-direction: column;
@@ -1900,6 +2008,12 @@ form hr {
   /* ---------- Modals ---------- */
   .modal {
     padding: 20px;
+  }
+  .vh-change {
+    grid-template-columns: 1fr 20px 1fr;
+  }
+  .vh-change .vh-label {
+    grid-column: 1 / -1;
   }
   .modal-actions {
     flex-wrap: wrap;

@@ -586,6 +586,20 @@
       </div>
     </div>
   </div>
+
+  <!-- VIDEO HISTORY MODAL -->
+  <div class="modal-overlay" id="videoHistoryModal">
+    <div class="modal modal-video-details">
+      <div class="modal-header">
+        <h2 id="videoHistoryTitle">Video History</h2>
+        <button class="modal-close" onclick="closeVideoHistoryModal()">&times;</button>
+      </div>
+
+      <div class="video-details-body" id="videoHistoryContent">
+        <!-- filled dynamically -->
+      </div>
+    </div>
+  </div>
   
   <script src="/static/js/requires/hls.min.js"></script>
   <script src="/static/{{ .CoreJsPath }}"></script>
