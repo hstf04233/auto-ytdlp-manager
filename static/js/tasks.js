@@ -67,6 +67,7 @@ function gotoVideosPageAndFilterChannel(channelId) {
   ensureVideoChannelOption(channelId);
   videoPage = 0;
   document.getElementById('videoChannelFilter').value = channelId;
+  updateVideoChannelActions();
 
   showPage(`videos?channel=${encodeURIComponent(channelId)}`);
   loadVideos();

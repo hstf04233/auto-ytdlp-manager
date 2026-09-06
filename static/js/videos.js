@@ -1034,6 +1034,7 @@ function applyVideosUrlParamsToUI(urlParams) {
   const channelId = urlParams.get('channel') || VIDEO_FILTER_DEFAULTS.channel;
   ensureVideoChannelOption(channelId);
   document.getElementById('videoChannelFilter').value = channelId;
+  updateVideoChannelActions();
 
   const search = urlParams.get('search') || VIDEO_FILTER_DEFAULTS.search;
   document.getElementById('videoSearch').value = search;
@@ -1078,6 +1079,7 @@ function onVideoFilterChange() {
   videoPage = 0;
   syncVideosUrl();
   updateVideosTabTitle();
+  updateVideoChannelActions();
 
   loadVideos();
 }
@@ -1174,6 +1176,34 @@ function updateVideoStats() {
 }
 
 // ========== Channel filter dropdown ==========
+// Shows "Check videos now" / "Edit" next to the channel filter when a
+// channel is selected, so you don't have to hop to the channels tab.
+function updateVideoChannelActions() {
+  const channelId = document.getElementById('videoChannelFilter').value;
+  const hasChannel = !!channelId;
+  for (const id of ['videoChannelCheckBtn', 'videoChannelEditBtn']) {
+    const btn = document.getElementById(id);
+    if (btn) btn.hidden = !hasChannel;
+  }
+}
+
+function runSelectedVideoChannelCheck() {
+  const channelId = document.getElementById('videoChannelFilter').value;
+  if (!channelId) return;
+  runChannelCheck(channelId);
+  showToast('Channel check started', 'success');
+}
+
+function openSelectedVideoChannelEditor() {
+  const channelId = document.getElementById('videoChannelFilter').value;
+  if (!channelId) return;
+  if (!getChannelFromId(channelId)) {
+    showToast('Channel data not loaded yet, try again in a moment', 'error');
+    return;
+  }
+  openEditChannelModal(channelId);
+}
+
 function updateChannelFilters() {
   const videoSelect = document.getElementById('videoChannelFilter');
   
@@ -1198,6 +1228,7 @@ function updateChannelFilters() {
     if (ch.id === current) opt.selected = true;
     taskSelect.appendChild(opt);
   });
-  
+
+  updateVideoChannelActions();
 }
 

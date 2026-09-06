@@ -81,6 +81,8 @@
         <select id="videoChannelFilter" onchange="onVideoFilterChange()">
           <option value="">All Channels</option>
         </select>
+        <button class="btn btn-secondary btn-sm" id="videoChannelCheckBtn" onclick="runSelectedVideoChannelCheck()" title="Check this channel for new videos now" hidden>Check videos now</button>
+        <button class="btn btn-secondary btn-sm" id="videoChannelEditBtn" onclick="openSelectedVideoChannelEditor()" title="Edit this channel" hidden>Edit</button>
       </div>
 
       <div class="stats-row" id="videoStats"></div>

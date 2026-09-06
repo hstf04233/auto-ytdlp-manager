@@ -125,7 +125,11 @@ function setTitle(newTitle) {
 }
 
 function showPage(page, dontSaveHistory) {
-  const basePage = new URL("/"+page, window.location.origin).pathname.replace(/^\//, '');
+  // The bare root URL "/" carries no tab name: treat it as the default
+  // 'channels' tab. Without this, stepping back to "/" (e.g. browser Back
+  // after clicking a tab from a fresh "/" load) matches no page div and
+  // leaves a blank page.
+  const basePage = new URL("/"+page, window.location.origin).pathname.replace(/^\//, '') || 'channels';
   
   let title = basePage;
   
