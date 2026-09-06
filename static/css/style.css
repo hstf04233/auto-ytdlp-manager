@@ -964,6 +964,14 @@ form hr {
   text-decoration: none;
 }
 
+/* Greyed-out dependent setting (e.g. auto-delete delays while disabled). */
+.form-group.disabled {
+  opacity: 0.45;
+}
+.form-group.disabled label {
+  cursor: not-allowed;
+}
+
 .form-group li {
   white-space: break-spaces;
   font-size: 0.85rem;

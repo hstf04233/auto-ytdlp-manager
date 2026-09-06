@@ -96,6 +96,7 @@ async function saveConfig(event) {
 }
 
 function updateConfigChanges() {
+
   const configSubmitBtn = document.getElementById("configSubmitBtn");
   const configCancelBtn = document.getElementById("configCancelBtn");
   wereChangesMade = areThereConfigChanges();
@@ -127,6 +128,8 @@ function renderConfig(config) {
       element.checked = programConfig[cfg.value];
     }
   }
+
+  updateTaskLogAutoDeleteState();
   
   const AllChannelsDisabledEl2 = document.getElementById("channels-config-AllChannelsDisabled");
   if (AllChannelsDisabledEl2) {
@@ -136,6 +139,20 @@ function renderConfig(config) {
   updateConfigChanges();
 }
 
+
+// ========== Task log auto-delete (dependent selects) ==========
+// The "after" delays only mean anything while auto-delete is enabled.
+function updateTaskLogAutoDeleteState() {
+  const enabledEl = document.getElementById('config-TaskLogAutoDeleteEnabled');
+  const enabled = enabledEl ? enabledEl.checked : true;
+  for (const id of ['config-TaskLogAutoDeleteSeconds', 'config-TaskLogListAutoDeleteSeconds']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.disabled = !enabled;
+    const row = el.closest('.form-group');
+    if (row) row.classList.toggle('disabled', !enabled);
+  }
+}
 
 // ========== Channels master toggle (sidebar) ==========
 async function quickToggleDisableAllChannels(cb) {
