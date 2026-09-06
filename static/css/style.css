@@ -709,54 +709,109 @@ body.no-transition .sidebar-bottom .btn {
   margin: 0 2px;
 }
 
-/* Selection checkbox overlays the thumbnail corner. */
-.video-thumb .video-select-checkbox {
+/* Selection checkbox overlays the thumbnail corner. The real (accessible,
+   keyboard-focusable) input is visually hidden; the styled box next to it
+   is what you see, so it always reads as a checkbox on any thumbnail. */
+.video-thumb .video-select {
   position: absolute;
   top: 6px;
   right: 6px;
-  width: 22px;
-  height: 22px;
-  margin: 0;
-  accent-color: var(--accent);
+  width: 24px;
+  height: 24px;
   cursor: pointer;
-  opacity: 0.55;
+  opacity: 0.85;
   transition: opacity 0.15s, transform 0.15s;
   filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
 }
 
-.video-card:hover .video-select-checkbox,
-.video-card:focus-within .video-select-checkbox,
-.video-select-checkbox:checked,
-.video-select-checkbox:focus-visible {
+.video-thumb .video-select:hover {
+  transform: scale(1.08);
+}
+
+.video-select-checkbox {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.video-select-box {
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.video-select-box::after {
+  content: "\2713";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.video-select-checkbox:checked + .video-select-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.video-select-checkbox:checked + .video-select-box::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.video-select-checkbox:focus-visible + .video-select-box {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.video-card:hover .video-select,
+.video-card:focus-within .video-select,
+.video-select:has(.video-select-checkbox:checked) {
   opacity: 1;
 }
 
 /* Nothing selected yet: keep cards clean, reveal the checkbox on hover/focus. */
-#videosList:not(.has-selection) .video-select-checkbox {
+#videosList:not(.has-selection) .video-select {
   opacity: 0;
 }
 
-#videosList:not(.has-selection) .video-card:hover .video-select-checkbox,
-#videosList:not(.has-selection) .video-card:focus-within .video-select-checkbox,
-#videosList:not(.has-selection) .video-select-checkbox:checked,
-#videosList:not(.has-selection) .video-select-checkbox:focus-visible {
+#videosList:not(.has-selection) .video-card:hover .video-select,
+#videosList:not(.has-selection) .video-card:focus-within .video-select,
+#videosList:not(.has-selection) .video-select:has(.video-select-checkbox:checked),
+#videosList:not(.has-selection) .video-select:focus-within {
   opacity: 1;
 }
 
 /* Touch screens have no hover: always show the checkboxes. */
 @media (hover: none) {
-  #videosList:not(.has-selection) .video-select-checkbox {
-    opacity: 0.55;
+  #videosList:not(.has-selection) .video-select {
+    opacity: 0.85;
   }
-}
-
-.video-select-checkbox:checked {
-  transform: scale(1.05);
 }
 
 .video-card.is-selected {
   border-color: var(--accent);
   background: rgba(233, 69, 96, 0.06);
+}
+
+/* Selection mode: the thumbnail toggles selection, so hint clickability. */
+#videosList.has-selection .video-thumb {
+  cursor: pointer;
 }
 
 .video-menu-wrap {

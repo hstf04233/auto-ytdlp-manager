@@ -1201,6 +1201,14 @@ func OpenDB() error {
 		}
 	}
 	
+	/* This is too slow to run every time at start up...
+	
+	_, err = db.Exec(`ANALYZE; VACUUM;`)
+	if err != nil {
+		return fmt.Errorf("Failed to optimize sqlite database... Error: %v", err)
+	}
+	*/
+	
 	GDB = db
 	
 	return nil

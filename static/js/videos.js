@@ -547,6 +547,16 @@ function toggleVideoSelection(videoId, checked) {
   updateBulkBar();
 }
 
+// While something is selected, clicking a thumbnail toggles that video
+// (bigger target than the checkbox). With nothing selected the thumbnail
+// does nothing, as before. The checkbox label stops propagation so it
+// never double-toggles.
+function videoThumbClick(videoId, event) {
+  if (selectedVideoIds.size === 0) return;
+  if (event) event.stopPropagation();
+  toggleVideoSelection(videoId, !selectedVideoIds.has(videoId));
+}
+
 function clearVideoSelection() {
   const ids = [...selectedVideoIds];
   selectedVideoIds.clear();
@@ -750,9 +760,9 @@ function videoCardHTML(v) {
   const isSelected = selectedVideoIds.has(v.id);
   return `
     <div class="card video-card${isSelected ? ' is-selected' : ''}" id="video-${v.id}">
-      <div class="video-thumb">
+      <div class="video-thumb" onclick="videoThumbClick('${v.id}', event)">
         <img class="video-thumb-img" src="${thumbnailUrl}" data-thumb="${escHtml(thumbnailUrl)}" alt="" onerror="handleVideoThumbError(this)">
-        <input type="checkbox" class="video-select-checkbox" data-video-id="${v.id}" title="Select video" onclick="event.stopPropagation()" onchange="toggleVideoSelection('${v.id}', this.checked)" ${isSelected ? 'checked' : ''}>
+        <label class="video-select" title="Select this video" onclick="event.stopPropagation()"><input type="checkbox" class="video-select-checkbox" data-video-id="${v.id}" onchange="toggleVideoSelection('${v.id}', this.checked)" ${isSelected ? 'checked' : ''}><span class="video-select-box" aria-hidden="true"></span></label>
         ${v.refresh_state ? `<span class="video-refresh-spinner" title="Metadata is being refreshed..." aria-label="Metadata is being refreshed..."></span>` : ''}
         <span class="video-duration" title="Video duration">${durationText}</span>
       </div>
