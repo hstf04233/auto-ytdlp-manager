@@ -421,10 +421,12 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 
 func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 	var Body struct {
-		DownloadUrl string `json:"download_url"`
+		DownloadUrl   string `json:"download_url"`
 		TargetChannel string `json:"target_channel_id"`
 		
 		QualitySelect int `json:"quality_select"`
+		PreferredVideoFormat string `json:"preferred_video_format"`
+		PreferredAudioFormat string `json:"preferred_audio_format"`
 		Type int `json:"type"`
 	}
 	Body.QualitySelect = -1
@@ -484,6 +486,12 @@ func API_AddVideos(w http.ResponseWriter, r *http.Request) {
 	CheckSettings.CheckUrls = []string{Body.DownloadUrl}
 	CheckSettings.Type = int32(Body.Type)
 	CheckSettings.QualitySelect = Body.QualitySelect
+	if Body.PreferredVideoFormat != "" {
+		CheckSettings.PreferredVideoFormat = Body.PreferredVideoFormat
+	}
+	if Body.PreferredAudioFormat != "" {
+		CheckSettings.PreferredAudioFormat = Body.PreferredAudioFormat
+	}
 	
 	// TODO: ManuallyAddVideos is a pretty shit function, I need to gut it or remove it and use something else...
 	go ManuallyAddVideos(CheckSettings, Body.DownloadUrl, Body.Type, CS)

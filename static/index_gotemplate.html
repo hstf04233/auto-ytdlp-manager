@@ -426,36 +426,23 @@
           </div>
         </div>
         
-        
-        <div class="form-group">
-          <label>Video/ Audio formats.</label>
-        </div>
         <div class="form-row">
           <div class="form-group">
             <label for="channelPreferredVideoFormat">Preferred Video Format</label>
-            <select id="channelPreferredVideoFormat">
-              <option value="">Auto</option>
-              <hr>
-              <option value="h264,h265,av01" selected>mp4 - H264 > H265 > AV1</option>
-              <option value="av01,h265,h264">mp4 - AV1 > H265 > H264</option>
-              <option value="h264">mp4 - H264</option>
-              <hr>
-              <option value="vp9.2,vp9,av01,vp8">webm - VP9 > AV1 > VP8</option>
-              <option value="vp9.2,vp9,av01">webm - VP9 > AV1</option>
-              <option value="av01,vp9.2,vp9">webm - AV1 > VP9</option>
+            <select id="channelPreferredVideoFormat" onchange="updateChannelOutputContainerNote()">
+              <!-- Options built by populatePreferredFormatSelects() in channels.js -->
             </select>
           </div>
           
           <div class="form-group">
             <label for="channelPreferredAudioFormat">Preferred Audio Format</label>
-            <select id="channelPreferredAudioFormat">
-              <option value="">Auto</option>
-              <hr>
-              <option value="aac" selected>mp4 - AAC</option>
-              <hr>
-              <option value="opus">webm - Opus</option>
+            <select id="channelPreferredAudioFormat" onchange="updateChannelOutputContainerNote()">
+              <!-- Options built by populatePreferredFormatSelects() in channels.js -->
             </select>
           </div>
+        </div>
+        <div class="form-group">
+          <span class="output-container-note" id="channelOutputContainerNote"></span>
         </div>
         
         <div class="form-group">
@@ -553,6 +540,24 @@
             <option value="1440">1440p</option>
             <option value="2160">2160p (4K)</option>
           </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="avm-PreferredVideoFormat">Video Format</label>
+            <select id="avm-PreferredVideoFormat" onchange="updateAvmOutputContainerNote()">
+              <!-- Options built by populatePreferredFormatSelects() in channels.js -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="avm-PreferredAudioFormat">Audio Format</label>
+            <select id="avm-PreferredAudioFormat" onchange="updateAvmOutputContainerNote()">
+              <!-- Options built by populatePreferredFormatSelects() in channels.js -->
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <span class="output-container-note" id="avmOutputContainerNote"></span>
         </div>
         
         <hr>

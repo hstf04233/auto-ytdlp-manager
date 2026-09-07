@@ -1,6 +1,9 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
+  /* Tell the browser this is a dark page so native controls (scrollbars,
+     dropdowns, etc.) render in their dark variants, notably in Chrome. */
+  color-scheme: dark;
   --bg-primary: #0f0f0f;
   --bg-secondary: #1a1a2e;
   --bg-card: #16213e;
@@ -16,6 +19,31 @@
   --border: #2a2a4a;
   --sidebar-width: 250px;
   --sidebar-collapsed-width: 60px;
+}
+
+/* Dark scrollbars for Chrome/Edge/Safari via ::-webkit-scrollbar. (Firefox
+   is left on its defaults: with `color-scheme: dark` above it already
+   renders its own readable dark scrollbars.) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #5b5b7d;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 body {
@@ -962,6 +990,12 @@ form hr {
 .form-group a {
   color: var(--accent);
   text-decoration: none;
+}
+
+/* Small derived hint under the format dropdowns (e.g. merge container). */
+.output-container-note {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
 }
 
 /* Greyed-out dependent setting (e.g. auto-delete delays while disabled). */

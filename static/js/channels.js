@@ -197,6 +197,101 @@ function updateChannelModalPlaceholders() {
   }
 }
 
+// ========== Preferred formats (single source of truth) ==========
+// Option tables for every Preferred Video/Audio Format dropdown (channel
+// modal + add-videos modal). Same values/labels as the old baked HTML.
+const PREFERRED_VIDEO_FORMAT_OPTIONS = [
+  { value: '', label: 'Auto' },
+  { sep: true },
+  { value: 'h264,h265,av01', label: 'mp4 - H264 > H265 > AV1', container: 'mp4' },
+  { value: 'av01,h265,h264', label: 'mp4 - AV1 > H265 > H264', container: 'mp4' },
+  { value: 'h264',           label: 'mp4 - H264',              container: 'mp4' },
+  { sep: true },
+  { value: 'vp9.2,vp9,av01,vp8', label: 'webm - VP9 > AV1 > VP8', container: 'webm' },
+  { value: 'vp9.2,vp9,av01',     label: 'webm - VP9 > AV1',       container: 'webm' },
+  { value: 'av01,vp9.2,vp9',     label: 'webm - AV1 > VP9',       container: 'webm' },
+];
+const PREFERRED_AUDIO_FORMAT_OPTIONS = [
+  { value: '', label: 'Auto' },
+  { sep: true },
+  { value: 'aac', label: 'mp4 - AAC', container: 'mp4' },
+  { sep: true },
+  { value: 'opus', label: 'webm - Opus', container: 'webm' },
+];
+
+function buildFormatOptions(selectId, options, defaultValue) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  select.innerHTML = '';
+  for (const opt of options) {
+    if (opt.sep) {
+      select.appendChild(document.createElement('hr'));
+    } else {
+      select.appendChild(new Option(opt.label, opt.value));
+    }
+  }
+  if (defaultValue !== undefined) select.value = defaultValue;
+}
+
+function populatePreferredFormatSelects() {
+  buildFormatOptions('channelPreferredVideoFormat', PREFERRED_VIDEO_FORMAT_OPTIONS, 'h264,h265,av01');
+  buildFormatOptions('channelPreferredAudioFormat', PREFERRED_AUDIO_FORMAT_OPTIONS, 'aac');
+  // Add-videos modal defaults to Auto (""), i.e. the channel's own formats.
+  buildFormatOptions('avm-PreferredVideoFormat', PREFERRED_VIDEO_FORMAT_OPTIONS, '');
+  buildFormatOptions('avm-PreferredAudioFormat', PREFERRED_AUDIO_FORMAT_OPTIONS, '');
+}
+populatePreferredFormatSelects();
+
+function preferredFormatGroup(value, options) {
+  if (!value) return null;
+  const match = options.find(o => !o.sep && o.value === value);
+  return (match && match.container) || null;
+}
+
+// yt-dlp merge behavior (we pass no --merge-output-format): same-container
+// streams merge into that container, mixed mp4+webm merges into .mkv.
+function outputContainerFor(videoValue, audioValue) {
+  const v = preferredFormatGroup(videoValue, PREFERRED_VIDEO_FORMAT_OPTIONS);
+  const a = preferredFormatGroup(audioValue, PREFERRED_AUDIO_FORMAT_OPTIONS);
+  if (!v || !a) return null;   // Auto or unknown: yt-dlp decides.
+  if (v === a) return v === 'mp4' ? '.mp4' : '.webm';
+  return '.mkv';
+}
+
+function updateOutputContainerNote(videoSelectId, audioSelectId, noteId) {
+  const note = document.getElementById(noteId);
+  if (!note) return;
+  const vSel = document.getElementById(videoSelectId);
+  const aSel = document.getElementById(audioSelectId);
+  const ext = outputContainerFor(vSel ? vSel.value : '', aSel ? aSel.value : '');
+  note.textContent = ext ? `Output container "${ext}"` : 'Output container "auto"';
+}
+function updateChannelOutputContainerNote() {
+  updateOutputContainerNote('channelPreferredVideoFormat', 'channelPreferredAudioFormat', 'channelOutputContainerNote');
+}
+function updateAvmOutputContainerNote() {
+  updateOutputContainerNote('avm-PreferredVideoFormat', 'avm-PreferredAudioFormat', 'avmOutputContainerNote');
+}
+
+// Remember the add-videos modal's last formats so they survive reopening.
+function saveAvmPreferredFormats() {
+  try {
+    localStorage.setItem('avm-PreferredVideoFormat', document.getElementById('avm-PreferredVideoFormat').value);
+    localStorage.setItem('avm-PreferredAudioFormat', document.getElementById('avm-PreferredAudioFormat').value);
+  } catch (e) { /* storage unavailable (private mode, etc.) */ }
+}
+function restoreAvmPreferredFormats() {
+  try {
+    for (const id of ['avm-PreferredVideoFormat', 'avm-PreferredAudioFormat']) {
+      const select = document.getElementById(id);
+      const saved = localStorage.getItem(id);
+      if (select && saved !== null && [...select.options].some(o => o.value === saved)) {
+        select.value = saved;
+      }
+    }
+  } catch (e) { /* storage unavailable (private mode, etc.) */ }
+}
+
 // ========== Channel Modal ==========
 function openAddChannelModal() {
   
@@ -220,6 +315,7 @@ function openAddChannelModal() {
   document.getElementById('channelModal').classList.add('active');
   
   updateChannelModalPlaceholders();
+  updateChannelOutputContainerNote();
 }
 
 function getChannelFromId(id) {
@@ -251,6 +347,7 @@ function openEditChannelModal(id) {
   document.getElementById('channelModal').classList.add('active');
   
   updateChannelModalPlaceholders();
+  updateChannelOutputContainerNote();
 }
 
 function closeChannelModal() {
@@ -302,6 +399,8 @@ function openAddVideosModal() {
   document.body.classList.add('modal-active');
   
   document.getElementById('avm-ChannelUrl').value = '';
+  restoreAvmPreferredFormats();
+  updateAvmOutputContainerNote();
   document.getElementById('avm-DownloadDir').textContent = `Default download directory: "${escHtml(programConfig.Default_DownloadDir)}"`;
 }
 function closeAddVideosModal() {
@@ -314,10 +413,16 @@ async function sendAddVideosForm(type) {
   
   const url = document.getElementById('avm-ChannelUrl').value.trim();
   const quality = parseInt(document.getElementById('avm-Quality').value);
+  const preferredVideoFormat = document.getElementById('avm-PreferredVideoFormat').value;
+  const preferredAudioFormat = document.getElementById('avm-PreferredAudioFormat').value;
+  saveAvmPreferredFormats();
   
   const body = {
     download_url: url,
     quality_select: quality,
+    // "" means Auto: the backend falls back to the channel's own formats.
+    preferred_video_format: preferredVideoFormat,
+    preferred_audio_format: preferredAudioFormat,
     type: type,
   };
   
