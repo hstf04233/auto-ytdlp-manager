@@ -1,11 +1,7 @@
 // videos.js - videos list, filters + URL state, video details modal.
-let firstTimeDeleteVideo = true;
 async function deleteVideo(id) {
-  if (firstTimeDeleteVideo) {
-    if (!confirm("Delete this video? (This prompt will only appear once. If you accept, this prompt will NOT pop up again.)")) {
-      return;
-    }
-    firstTimeDeleteVideo = false;
+  if (!confirm("Delete this video?")) {
+    return;
   }
   
   try {
