@@ -292,6 +292,73 @@ function restoreAvmPreferredFormats() {
   } catch (e) { /* storage unavailable (private mode, etc.) */ }
 }
 
+// ========== Check interval (preset dropdown + custom) ==========
+const CHECK_INTERVAL_PRESETS = ['0', '300', '900', '1800', '3600', '10800', '21600', '43200', '86400', '604800'];
+
+// Full breakdown: 1800 -> "30m", 3964 -> "1h 6m 4s". (intervalLabel()
+// drops smaller units, so it can't do this.)
+function formatIntervalFull(totalSeconds) {
+  totalSeconds = Math.floor(Number(totalSeconds));
+  if (!isFinite(totalSeconds) || totalSeconds < 0) return '';
+  if (totalSeconds === 0) return '0s';
+  const d = Math.floor(totalSeconds / 86400);
+  const h = Math.floor((totalSeconds % 86400) / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const parts = [];
+  if (d) parts.push(`${d}d`);
+  if (h) parts.push(`${h}h`);
+  if (m) parts.push(`${m}m`);
+  if (s) parts.push(`${s}s`);
+  return parts.join(' ');
+}
+
+function getChannelCheckInterval() {
+  const select = document.getElementById('channelCheckInterval');
+  if (select && select.value !== 'custom') {
+    const v = parseInt(select.value);
+    return isNaN(v) ? 1800 : v;
+  }
+  const custom = document.getElementById('channelCheckIntervalCustom');
+  const v = custom ? parseInt(custom.value) : NaN;
+  return isNaN(v) ? 1800 : v;
+}
+
+function setChannelCheckInterval(seconds) {
+  const select = document.getElementById('channelCheckInterval');
+  const custom = document.getElementById('channelCheckIntervalCustom');
+  const str = (seconds === null || seconds === undefined || seconds === '') ? '' : String(seconds);
+  if (str !== '' && CHECK_INTERVAL_PRESETS.includes(str)) {
+    select.value = str;
+    if (custom) custom.value = '';
+  } else if (str === '') {
+    select.value = '1800';
+    if (custom) custom.value = '';
+  } else {
+    select.value = 'custom';
+    if (custom) custom.value = str;
+  }
+  updateCheckIntervalCustom();
+}
+
+function updateCheckIntervalCustom() {
+  const select = document.getElementById('channelCheckInterval');
+  const row = document.getElementById('channelCheckIntervalCustomRow');
+  const isCustom = !!select && select.value === 'custom';
+  if (row) row.hidden = !isCustom;
+  updateCheckIntervalPreview();
+}
+
+function updateCheckIntervalPreview() {
+  const preview = document.getElementById('channelCheckIntervalPreview');
+  if (!preview) return;
+  const custom = document.getElementById('channelCheckIntervalCustom');
+  const raw = custom ? custom.value : '';
+  if (raw === '' || raw === null) { preview.textContent = ''; return; }
+  const v = parseInt(raw);
+  preview.textContent = (isNaN(v) || v < 0) ? '' : `= ${formatIntervalFull(v)}`;
+}
+
 // ========== Channel Modal ==========
 function openAddChannelModal() {
   
@@ -307,10 +374,10 @@ function openAddChannelModal() {
   document.getElementById('channelPreferredVideoFormat').value = "h264,h265,av01";
   document.getElementById('channelPreferredAudioFormat').value = "aac";
   
-  document.getElementById('channelCheckInterval').value = '';
+  setChannelCheckInterval('');
   document.getElementById('channelPlaylistEnd').value = '20';
   document.getElementById('channelSubmitBtn').textContent = 'Add Channel';
-  
+
   document.body.classList.add('modal-active');
   document.getElementById('channelModal').classList.add('active');
   
@@ -339,7 +406,7 @@ function openEditChannelModal(id) {
   
   document.getElementById('channelDownloadDir').value = ch.download_dir || '';
   document.getElementById('channelOutputTemplate').value = ch.output_template || '';
-  document.getElementById('channelCheckInterval').value = ch.check_interval || '';
+  setChannelCheckInterval(ch.check_interval);
   document.getElementById('channelPlaylistEnd').value = ch.playlist_end;
   document.getElementById('channelSubmitBtn').textContent = 'Save Changes';
   
@@ -451,7 +518,7 @@ async function saveChannel(e) {
   
   const downloadDir = document.getElementById('channelDownloadDir').value.trim();
   const outputTemplate = document.getElementById('channelOutputTemplate').value.trim();
-  const checkInterval  = document.getElementById('channelCheckInterval').value ? parseInt(document.getElementById('channelCheckInterval').value) : 1800;
+  const checkInterval = getChannelCheckInterval();
   const playlistEnd = parseInt(document.getElementById('channelPlaylistEnd').value);
 
   const body = {
