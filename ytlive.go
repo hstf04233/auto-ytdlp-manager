@@ -374,8 +374,14 @@ func ytarchive_DownloadLive(CheckSettings ChannelCheckSettings, Video *VideoInfo
 			if !G_Config.Download_Live_Chat {
 				return
 			}
-			ChatJsonPath := fmt.Sprintf("%s.chat.json", filepath.Join(DownloadDir, FilenameWithoutExt))
-			err := yt_chat_Run(Video.Url, ChatJsonPath, DownloadTask)
+			ChatDownloadDir := filepath.Join(DownloadDir, "/chats")
+			err := os.MkdirAll(ChatDownloadDir, 0755)
+			if err != nil {
+				L_Printf("Could not make directory \"%s\" err: %v\n", ChatDownloadDir, err)
+			}
+			
+			ChatJsonPath := fmt.Sprintf("%s.chat.json", filepath.Join(ChatDownloadDir, FilenameWithoutExt))
+			err = yt_chat_Run(Video.Url, ChatJsonPath, DownloadTask)
 			if err != nil {
 				L_Printf("yt_chat_Run error: %v\n", err)
 			}
