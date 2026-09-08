@@ -133,6 +133,8 @@ async function copySharedVideoFile(videoId) {
 }
 
 async function openVideoDetailsModal(videoId) {
+  // A previous details poll (if any) belongs to another video/open.
+  stopVideoDetailsRefreshPoll();
   document.getElementById('videoDetailsContent').innerHTML = `Loading video...`
   
   document.getElementById('videoDetailsModal').classList.add('active');
@@ -160,7 +162,16 @@ async function openVideoDetailsModal(videoId) {
   }
   
   currentVideoDetails = videoInfo;
+  renderVideoDetailsModal(videoInfo);
+  // A refresh may already be running (e.g. started from the videos list):
+  // watch it so the button + spinner update live.
+  if (videoInfo.refresh_state) {
+    startVideoDetailsRefreshPoll(videoInfo.id);
+  }
+}
 
+function renderVideoDetailsModal(videoInfo) {
+  const videoId = videoInfo.id;
   const channel = getChannelFromId(videoInfo.from_channel);
   const channelName = channel ? escHtml(channel.name) : 'Unknown Channel';
   const channelUrl = channel ? escHtml(channel.url) : '';
@@ -189,6 +200,7 @@ async function openVideoDetailsModal(videoId) {
         ${videoIsPlayable ? ` style="cursor: pointer;" title="Click to play video"` : ''}>
         ${videoIsPlayable ? `<span>&#9654;</span>` : ''}
       </img>
+      ${videoInfo.refresh_state ? `<span class="video-refresh-spinner" title="Metadata is being refreshed..."></span>` : ''}
       <div class="vd-preview-placeholder" style="display:none">No thumbnail</div>
     </div>
     <h3 class="vd-title">${escHtml(videoInfo.title)}</h3>
@@ -231,7 +243,7 @@ async function openVideoDetailsModal(videoId) {
     `<button type="button" class="btn btn-secondary btn-sm" class="btn btn-secondary btn-sm" onclick="copySharedVideoFile('${videoInfo.id}')" title="Copy shared video file link to clipboard">Share video file link</a>` :
     ''
     }
-    <button type="button" class="btn btn-secondary btn-sm" ${refreshDisabled} onclick="refreshVideoInfo('${videoInfo.id}');closeVideoDetailsModal();" title="${refreshTitle}">${videoInfo.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
+    <button type="button" class="btn btn-secondary btn-sm" id="videoDetailsRefreshBtn" data-action="refresh-details" ${refreshDisabled} onclick="refreshVideoDetailsInfo('${videoInfo.id}')" title="${refreshTitle}">${videoInfo.refresh_state ? 'Refreshing...' : 'Refresh'}</button>
     <button type="button" class="btn btn-secondary btn-sm" onclick="openVideoHistoryModal('${videoInfo.id}')" title="View change history for this video">History</button>
     <button type="button" class="btn btn-danger btn-sm" onclick="deleteVideo('${videoInfo.id}');closeVideoDetailsModal();">Delete</button>
   `;
@@ -257,6 +269,7 @@ function openVideoDetailsFromList(videoId) {
 }
 
 function closeVideoDetailsModal(skipHistory) {
+  stopVideoDetailsRefreshPoll();
   if (currentHls) {
     currentHls.detachMedia();
     currentHls.destroy();
@@ -304,25 +317,96 @@ function closeVideoDetailsModal(skipHistory) {
   }
 }
 
+// ========== Video details refresh polling ==========
+// The details modal stays open while refreshing: the Refresh button flips to
+// a disabled "Refreshing..." + the preview gets the refresh spinner, and we
+// re-fetch every 4s until refresh_state clears (then re-render for the new
+// metadata, unless a preview video is playing).
+let videoDetailsRefreshTimer = null;
+let videoDetailsRefreshToken = 0;
+
+function stopVideoDetailsRefreshPoll() {
+  if (videoDetailsRefreshTimer) {
+    clearInterval(videoDetailsRefreshTimer);
+    videoDetailsRefreshTimer = null;
+  }
+  videoDetailsRefreshToken++;
+}
+
+async function refreshVideoDetailsInfo(id) {
+  try {
+    await API.patch(`/api/videos/${encodeURIComponent(id)}`, { refresh_state: true });
+  } catch (err) {
+    showToast(`Failed to refresh: ${err.message}`, 'error');
+    return;
+  }
+  startVideoDetailsRefreshPoll(id);
+}
+
+// Patch just the button + spinner so polling never disturbs playback.
+function updateVideoDetailsRefreshUI(videoInfo) {
+  const refreshing = !!videoInfo.refresh_state;
+  const btn = document.getElementById('videoDetailsRefreshBtn');
+  if (btn) {
+    btn.disabled = refreshing;
+    btn.style.opacity = refreshing ? '0.5' : '';
+    btn.style.cursor = refreshing ? 'not-allowed' : '';
+    btn.title = refreshing ? 'Refreshing...' : 'Refresh metadata';
+    btn.textContent = refreshing ? 'Refreshing...' : 'Refresh';
+  }
+  const preview = document.getElementById('modal-video-preview');
+  if (preview) {
+    let spinner = preview.querySelector('.video-refresh-spinner');
+    if (refreshing && !spinner) {
+      spinner = document.createElement('span');
+      spinner.className = 'video-refresh-spinner';
+      spinner.title = 'Metadata is being refreshed...';
+      preview.appendChild(spinner);
+    } else if (!refreshing && spinner) {
+      spinner.remove();
+    }
+  }
+}
+
+function startVideoDetailsRefreshPoll(id) {
+  stopVideoDetailsRefreshPoll();
+  const token = videoDetailsRefreshToken;
+  const tick = async () => {
+    if (token !== videoDetailsRefreshToken) return;
+    const modal = document.getElementById('videoDetailsModal');
+    if (!modal || !modal.classList.contains('active')) {
+      stopVideoDetailsRefreshPoll();
+      return;
+    }
+    if (!currentVideoDetails || currentVideoDetails.id !== id) {
+      stopVideoDetailsRefreshPoll();
+      return;
+    }
+    let fresh = null;
+    try {
+      fresh = await API.get(`/api/videos/${encodeURIComponent(id)}`);
+    } catch (err) {
+      stopVideoDetailsRefreshPoll();
+      showToast(`Refresh poll failed: ${err.message}`, 'error');
+      return;
+    }
+    if (token !== videoDetailsRefreshToken) return;
+    currentVideoDetails = fresh;
+    updateVideoDetailsRefreshUI(fresh);
+    if (!fresh.refresh_state) {
+      stopVideoDetailsRefreshPoll();
+      const preview = document.getElementById('modal-video-preview');
+      if (!preview || !preview.querySelector('video')) {
+        renderVideoDetailsModal(fresh);
+      }
+      if (!areVideosLoading) loadVideos(true);
+    }
+  };
+  tick();
+  videoDetailsRefreshTimer = setInterval(tick, 4000);
+}
+
 // ========== Video history ==========
-// A history point stores the OLD values (the state before the change), and
-// only for fields that changed at that step:
-//   Title/Description/Availability/OriginThumbnail/StoredThumbnail: a string
-//     means "changed, this was the old value"; null/missing = unchanged.
-//   Duration/VideoType: -1 = unchanged, otherwise the old value.
-//   AddedAt = when this old state became current; UpdatedAt = when the
-//     change was detected (i.e. this state's validity window).
-// Url is always recorded but never diffed, and uploader/release_date are
-// never recorded at all, so those always resolve to the current video.
-//
-// Filling a blank field is therefore ALWAYS a forward search: if point i
-// leaves a field unset, the field didn't change at step i, so its value at
-// point i equals the value right after step i -- the next set value at some
-// point j > i, or the current video's value when no later point sets it.
-// (Searching backwards would be WRONG: e.g. title A ->(pt0) B ->(pt1,
-// availability-only change) B ->(pt2) C stores titles [A, <blank>, B]; a
-// backwards lookup for point 1 finds "A", but the title during state 1 was
-// "B". The forward search finds it correctly.)
 function histGet(point, kind) {
   switch (kind) {
     case 'title':
