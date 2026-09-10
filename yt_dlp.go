@@ -400,14 +400,10 @@ func GetYtDlpFormatSort(CheckSettings ChannelCheckSettings) string {
 	return Args
 }
 
-func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video *VideoInfo, Task *CommandTask) (error) {
+// Returns OutputJson, Stderr, err
+func yt_dlp_RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, CheckWithNoCookies bool) ([]byte, string, error) {
 	DownloadDir    := GetDownloadDir(CheckSettings)
 	OutputTemplate := GetOutputTemplate(CheckSettings)
-	
-	err := os.MkdirAll(DownloadDir, 0755)
-	if err != nil {
-		CL_Logf(Task, "Could not make directory \"%s\" err: %v\n", DownloadDir, err)
-	}
 	
 	Args := []string{
 		VideoUrl,
@@ -426,26 +422,59 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 	if ShouldLiveFromStart(CheckSettings.AChannel, VideoUrl) {
 		Args = append(Args, "--live-from-start")
 	}
+	if CheckWithNoCookies {
+		Args = append(Args, "--no-cookies")
+	}
 	
 	Cmd := exec.Command(Get_YtDlpPath(G_Config), Args...)
 	Cmd.Dir = DownloadDir
 	
 	stderr, err := Cmd.StderrPipe()
 	if err != nil {
-		CL_Logf(Task, "Error when creating StderrPipe: %v\n", err)
-		return err
+		return nil, "", fmt.Errorf("Error when creating StderrPipe: %v\n", err)
 	}
 	ErrOut := CL_BasicWatchStdPipe(stderr)
 	
 	Out, err := Cmd.Output()
-	if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
-		return nil
-	}
 	if err != nil {
 		ErrOut.Lock.RLock()
 		ErrOutput := ErrOut.RawOutput
 		ErrOut.Lock.RUnlock()
+		return nil, ErrOutput, err
+	}
+	
+	return Out, "", nil
+}
+
+func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video *VideoInfo, Task *CommandTask) (error) {
+	DownloadDir    := GetDownloadDir(CheckSettings)
+	//OutputTemplate := GetOutputTemplate(CheckSettings)
+	
+	err := os.MkdirAll(DownloadDir, 0755)
+	if err != nil {
+		CL_Logf(Task, "Could not make directory \"%s\" err: %v\n", DownloadDir, err)
+	}
+	
+	var OutJson []byte
+	var Stderr  string
+	
+	for i := 0; i < 2; i++ {
+		CheckWithNoCookies := (i > 0)
 		
+		OutJson, Stderr, err = yt_dlp_RequestVideoInfo(CheckSettings, VideoUrl, CheckWithNoCookies)
+		if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
+			return nil
+		}
+		if err != nil && Stderr != "" {
+			if strings.Contains(Stderr, "Video unavailable") {
+				CL_Logf(Task, "Video is 'unavailable', checking again with no cookies passed.\n")
+				// This usually happens when we passed cookies to yt-dlp and the video is 'removed' or 'private' ...
+				continue  // Continue to pass no cookies.
+			}
+		}
+		break
+	}
+	if err != nil {
 		if Video.VideoType == VIDEO_TYPE_ISLIVE {
 			Video.VideoType = VIDEO_TYPE_WASLIVE
 		}
@@ -462,37 +491,38 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 		}
 		
 		// Have no idea if YouTube serves up different error messages for seperate languages...
-		if strings.Contains(ErrOutput, "Private video.") {
+		if strings.Contains(Stderr, "Private video.") {
 			Video.Availability = "private"
-			return fmt.Errorf("%s", ErrOutput)
-		} else if strings.Contains(ErrOutput, "Sign in to confirm your age.") ||
-				  strings.Contains(ErrOutput, "This video may be inappropriate for some users.") {
+			return fmt.Errorf("%s", Stderr)
+		} else if strings.Contains(Stderr, "Sign in to confirm your age.") ||
+				  strings.Contains(Stderr, "This video may be inappropriate for some users.") {
 			Video.Availability = "age-restricted"
-			return fmt.Errorf("%s", ErrOutput)
-		} else if strings.Contains(ErrOutput, "This video has been removed by the uploader") ||
-				  strings.Contains(ErrOutput, "Video unavailable.") ||
-				  strings.Contains(ErrOutput, "This video has been removed for violating") {
+			return fmt.Errorf("%s", Stderr)
+		} else if strings.Contains(Stderr, "This video has been removed by the uploader") ||
+				  //strings.Contains(Stderr, "Video unavailable.") ||
+				  strings.Contains(Stderr, "This video has been removed for violating") ||
+				  strings.Contains(Stderr, "This video is unavailable") {
 			Video.Availability = "removed"
-			return fmt.Errorf("%s", ErrOutput)
-		} else if strings.Contains(ErrOutput, "This live event will begin in a few moments.") ||
-				  strings.Contains(ErrOutput, "This live event will begin in") {
-			return fmt.Errorf("%s", ErrOutput)
-		} else if strings.Contains(ErrOutput, "Join this channel to get access to members-only content like this video") ||
-		strings.Contains(ErrOutput, "members-only") {
+			return fmt.Errorf("%s", Stderr)
+		} else if strings.Contains(Stderr, "This live event will begin in a few moments.") ||
+				  strings.Contains(Stderr, "This live event will begin in") {
+			return fmt.Errorf("%s", Stderr)
+		} else if strings.Contains(Stderr, "Join this channel to get access to members-only content like this video") ||
+		strings.Contains(Stderr, "members-only") {
 			Video.Availability = "members-only"
-			return fmt.Errorf("%s", ErrOutput)
-		} else if strings.Contains(ErrOutput, "Video unavailable") {
+			return fmt.Errorf("%s", Stderr)
+		} else if strings.Contains(Stderr, "Video unavailable") {
 			// This error occurs when you have provided cookies and the video is private... Why this happends I have no idea 🤬
 			Video.Availability = "unavailable"
-			return fmt.Errorf("%s", ErrOutput)
+			return fmt.Errorf("%s", Stderr)
 		}
 		
-		CL_Logf(Task, "%s\n", ErrOutput)
+		CL_Logf(Task, "%s\n", Stderr)
 		CL_Logf(Task, "Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
-		return fmt.Errorf("%s", ErrOutput)
+		return fmt.Errorf("%s", Stderr)
 	}
 	var OutVideo YT_DLP_OUTVIDEO
-	err = json.Unmarshal(Out, &OutVideo)
+	err = json.Unmarshal(OutJson, &OutVideo)
 	if err != nil {
 		CL_Logf(Task, "json.Unmarshal err: %v\n", err)
 		return err
