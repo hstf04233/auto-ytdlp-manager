@@ -214,14 +214,15 @@ func (t *ThrottledResponseWriter) Write(ToWrite []byte) (int, error) {
 		
 		t.LastWriteTime = time.Now()
 		
+		t.mu.Unlock()
 		n, err := t.ResponseWriter.Write(ToWrite[:AllowedCount])
-		totalWritten += n
-		ToWrite = ToWrite[n:]
-		
 		if err != nil {
-			t.mu.Unlock()
 			return totalWritten, err
 		}
+		t.mu.Lock()
+		
+		totalWritten += n
+		ToWrite = ToWrite[n:]
 		
 		if t.BytesUntilSleep > bytesPerTick {  // kbps could have changed!
 			t.BytesUntilSleep = bytesPerTick
