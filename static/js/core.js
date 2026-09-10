@@ -355,7 +355,7 @@ function buildPaginationHTML(cfg) {
     pageButtons.push(btn('1', 0, false, isFirstActive));
     
     if (rangeStart > 2) {
-      pageButtons.push('<span class="page-ellipsis">…</span>');
+      pageButtons.push(pageEllipsisHTML(cbsId, totalPages, currentPage));
     } else if (rangeStart === 2) {
       pageButtons.push(btn('2', 1, false, false));
     }
@@ -365,7 +365,7 @@ function buildPaginationHTML(cfg) {
     }
     
     if (rangeEnd < totalPages - 2) {
-      pageButtons.push('<span class="page-ellipsis">…</span>');
+      pageButtons.push(pageEllipsisHTML(cbsId, totalPages, currentPage));
     }
     
     pageButtons.push(btn(String(totalPages), totalPages - 1, false, currentPage === totalPages - 1));
@@ -376,6 +376,50 @@ function buildPaginationHTML(cfg) {
   const prevBtn = btn('‹', -1, prevDisabled, false);
   const nextBtn = btn('›', totalPages+100, nextDisabled, false);
   return prevBtn + pageButtons.join('') + nextBtn + `<span class="single-page-msg">${countMsg}</span>`;
+}
+
+// Page-gap ellipsis: looks identical to the old static "…" until hovered,
+// but clicking it swaps in a page-number field (Enter commits, Esc cancels).
+function pageEllipsisHTML(cbsId, totalPages, currentPage) {
+  return `<button class="page-ellipsis" title="Go to page..." onclick="pageEllipsisToInput(this, ${cbsId}, ${totalPages}, ${currentPage})">…</button>`;
+}
+
+function pageEllipsisToInput(btn, cbsId, totalPages, currentPage) {
+  const cbs = _pgCallbacks[cbsId];
+  if (!cbs || typeof cbs.page !== 'function') return;
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '1';
+  input.max = String(totalPages);
+  input.value = String(currentPage + 1);
+  input.className = 'page-jump-input';
+  input.setAttribute('aria-label', `Go to page (1 to ${totalPages})`);
+  btn.replaceWith(input);
+  input.focus();
+  input.select();
+  let settled = false;
+  const restore = () => {
+    if (settled) return;
+    settled = true;
+    if (input.parentNode) input.replaceWith(btn);
+  };
+  const commit = () => {
+    if (settled) return;
+    const n = parseInt(input.value, 10);
+    restore();
+    // Clamp into range; empty/garbage just closes the field.
+    if (!isNaN(n)) cbs.page(Math.min(Math.max(n, 1), totalPages) - 1);
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.stopPropagation();
+      commit();
+    } else if (e.key === 'Escape') {
+      e.stopPropagation();
+      restore();
+    }
+  });
+  input.addEventListener('blur', commit);
 }
 
 // ========== HTML escaping (also used by chat.js, which loads after these files) ==========

@@ -110,11 +110,9 @@ func G_ExitProgram() {
 
 func SetupSystray() {
 	IconFileName := "p_icon.png"
-	//IconFileIcoName := "p_icon.ico"
 	
 	if APPLICATION_VERSION_TYPE == "debug" {
 		IconFileName = "p_icon_debog.png"
-		//IconFileIcoName = "p_icon_debog.ico"
 	}
 	
 	IconPNGContent := ReadFileFromStatic(IconFileName)
@@ -229,7 +227,7 @@ func main() {
 				L_Printf("\nFailed to create admin account! error: %v\n\n", err)
 				return
 			}
-			L_Printf("Admin account created! You can now log in on the webui. \"Username\": %s\n", NewUser.UsernameDisplay)
+			L_Printf("Admin account created! You can now log in via the webui. \"Username\": %s\n", NewUser.UsernameDisplay)
 		}
 	}
 	
