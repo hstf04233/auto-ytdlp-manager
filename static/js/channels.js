@@ -293,7 +293,7 @@ function restoreAvmPreferredFormats() {
 }
 
 // ========== Check interval (preset dropdown + custom) ==========
-const CHECK_INTERVAL_PRESETS = ['0', '300', '900', '1800', '3600', '10800', '21600', '43200', '86400', '604800'];
+const CHECK_INTERVAL_PRESETS = ['0', '300', '900', '1800', '3600', '7200', '10800', '21600', '43200', '86400', '604800'];
 
 // Full breakdown: 1800 -> "30m", 3964 -> "1h 6m 4s". (intervalLabel()
 // drops smaller units, so it can't do this.)
