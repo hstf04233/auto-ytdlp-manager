@@ -1296,12 +1296,6 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 		return
 	}
-	/*
-	if !IsAuthorized {
-		http.Error(w, "Unauthorized.", http.StatusUnauthorized)
-		return
-	}
-	*/
 	
 	IsAdminAuthorized := (AuthUser.Role == AUTH_ROLE_ADMIN)
 	IsReadOnlyAuthorized := (AuthUser.Role == AUTH_ROLE_USER_READONLY || IsAdminAuthorized)
@@ -1313,55 +1307,43 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		// POSTing to api/channels will create a new channel.
+		
 		API_NewChannel(w, r)
 	} else if strings.HasPrefix(Path, "channels/") && Method == "PATCH" {
 		if !IsAdminAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		// PATCHing to api/channels/{channel_id} will update a channel.
 		API_UpdateChannel(w, r)
 	} else if strings.HasPrefix(Path, "channels/") && Method == "DELETE" {
 		if !IsAdminAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		// DELETE-ing to api/channels/{channel_id} will delete a channel.
 		API_DeleteChannel(w, r)
 	} else if (Path == "channels" || strings.HasPrefix(Path, "channels/")) && Method == "GET" {
 		if !IsReadOnlyAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		// api/channels will give the entire list of channels !
-		// api/channels/{channel_id} will give you a specific channel.
 		API_GetChannels(w, r)
 	} else if strings.HasPrefix(Path, "check-channel-now/") && Method == "POST" {
 		if !IsAdminAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		// PPOSTing to api/check-channel-now/{channel_id} make the channel be checked first chance it gets.
 		API_CheckChannel(w, r)
 	} else if (Path == "videos" || strings.HasPrefix(Path, "videos/")) && Method == "GET" {
 		if !IsReadOnlyAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		/*
-		  api/videos?limit={int}&offset={int}&status={int}&from_channel={channel_id}&order_by={order}&order_direction={1, -1} Will return a list of videos.
-		  status, from_channel, order_by and order_direction are optional.
-		  
-		  api/videos/{video_id} will give you a specific video.
-		*/
 		API_GetVideos(w, r)
 	} else if (strings.HasPrefix(Path, "videos/")) && Method == "PATCH" {
 		if !IsAdminAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		// You can set status, refresh_state
 		API_UpdateVideo(w, r)
 	} else if (strings.HasPrefix(Path, "bulk-update-videos")) && Method == "PATCH" {
 		if !IsAdminAuthorized {
@@ -1374,7 +1356,6 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		// DELETE api/videos/{video_id} will delete a video
 		API_DeleteVideo(w, r)
 	} else if (strings.HasPrefix(Path, "bulk-delete-videos")) && Method == "DELETE" {
 		if !IsAdminAuthorized {
@@ -1389,7 +1370,7 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		}
 		API_AddVideos(w, r)
 	} else if (strings.HasPrefix(Path, "video-history/")) && Method == "GET" {
-		if !IsAdminAuthorized {
+		if !IsReadOnlyAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
@@ -1405,11 +1386,6 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 			return
 		}
-		/*
-		  api/tasks?limit={int}&offset={int}&status={int}&type={int}&from_channel={channel_id}&from_video={video_id}&order_by={order}&order_direction={1, -1}
-		  
-		  api/tasks/{video_id} will give you a specific task.
-		*/
 		API_GetTasks(w, r)
 	} else if (strings.HasPrefix(Path, "cancel-task/")) && Method == "POST" {
 		if !IsAdminAuthorized {
