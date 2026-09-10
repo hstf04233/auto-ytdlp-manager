@@ -237,7 +237,7 @@ func TurnYTLiveIntoM3U8LiveStream(DownloadTask *CommandTask, DownloadDir string,
 		"-f", "hls",
 		"-hls_init_time", "1",
 		"-hls_time", "1",
-		"-hls_list_size", "1800",		// 30 minutes to 5 hours.
+		"-hls_list_size", "3600",		// 1 hour to 10 hours (depending on segment length...)
 		"-hls_delete_threshold", "10",
 		//"-hls_flags", "delete_segments+append_list+omit_endlist",
 		"-fflags", "nobuffer", "-flags", "low_delay",
