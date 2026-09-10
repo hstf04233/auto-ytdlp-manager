@@ -62,7 +62,10 @@ type ArchiveChannel struct {
 	QualitySelect        int    `json:"quality_select"`
 	PreferredVideoFormat string `json:"preferred_video_format"`
 	PreferredAudioFormat string `json:"preferred_audio_format"`
-	
+
+	DownloadLiveChat    bool   `json:"download_live_chat"`
+	LiveChatDownloadDir string `json:"live_chat_download_dir"`
+
 	NeedsRefreshing bool `json:"-"`
 	
 	Enabled bool `json:"enabled"`
@@ -92,7 +95,10 @@ type ChannelCheckSettings struct{
 	YtDlpFormatSelect string
 	PreferredVideoFormat string
 	PreferredAudioFormat string
-	
+
+	DownloadLiveChat    bool
+	LiveChatDownloadDir string
+
 	PlaylistEnd int
 	CheckAllVideos bool
 }
@@ -157,7 +163,9 @@ func GetManualArchiveChannel(CB *ArchiveChannelsBundle) *ArchiveChannel {
 			Id: MANUAL_CHANNEL_ID,
 			Name: "Manually Downloaded Videos",
 			Enabled: false,
-			
+
+			DownloadLiveChat: true,
+
 			Hidden: true,
 			PlaylistEnd: -1,
 		}
@@ -732,7 +740,10 @@ func GetCheckSettingsFromAChannel(AChannel *ArchiveChannel) ChannelCheckSettings
 		QualitySelect: AChannel.QualitySelect,
 		PreferredVideoFormat: AChannel.PreferredVideoFormat,
 		PreferredAudioFormat: AChannel.PreferredAudioFormat,
-		
+
+		DownloadLiveChat: AChannel.DownloadLiveChat,
+		LiveChatDownloadDir: AChannel.LiveChatDownloadDir,
+
 		PlaylistEnd: AChannel.PlaylistEnd,
 	}
 }

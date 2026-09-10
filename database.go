@@ -39,7 +39,10 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 	QualitySelect INTEGER NOT NULL,
 	PreferredVideoFormat TEXT NOT NULL,
 	PreferredAudioFormat TEXT NOT NULL,
-	
+
+	DownloadLiveChat BOOLEAN NOT NULL DEFAULT 1,
+	LiveChatDownloadDir TEXT NOT NULL DEFAULT '',
+
 	Type    INTEGER NOT NULL,
 	Enabled BOOLEAN,
 	
@@ -216,25 +219,28 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	defer AChannel.Lock.RUnlock()
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, PreferredVideoFormat, PreferredAudioFormat, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, PreferredVideoFormat, PreferredAudioFormat, DownloadLiveChat, LiveChatDownloadDir, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
 	Url=excluded.Url,
 	DownloadDir=excluded.DownloadDir,
 	OutputTemplate=excluded.OutputTemplate,
-	
+
 	QualitySelect=excluded.QualitySelect,
 	PreferredVideoFormat=excluded.PreferredVideoFormat,
 	PreferredAudioFormat=excluded.PreferredAudioFormat,
-	
+
+	DownloadLiveChat=excluded.DownloadLiveChat,
+	LiveChatDownloadDir=excluded.LiveChatDownloadDir,
+
 	CheckInterval=excluded.CheckInterval,
 	FullCheckInterval=excluded.FullCheckInterval,
 	Type=excluded.Type,
 	PlaylistEnd=excluded.PlaylistEnd,
 	Enabled=excluded.Enabled,
 	UpdatedAt=excluded.UpdatedAt
-	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.PreferredVideoFormat, AChannel.PreferredAudioFormat, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.PlaylistEnd, AChannel.Enabled, TimeNow, TimeNow)
+	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.PreferredVideoFormat, AChannel.PreferredAudioFormat, AChannel.DownloadLiveChat, AChannel.LiveChatDownloadDir, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.PlaylistEnd, AChannel.Enabled, TimeNow, TimeNow)
 	
 	if err != nil {
 		L_Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
@@ -265,11 +271,14 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 	Name,
 	Url,
 	DownloadDir, OutputTemplate, CheckInterval, FullCheckInterval,
-	
+
 	QualitySelect,
 	PreferredVideoFormat,
 	PreferredAudioFormat,
-	
+
+	DownloadLiveChat,
+	LiveChatDownloadDir,
+
 	Type, PlaylistEnd,
 	Enabled FROM ArchiveChannels %s`, Condition))
 	if err != nil {
@@ -284,11 +293,14 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 			&Channel.Name,
 			&Channel.Url,
 			&Channel.DownloadDir, &Channel.OutputTemplate, &Channel.CheckInterval, &Channel.FullCheckInterval,
-			
+
 			&Channel.QualitySelect,
 			&Channel.PreferredVideoFormat,
 			&Channel.PreferredAudioFormat,
-			
+
+			&Channel.DownloadLiveChat,
+			&Channel.LiveChatDownloadDir,
+
 			&Channel.Type,
 			&Channel.PlaylistEnd,
 			&Channel.Enabled)
@@ -1238,6 +1250,8 @@ func OpenDB() error {
 		"ALTER TABLE Images ADD COLUMN Sha256Hash TEXT NOT NULL DEFAULT ''",
 		
 		// v0.30
+		"ALTER TABLE ArchiveChannels ADD COLUMN DownloadLiveChat BOOLEAN NOT NULL DEFAULT 1",
+		"ALTER TABLE ArchiveChannels ADD COLUMN LiveChatDownloadDir TEXT NOT NULL DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

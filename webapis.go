@@ -20,19 +20,22 @@ const API_MAX_REQUEST_ID = 1 << 8
 type API_RequestChannelBody struct{
 	Name string `json:"name"`
 	Url  string `json:"url"`
-	
+
 	DownloadDir    *string `json:"download_dir"`
 	OutputTemplate *string `json:"output_template"`
 	Type           int32  `json:"type"`
-	
+
 	QualitySelect int `json:"quality_select"`
 	PreferredVideoFormat *string `json:"preferred_video_format"`
 	PreferredAudioFormat *string `json:"preferred_audio_format"`
-	
+
+	DownloadLiveChat *bool `json:"download_live_chat"`
+	LiveChatDownloadDir *string `json:"live_chat_download_dir"`
+
 	CheckInterval     int64  `json:"check_interval"`
 	FullCheckInterval int64 `json:"full_check_interval"`
 	PlaylistEnd       int   `json:"playlist_end"`
-	
+
 	Enabled *bool `json:"enabled"`
 }
 
@@ -59,7 +62,10 @@ func Verify_API_RequestChannelBody(Body API_RequestChannelBody) (bool, string) {
 	if Body.PreferredAudioFormat != nil && len(*Body.PreferredAudioFormat) > 512 {
 		return false, "PreferredAudioFormat must be shorter than 512 characters."
 	}
-	
+	if Body.LiveChatDownloadDir != nil && len(*Body.LiveChatDownloadDir) > 1024 {
+		return false, "LiveChatDownloadDir must be shorter than 1024 characters."
+	}
+
 	return true, ""
 }
 
@@ -104,12 +110,19 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 	if Body.OutputTemplate != nil {
 		NewChannel.OutputTemplate = *Body.OutputTemplate
 	}
-	
+
 	if Body.PreferredVideoFormat != nil {
 		NewChannel.PreferredVideoFormat = *Body.PreferredVideoFormat
 	}
 	if Body.PreferredAudioFormat != nil {
 		NewChannel.PreferredAudioFormat = *Body.PreferredAudioFormat
+	}
+
+	if Body.DownloadLiveChat != nil {
+		NewChannel.DownloadLiveChat = *Body.DownloadLiveChat
+	}
+	if Body.LiveChatDownloadDir != nil {
+		NewChannel.LiveChatDownloadDir = *Body.LiveChatDownloadDir
 	}
 	
 	if NewChannel.CheckInterval < 0 {
@@ -189,7 +202,14 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 	if Body.PreferredAudioFormat != nil {
 		AChannel.PreferredAudioFormat = *Body.PreferredAudioFormat
 	}
-	
+
+	if Body.DownloadLiveChat != nil {
+		AChannel.DownloadLiveChat = *Body.DownloadLiveChat
+	}
+	if Body.LiveChatDownloadDir != nil {
+		AChannel.LiveChatDownloadDir = *Body.LiveChatDownloadDir
+	}
+
 	if Body.QualitySelect >= 0 {
 		AChannel.QualitySelect = Body.QualitySelect
 	}
@@ -1082,7 +1102,6 @@ func API_GetConfig(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(RequestConfig)
 }
 func API_SetConfig(w http.ResponseWriter, r *http.Request) {
-	
 	var Body struct {
 		YtDlp_Path     string `json:"YtDlp_Path"`
 		YtArchive_Path string `json:"YtArchive_Path"`
@@ -1101,7 +1120,6 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 		AutoRefresh_Videos_Seconds int `json:"AutoRefresh_Videos_Seconds"`
 		
 		Download_Video_Thumbnails *bool `json:"Download_Video_Thumbnails"`
-		Download_Live_Chat *bool `json:"Download_Live_Chat"`
 	}
 	Body.TaskLog_AutoDelete_Seconds = -1
 	Body.TaskLog_List_AutoDelete_Seconds = -1
@@ -1170,9 +1188,6 @@ func API_SetConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if Body.Download_Video_Thumbnails != nil {
 		G_Config.Download_Video_Thumbnails = *Body.Download_Video_Thumbnails
-	}
-	if Body.Download_Live_Chat != nil {
-		G_Config.Download_Live_Chat = *Body.Download_Live_Chat
 	}
 	
 	if Body.YtDlp_Path != "" {

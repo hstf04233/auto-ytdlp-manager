@@ -371,10 +371,10 @@ func ytarchive_DownloadLive(CheckSettings ChannelCheckSettings, Video *VideoInfo
 			}
 		}()
 		go func() {
-			if !G_Config.Download_Live_Chat {
+			if !CheckSettings.DownloadLiveChat {
 				return
 			}
-			ChatDownloadDir := filepath.Join(DownloadDir, "/chats")
+			ChatDownloadDir := GetLiveChatDownloadDir(CheckSettings, DownloadDir)
 			err := os.MkdirAll(ChatDownloadDir, 0755)
 			if err != nil {
 				L_Printf("Could not make directory \"%s\" err: %v\n", ChatDownloadDir, err)

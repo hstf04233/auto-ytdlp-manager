@@ -195,6 +195,20 @@ function updateChannelModalPlaceholders() {
       channelOutputTemplate.placeholder = programConfig.Default_YtDlp_OutputTemplate || '%(title)s %(id)s.%(ext)s';
     }
   }
+  updateLiveChatDirVisibility();
+}
+
+function updateLiveChatDirVisibility() {
+  const checkbox = document.getElementById('channelDownloadLiveChat');
+  const row = document.getElementById('channelLiveChatDirRow');
+  const chatDirInput = document.getElementById('channelLiveChatDir');
+  const enabled = checkbox ? checkbox.checked : false;
+  if (row) row.hidden = !enabled;
+  if (chatDirInput && !chatDirInput.value) {
+    const dlDir = (document.getElementById('channelDownloadDir') || {}).value;
+    const base = (dlDir && dlDir.trim()) || programConfig.Default_DownloadDir || "./downloads";
+    chatDirInput.placeholder = base.replace(/\/+$/, '') + "/chats";
+  }
 }
 
 // ========== Preferred formats (single source of truth) ==========
@@ -361,7 +375,7 @@ function updateCheckIntervalPreview() {
 
 // ========== Channel Modal ==========
 function openAddChannelModal() {
-  
+
   document.getElementById('channelModalTitle').textContent = 'Add Channel';
   document.getElementById('channelId').value = '';
   document.getElementById('channelName').value = '';
@@ -369,20 +383,24 @@ function openAddChannelModal() {
   document.getElementById('channelType').value = '0';
   document.getElementById('channelDownloadDir').value = '';
   document.getElementById('channelOutputTemplate').value = '';
-  
+
   document.getElementById('channelQuality').value = '0';
   document.getElementById('channelPreferredVideoFormat').value = "h264,h265,av01";
   document.getElementById('channelPreferredAudioFormat').value = "aac";
-  
+
+  document.getElementById('channelDownloadLiveChat').checked = true;
+  document.getElementById('channelLiveChatDir').value = '';
+
   setChannelCheckInterval('');
   document.getElementById('channelPlaylistEnd').value = '20';
   document.getElementById('channelSubmitBtn').textContent = 'Add Channel';
 
   document.body.classList.add('modal-active');
   document.getElementById('channelModal').classList.add('active');
-  
+
   updateChannelModalPlaceholders();
   updateChannelOutputContainerNote();
+  updateLiveChatDirVisibility();
 }
 
 function getChannelFromId(id) {
@@ -406,15 +424,18 @@ function openEditChannelModal(id) {
   
   document.getElementById('channelDownloadDir').value = ch.download_dir || '';
   document.getElementById('channelOutputTemplate').value = ch.output_template || '';
+  document.getElementById('channelDownloadLiveChat').checked = ch.download_live_chat !== false;
+  document.getElementById('channelLiveChatDir').value = ch.live_chat_download_dir || '';
   setChannelCheckInterval(ch.check_interval);
   document.getElementById('channelPlaylistEnd').value = ch.playlist_end;
   document.getElementById('channelSubmitBtn').textContent = 'Save Changes';
-  
+
   document.body.classList.add('modal-active');
   document.getElementById('channelModal').classList.add('active');
-  
+
   updateChannelModalPlaceholders();
   updateChannelOutputContainerNote();
+  updateLiveChatDirVisibility();
 }
 
 function closeChannelModal() {
@@ -518,6 +539,8 @@ async function saveChannel(e) {
   
   const downloadDir = document.getElementById('channelDownloadDir').value.trim();
   const outputTemplate = document.getElementById('channelOutputTemplate').value.trim();
+  const downloadLiveChat = document.getElementById('channelDownloadLiveChat').checked;
+  const liveChatDownloadDir = document.getElementById('channelLiveChatDir').value.trim();
   const checkInterval = getChannelCheckInterval();
   const playlistEnd = parseInt(document.getElementById('channelPlaylistEnd').value);
 
@@ -527,11 +550,14 @@ async function saveChannel(e) {
     download_dir: downloadDir,
     output_template: outputTemplate,
     type,
-    
+
     quality_select: quality,
     preferred_video_format: preferredVideoFormat,
     preferred_audio_format: preferredAudioFormat,
-    
+
+    download_live_chat: downloadLiveChat,
+    live_chat_download_dir: liveChatDownloadDir,
+
     check_interval: checkInterval,
     playlist_end: playlistEnd,
   };
@@ -546,11 +572,14 @@ async function saveChannel(e) {
       patch.download_dir = downloadDir;
       patch.output_template = outputTemplate;
       patch.type = type;
-      
+
       patch.quality_select = quality;
       patch.preferred_video_format = preferredVideoFormat;
       patch.preferred_audio_format = preferredAudioFormat;
-      
+
+      patch.download_live_chat = downloadLiveChat;
+      patch.live_chat_download_dir = liveChatDownloadDir;
+
       patch.check_interval = checkInterval;
       patch.playlist_end = playlistEnd;
       newChannelData = await API.patch(`/api/channels/${id}`, patch);

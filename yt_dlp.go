@@ -264,12 +264,28 @@ func GetDownloadDir(CheckSettings ChannelCheckSettings) string {
 	if DownloadDir == "" {
 		DownloadDir = G_Config.Default_DownloadDir
 	}
-	
+
 	if filepath.IsLocal(DownloadDir) {
 		DownloadDir = filepath.Join(CURRENT_WORKING_DIRECTORY, DownloadDir)
 	}
-	
+
 	return DownloadDir
+}
+func GetLiveChatDownloadDir(CheckSettings ChannelCheckSettings, DownloadDir string) string {
+	ChatDir := CheckSettings.LiveChatDownloadDir
+	if ChatDir == "" {
+		if DownloadDir == "" {
+			DownloadDir = GetDownloadDir(CheckSettings)
+		}
+		ChatDir = filepath.Join(DownloadDir, "chats")
+		return ChatDir
+	}
+
+	if filepath.IsLocal(ChatDir) {
+		ChatDir = filepath.Join(CURRENT_WORKING_DIRECTORY, ChatDir)
+	}
+
+	return ChatDir
 }
 func GetOutputTemplate(CheckSettings ChannelCheckSettings) string {
 	OutputTemplate := CheckSettings.OutputTemplate

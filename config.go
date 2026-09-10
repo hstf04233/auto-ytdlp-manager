@@ -75,7 +75,6 @@ type ProgramConfig struct {
 	
 	//
 	
-	Download_Live_Chat bool
 	Download_Video_Thumbnails bool
 	
 	APPLICATION_VERSION string `json:"application_version"`
@@ -105,7 +104,6 @@ var G_Config = &ProgramConfig{
 	AutoRefresh_Videos_Seconds: (60*60*24 * 30), // 1 Month
 	
 	Download_Video_Thumbnails: true,
-	Download_Live_Chat: true,
 	
 	APPLICATION_VERSION: APPLICATION_VERSION,
 }
