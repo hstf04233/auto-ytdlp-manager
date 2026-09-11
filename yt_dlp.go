@@ -473,15 +473,16 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 	
 	var OutJson []byte
 	var Stderr  string
+	var RequestErr    error
 	
 	for i := 0; i < 2; i++ {
 		CheckWithNoCookies := (i > 0)
 		
-		OutJson, Stderr, err = yt_dlp_RequestVideoInfo(CheckSettings, VideoUrl, CheckWithNoCookies)
+		OutJson, Stderr, RequestErr = yt_dlp_RequestVideoInfo(CheckSettings, VideoUrl, CheckWithNoCookies)
 		if (Task != nil && Task.Status != TASK_STATUS_RUNNING) {
 			return nil
 		}
-		if err != nil && Stderr != "" {
+		if RequestErr != nil && Stderr != "" {
 			if strings.Contains(Stderr, "Video unavailable") {
 				CL_Logf(Task, "Video is 'unavailable', checking again with no cookies passed.\n")
 				// This usually happens when we passed cookies to yt-dlp and the video is 'removed' or 'private' ...
@@ -490,7 +491,7 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 		}
 		break
 	}
-	if err != nil {
+	if RequestErr != nil {
 		if Video.VideoType == VIDEO_TYPE_ISLIVE {
 			Video.VideoType = VIDEO_TYPE_WASLIVE
 		}
@@ -534,7 +535,7 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 		}
 		
 		CL_Logf(Task, "%s\n", Stderr)
-		CL_Logf(Task, "Failed to get video info from url: %s, Error: %v\n", VideoUrl, err)
+		CL_Logf(Task, "Failed to get video info from url: %s, Error: %v\n", VideoUrl, RequestErr)
 		return fmt.Errorf("%s", Stderr)
 	}
 	var OutVideo YT_DLP_OUTVIDEO
