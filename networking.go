@@ -329,11 +329,6 @@ func IsIpAddressLocal(Ip string) bool {
 		return true
 	}
 	
-	// Link-local unicast/multicast
-	if ParsedIp.IsLinkLocalUnicast() || ParsedIp.IsLinkLocalMulticast() {
-		return true
-	}
-	
 	return false
 }
 
