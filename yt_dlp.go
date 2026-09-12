@@ -518,7 +518,8 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 		} else if strings.Contains(Stderr, "This video has been removed by the uploader") ||
 				  //strings.Contains(Stderr, "Video unavailable.") ||
 				  strings.Contains(Stderr, "This video has been removed for violating") ||
-				  strings.Contains(Stderr, "This video is unavailable") {
+				  strings.Contains(Stderr, "This video is unavailable") ||
+				  strings.Contains(Stderr, "Video unavailable") {
 			Video.Availability = "removed"
 			return fmt.Errorf("%s", Stderr)
 		} else if strings.Contains(Stderr, "This live event will begin in a few moments.") ||
@@ -527,10 +528,6 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 		} else if strings.Contains(Stderr, "Join this channel to get access to members-only content like this video") ||
 		strings.Contains(Stderr, "members-only") {
 			Video.Availability = "members-only"
-			return fmt.Errorf("%s", Stderr)
-		} else if strings.Contains(Stderr, "Video unavailable") {
-			// This error occurs when you have provided cookies and the video is private... Why this happends I have no idea 🤬
-			Video.Availability = "unavailable"
 			return fmt.Errorf("%s", Stderr)
 		}
 		
