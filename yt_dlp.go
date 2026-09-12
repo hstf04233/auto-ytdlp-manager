@@ -508,7 +508,7 @@ func RequestVideoInfo(CheckSettings ChannelCheckSettings, VideoUrl string, Video
 		}
 		
 		// Have no idea if YouTube serves up different error messages for seperate languages...
-		if strings.Contains(Stderr, "Private video.") || strings.Contains(Stderr, "Private video") {
+		if strings.Contains(Stderr, "Private video") {
 			Video.Availability = "private"
 			return fmt.Errorf("%s", Stderr)
 		} else if strings.Contains(Stderr, "Sign in to confirm your age.") ||

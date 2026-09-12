@@ -363,35 +363,36 @@
 
   <!-- ADD/EDIT CHANNEL MODAL -->
   <div class="modal-overlay" id="channelModal">
-    <div class="modal" onclick="event.stopPropagation();">
+    <div class="modal modal-col" onclick="event.stopPropagation();">
       <h2 id="channelModalTitle">Add Channel</h2>
       <form id="channelForm" onsubmit="saveChannel(event)" autocomplete="off">
         <input type="hidden" id="channelId">
         
-        <div class="form-group">
-          <label for="channelName">Channel Name</label>
-          <input type="text" id="channelName" placeholder="Example - videos" maxlength="128" required>
-        </div>
-        <hr>
-        
-        <div class="form-group">
-          <label>Make sure you have the correct url!</label>
-        </div>
-        <div class="form-group">
-          <ul>
-            <li><i>https://www.youtube.com/@ExampleChannel/videos</i> Will only download from the videos tab (This will not download shorts.)</li>
-            <li><i>https://www.youtube.com/@ExampleChannel/shorts</i> Will only download from the shorts tab (This will not download videos.)</li>
-            <li><i>https://www.youtube.com/@ExampleChannel/streams</i> Will only download live streams (Pair this with Type: 'Live Streams')</li>
-            <li><i>https://www.youtube.com/@ExampleChannel</i> Will download everything relating to the channel (videos, shorts, live streams, etc...)</li>
-          </ul>
-        </div>
-        
-        <div class="form-group">
-          <label for="channelUrl">Channel / Playlist URL</label>
-          <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." maxlength="8192" required>
-        </div>
-        
-        <div class="form-row">
+        <details class="modal-section" id="channelSourceSection" open>
+          <summary class="modal-section-title">Source</summary>
+          <div class="form-group">
+            <label for="channelName">Channel Name</label>
+            <input type="text" id="channelName" placeholder="Example - videos" maxlength="128" required>
+          </div>
+
+          <div class="form-group">
+            <label for="channelUrl">Channel / Playlist URL</label>
+            <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." maxlength="8192" required>
+          </div>
+          <details class="modal-details">
+            <summary>Make sure you have the correct url!</summary>
+            <ul>
+              <li><i>https://www.youtube.com/@ExampleChannel/videos</i> Will only download from the videos tab (This will not download shorts.)</li>
+              <li><i>https://www.youtube.com/@ExampleChannel/shorts</i> Will only download from the shorts tab (This will not download videos.)</li>
+              <li><i>https://www.youtube.com/@ExampleChannel/streams</i> Will only download live streams (Pair this with Type: 'Live Streams')</li>
+              <li><i>https://www.youtube.com/@ExampleChannel</i> Will download everything relating to the channel (videos, shorts, live streams, etc...)</li>
+            </ul>
+          </details>
+        </details>
+
+        <details class="modal-section" id="channelMediaSection" open>
+          <summary class="modal-section-title">Media</summary>
+          <div class="form-row">
           <div class="form-group">
             <label for="channelType">Type</label>
             <select id="channelType" onchange="updateChannelModalPlaceholders()">
@@ -452,19 +453,20 @@
           <label for="channelLiveChatDir">Chat download directory (Optional)</label>
           <input type="text" id="channelLiveChatDir" placeholder="./downloads/chats" maxlength="1024">
         </div>
+        </details>
 
-        <hr>
-        <div class="form-group">
-          <label>yt-dlp output format. See more at: <a href="https://github.com/yt-dlp/yt-dlp#output-template" target="_blank">yt-dlp#output-template</a></label>
-        </div>
-        <div class="form-group">
-          <label for="channelOutputTemplate">Output Template (Optional)</label>
-          <input type="text" id="channelOutputTemplate" placeholder="..." maxlength="1024">
-        </div>
-        
-        <hr>
-        
-        <div class="form-row">
+        <details class="modal-section" id="channelOutputSection">
+          <summary class="modal-section-title">Output</summary>
+          <div class="modal-hint">yt-dlp output format. See more at: <a href="https://github.com/yt-dlp/yt-dlp#output-template" target="_blank">yt-dlp#output-template</a></div>
+          <div class="form-group">
+            <label for="channelOutputTemplate">Output Template (Optional)</label>
+            <input type="text" id="channelOutputTemplate" placeholder="..." maxlength="1024">
+          </div>
+        </details>
+
+        <details class="modal-section" id="channelCheckingSection" open>
+          <summary class="modal-section-title">Checking</summary>
+          <div class="form-row">
           <div class="form-group" title="Interval in seconds">
             <label for="channelCheckInterval">Check Interval</label>
             <select id="channelCheckInterval" onchange="updateCheckIntervalCustom()">
@@ -506,14 +508,12 @@
             </select>
           </div>
         </div>
-        
-        <hr>
-        
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" onclick="closeChannelModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" id="channelSubmitBtn">Add Channel</button>
-        </div>
+        </details>
       </form>
+      <div class="modal-actions modal-actions-sticky">
+        <button type="button" class="btn btn-secondary" onclick="closeChannelModal()">Cancel</button>
+        <button type="submit" form="channelForm" class="btn btn-primary" id="channelSubmitBtn">Add Channel</button>
+      </div>
     </div>
   </div>
   

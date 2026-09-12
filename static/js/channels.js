@@ -307,7 +307,13 @@ function restoreAvmPreferredFormats() {
 }
 
 // ========== Check interval (preset dropdown + custom) ==========
-const CHECK_INTERVAL_PRESETS = ['0', '300', '900', '1800', '3600', '7200', '10800', '21600', '43200', '86400', '604800'];
+// A value is a preset when the dropdown holds a matching non-custom option,
+// so editing the HTML options never desyncs this logic.
+function isCheckIntervalPreset(str) {
+  const select = document.getElementById('channelCheckInterval');
+  if (!select || str === '') return false;
+  return [...select.options].some(o => o.value === str && o.value !== 'custom');
+}
 
 // Full breakdown: 1800 -> "30m", 3964 -> "1h 6m 4s". (intervalLabel()
 // drops smaller units, so it can't do this.)
@@ -342,7 +348,7 @@ function setChannelCheckInterval(seconds) {
   const select = document.getElementById('channelCheckInterval');
   const custom = document.getElementById('channelCheckIntervalCustom');
   const str = (seconds === null || seconds === undefined || seconds === '') ? '' : String(seconds);
-  if (str !== '' && CHECK_INTERVAL_PRESETS.includes(str)) {
+  if (str !== '' && isCheckIntervalPreset(str)) {
     select.value = str;
     if (custom) custom.value = '';
   } else if (str === '') {
@@ -373,6 +379,18 @@ function updateCheckIntervalPreview() {
   preview.textContent = (isNaN(v) || v < 0) ? '' : `= ${formatIntervalFull(v)}`;
 }
 
+// ========== Channel modal collapsible sections ==========
+// Output starts collapsed; when editing, it opens itself if a template set.
+function setChannelModalSections(outputOpen) {
+  const sections = ['channelSourceSection', 'channelMediaSection', 'channelCheckingSection'];
+  for (const id of sections) {
+    const el = document.getElementById(id);
+    if (el) el.open = true;
+  }
+  const output = document.getElementById('channelOutputSection');
+  if (output) output.open = !!outputOpen;
+}
+
 // ========== Channel Modal ==========
 function openAddChannelModal() {
 
@@ -398,6 +416,7 @@ function openAddChannelModal() {
   document.body.classList.add('modal-active');
   document.getElementById('channelModal').classList.add('active');
 
+  setChannelModalSections(false);
   updateChannelModalPlaceholders();
   updateChannelOutputContainerNote();
   updateLiveChatDirVisibility();
@@ -433,6 +452,8 @@ function openEditChannelModal(id) {
   document.body.classList.add('modal-active');
   document.getElementById('channelModal').classList.add('active');
 
+  // Output starts collapsed unless this channel actually has a template.
+  setChannelModalSections(!!(ch.output_template && ch.output_template.trim()));
   updateChannelModalPlaceholders();
   updateChannelOutputContainerNote();
   updateLiveChatDirVisibility();
