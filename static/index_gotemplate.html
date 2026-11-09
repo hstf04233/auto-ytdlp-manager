@@ -545,6 +545,24 @@
           <div class="modal-hint" id="groupParentHint" hidden></div>
         </div>
 
+        <div class="modal-section" id="groupShareSection">
+          <div class="modal-section-title">Sharing</div>
+          <div class="form-group">
+            <label for="groupIsPublic">Public link</label>
+            <label class="toggle">
+              <input type="checkbox" id="groupIsPublic" onchange="setGroupPublic(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="modal-hint">Anyone with the link can browse this group's videos (including its sub groups) and watch or download downloaded files, without logging in. They can't change anything.</div>
+          <div class="group-share-link" id="groupShareLinkRow" hidden>
+            <input type="text" id="groupShareLink" readonly aria-label="Share link" onclick="this.select()">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="copyGroupShareLink()">Copy</button>
+            <a class="btn btn-secondary btn-sm" id="groupShareOpen" href="#" target="_blank" rel="noopener noreferrer">Open</a>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="resetGroupShareLink()" title="Create a new link. The current link stops working.">Reset link</button>
+          </div>
+        </div>
+
         <div class="modal-section">
           <div class="modal-section-title">Channels <span class="group-channels-count" id="groupChannelsCount"></span></div>
           <div class="modal-hint">Pick the channels shown in this group. Sub groups' channels are included automatically when viewing this group.</div>
@@ -675,6 +693,7 @@
   
   <script src="/static/js/requires/hls.min.js"></script>
   <script src="/static/{{ .CoreJsPath }}"></script>
+  <script src="/static/{{ .PaginationJsPath }}"></script>
   <script src="/static/{{ .FormatJsPath }}"></script>
   <script src="/static/{{ .ConfigJsPath }}"></script>
   <script src="/static/{{ .ChannelsJsPath }}"></script>

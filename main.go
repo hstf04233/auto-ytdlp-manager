@@ -73,6 +73,7 @@ func StartServer(ServerPort int) {
 	
 	Mux.HandleFunc("/api/", ServeApi)
 	Mux.HandleFunc("/video-file/", ServeVideoDownload)
+	Mux.HandleFunc("/share-file/", ServePublicVideoFile)  // Public group files, no login required.
 	Mux.HandleFunc("/video-stream/", ServeVideoStream)
 	Mux.HandleFunc("/db-image/", ServeDBImage)
 	

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"mime"
 	"net/http"
 	"path"
 	"fmt"
@@ -1322,6 +1323,11 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Public (shared group) endpoints, read only, no login required.
+	if ServePublicApi(w, r, Path) {
+		return
+	}
+
 	AuthUser, err := GetAuthUserFromRequest(r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Auth error: %v", err), http.StatusInternalServerError)
@@ -1552,6 +1558,12 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Video not found.", http.StatusNotFound)
 		return
 	}
+
+	ServeVideoFileForVideo(w, r, VideoInfo)
+}
+
+// Serves the downloaded video file of VideoInfo. The caller must have already authorized the request!
+func ServeVideoFileForVideo(w http.ResponseWriter, r *http.Request, VideoInfo *VideoInfo) {
 	if VideoInfo.DownloadedFilename == "" {
 		http.Error(w, "Video contains no file attached.", http.StatusNotFound)
 		return
@@ -1571,18 +1583,18 @@ func ServeVideoDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	Filename := filepath.Base(FilePath)
-	
-	if DownloadVal := r.URL.Query().Get("download"); DownloadVal != "" {
+
+	Disposition := "inline"
+	if DownloadVal := strings.ToLower(r.URL.Query().Get("download")); DownloadVal == "true" || DownloadVal == "1" || DownloadVal == "yes" {
 		// User wants to download this video
-		DownloadVal = strings.ToLower(DownloadVal)
-		if DownloadVal == "true" || DownloadVal == "1" || DownloadVal == "yes" {
-			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", Filename))
-		} else {
-			w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
-		}
-	} else {
-		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%s", Filename))
+		Disposition = "attachment"
 	}
+	// FormatMediaType quotes the filename (spaces!) and encodes non ASCII titles.
+	ContentDisposition := mime.FormatMediaType(Disposition, map[string]string{"filename": Filename})
+	if ContentDisposition == "" {
+		ContentDisposition = Disposition
+	}
+	w.Header().Set("Content-Disposition", ContentDisposition)
 	
 	ThrottledWriter := NewDynamicThrottledResponseWriter(w, r)
 	

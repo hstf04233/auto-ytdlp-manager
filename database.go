@@ -59,6 +59,10 @@ CREATE TABLE IF NOT EXISTS ChannelGroups (
 	ParentId  TEXT NOT NULL DEFAULT '',
 	SortOrder INTEGER NOT NULL DEFAULT 0,
 
+	/* Public groups can be viewed (read only) by anyone with the share link containing PublicToken. */
+	IsPublic    BOOLEAN NOT NULL DEFAULT 0,
+	PublicToken TEXT NOT NULL DEFAULT '',
+
 	CreatedAt DATETIME NOT NULL DEFAULT (datetime('now')),
 	UpdatedAt DATETIME
 );
@@ -1552,6 +1556,8 @@ func OpenDB() error {
 
 		// Channel groups
 		"ALTER TABLE ArchiveChannels ADD COLUMN GroupId TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE ChannelGroups ADD COLUMN IsPublic BOOLEAN NOT NULL DEFAULT 0",
+		"ALTER TABLE ChannelGroups ADD COLUMN PublicToken TEXT NOT NULL DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

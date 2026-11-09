@@ -28,6 +28,10 @@ type ChannelGroup struct {
 	Name     string `json:"name"`
 	ParentId string `json:"parent_id"`
 
+	// Public groups can be viewed (read only) by anyone with the share link, even when logged out.
+	IsPublic    bool   `json:"is_public"`
+	PublicToken string `json:"public_token"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -35,8 +39,22 @@ type ChannelGroup struct {
 // Serializes group modifications, so validation (nesting rules) and the write happen together.
 var GroupsLock sync.Mutex
 
+const db_ChannelGroupColumns = `Id, Name, ParentId, IsPublic, PublicToken, CreatedAt, UpdatedAt`
+
+func db_ScanChannelGroup(Row db_RowScanner) (*ChannelGroup, error) {
+	Group := &ChannelGroup{}
+	var rawCreatedAt, rawUpdatedAt any
+	err := Row.Scan(&Group.Id, &Group.Name, &Group.ParentId, &Group.IsPublic, &Group.PublicToken, &rawCreatedAt, &rawUpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	Group.CreatedAt = parseDBTime(rawCreatedAt)
+	Group.UpdatedAt = parseDBTime(rawUpdatedAt)
+	return Group, nil
+}
+
 func DB_ListChannelGroups() ([]*ChannelGroup, error) {
-	Rows, err := GDB.Query(`SELECT Id, Name, ParentId, CreatedAt, UpdatedAt FROM ChannelGroups ORDER BY Name COLLATE NOCASE ASC, CreatedAt ASC`)
+	Rows, err := GDB.Query(`SELECT ` + db_ChannelGroupColumns + ` FROM ChannelGroups ORDER BY Name COLLATE NOCASE ASC, CreatedAt ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -44,13 +62,10 @@ func DB_ListChannelGroups() ([]*ChannelGroup, error) {
 
 	Groups := []*ChannelGroup{}
 	for Rows.Next() {
-		Group := &ChannelGroup{}
-		var rawCreatedAt, rawUpdatedAt any
-		if err := Rows.Scan(&Group.Id, &Group.Name, &Group.ParentId, &rawCreatedAt, &rawUpdatedAt); err != nil {
+		Group, err := db_ScanChannelGroup(Rows)
+		if err != nil {
 			return nil, err
 		}
-		Group.CreatedAt = parseDBTime(rawCreatedAt)
-		Group.UpdatedAt = parseDBTime(rawUpdatedAt)
 		Groups = append(Groups, Group)
 	}
 
@@ -58,32 +73,52 @@ func DB_ListChannelGroups() ([]*ChannelGroup, error) {
 }
 
 func DB_GetChannelGroup(GroupId string) (*ChannelGroup, error) {
-	Group := &ChannelGroup{}
-	var rawCreatedAt, rawUpdatedAt any
-	err := GDB.QueryRow(`SELECT Id, Name, ParentId, CreatedAt, UpdatedAt FROM ChannelGroups WHERE Id = ?`, GroupId).Scan(
-		&Group.Id, &Group.Name, &Group.ParentId, &rawCreatedAt, &rawUpdatedAt)
+	Group, err := db_ScanChannelGroup(GDB.QueryRow(`SELECT `+db_ChannelGroupColumns+` FROM ChannelGroups WHERE Id = ?`, GroupId))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
 		return nil, err
 	}
-	Group.CreatedAt = parseDBTime(rawCreatedAt)
-	Group.UpdatedAt = parseDBTime(rawUpdatedAt)
-
 	return Group, nil
+}
+
+// Returns the group for a share token, only if that group is currently public. Otherwise returns nil.
+func DB_GetPublicChannelGroupByToken(Token string) (*ChannelGroup, error) {
+	if len(Token) != GROUP_PUBLIC_TOKEN_LENGTH {
+		return nil, nil
+	}
+	Group, err := db_ScanChannelGroup(GDB.QueryRow(`SELECT `+db_ChannelGroupColumns+` FROM ChannelGroups WHERE PublicToken = ? AND IsPublic = 1`, Token))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if Group.PublicToken == "" || !Group.IsPublic {
+		return nil, nil
+	}
+	return Group, nil
+}
+
+const GROUP_PUBLIC_TOKEN_LENGTH = 32  // 32 base64 characters = 192 bits.
+
+func NewGroupPublicToken() string {
+	return string(GenerateRandomBase64String(GROUP_PUBLIC_TOKEN_LENGTH))
 }
 
 func DB_UpdateChannelGroup(Group *ChannelGroup) error {
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT INTO ChannelGroups(Id, Name, ParentId, CreatedAt, UpdatedAt)
-	VALUES (?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO ChannelGroups(Id, Name, ParentId, IsPublic, PublicToken, CreatedAt, UpdatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
 	ParentId=excluded.ParentId,
+	IsPublic=excluded.IsPublic,
+	PublicToken=excluded.PublicToken,
 	UpdatedAt=excluded.UpdatedAt
-	`, Group.Id, Group.Name, Group.ParentId, TimeNow, TimeNow)
+	`, Group.Id, Group.Name, Group.ParentId, Group.IsPublic, Group.PublicToken, TimeNow, TimeNow)
 	if err != nil {
 		L_Printf("DB_UpdateChannelGroup ERR: %v\n", err)
 	}
@@ -186,6 +221,20 @@ type API_RequestGroupBody struct {
 	// When set, these channels become exactly the channels directly inside this group.
 	// Channels that were inside this group but aren't in this list become ungrouped.
 	ChannelIds *[]string `json:"channel_ids"`
+
+	IsPublic *bool `json:"is_public"`
+	// Generates a new share link, the old link stops working.
+	ResetPublicToken bool `json:"reset_public_token"`
+}
+
+// Must be called with GroupsLock held.
+func api_ApplyGroupPublic(Group *ChannelGroup, Body API_RequestGroupBody) {
+	if Body.IsPublic != nil {
+		Group.IsPublic = *Body.IsPublic
+	}
+	if Body.ResetPublicToken || (Group.IsPublic && Group.PublicToken == "") {
+		Group.PublicToken = NewGroupPublicToken()
+	}
 }
 
 // Must be called with GroupsLock held.
@@ -324,6 +373,7 @@ func API_NewGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		Group.ParentId = *Body.ParentId
 	}
+	api_ApplyGroupPublic(Group, Body)
 
 	if err := DB_UpdateChannelGroup(Group); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -390,6 +440,7 @@ func API_UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		Group.ParentId = *Body.ParentId
 	}
+	api_ApplyGroupPublic(Group, Body)
 
 	if err := DB_UpdateChannelGroup(Group); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -95,7 +95,7 @@ function toggleGroupCollapsed(groupId) {
 // ========== Channels page rendering ==========
 function channelsRenderSig() {
   const ch = allChannels.map(c => `${c.id}:${c.group_id || ''}:${c.name}:${c.url}:${c.type}:${c.quality_select}:${c.check_interval}:${c.hidden ? 1 : 0}`).join('|');
-  const gr = allGroups.map(g => `${g.id}:${g.parent_id || ''}:${g.name}`).join('|');
+  const gr = allGroups.map(g => `${g.id}:${g.parent_id || ''}:${g.name}:${g.is_public ? 1 : 0}`).join('|');
   return ch + '#' + gr;
 }
 
@@ -128,6 +128,7 @@ function groupSectionHTML(group, depth, collapsed) {
         <button type="button" class="channel-group-toggle" onclick="toggleGroupCollapsed('${gid}')" aria-expanded="${!isCollapsed}" title="Collapse / expand">
           <span class="channel-group-caret" aria-hidden="true">&#9662;</span>
           <span class="channel-group-name">${escHtml(group.name)}</span>
+          ${group.is_public ? '<span class="channel-group-public" title="Anyone with the share link can view this group">Public</span>' : ''}
           <span class="channel-group-count">${countParts.join(' · ')}</span>
         </button>
         <div class="channel-group-actions">
@@ -214,12 +215,78 @@ function openGroupModal(group, parentId) {
   hint.hidden = !hasSubGroups;
   hint.textContent = hasSubGroups ? 'This group has sub groups, so it has to stay a top level group.' : '';
 
+  // Sharing is toggled live on an existing group (a new group has to be created first).
+  document.getElementById('groupShareSection').hidden = !isEdit;
+  if (isEdit) renderGroupShareSection(group);
+
   groupModalSelected = new Set(isEdit ? getDirectGroupChannels(group.id).map(ch => ch.id) : []);
   renderGroupChannelPicker();
 
   document.body.classList.add('modal-active');
   document.getElementById('groupModal').classList.add('active');
   setTimeout(() => document.getElementById('groupName').focus(), 0);
+}
+
+// ========== Public sharing ==========
+function groupShareUrl(group) {
+  return `${location.origin}/share/${encodeURIComponent(group.public_token)}`;
+}
+
+function renderGroupShareSection(group) {
+  const isPublic = !!(group && group.is_public && group.public_token);
+  document.getElementById('groupIsPublic').checked = isPublic;
+  document.getElementById('groupShareLinkRow').hidden = !isPublic;
+  if (isPublic) {
+    const url = groupShareUrl(group);
+    document.getElementById('groupShareLink').value = url;
+    document.getElementById('groupShareOpen').href = url;
+  }
+}
+
+async function updateGroupSharing(body) {
+  const id = document.getElementById('groupId').value;
+  if (!id) return null;
+  const updated = await API.patch(`/api/groups/${encodeURIComponent(id)}`, body);
+  const idx = allGroups.findIndex(g => g.id === id);
+  if (idx >= 0) allGroups[idx] = updated;
+  renderGroupShareSection(updated);
+  renderChannels();
+  return updated;
+}
+
+async function setGroupPublic(isPublic) {
+  const checkbox = document.getElementById('groupIsPublic');
+  checkbox.disabled = true;
+  try {
+    await updateGroupSharing({ is_public: isPublic });
+    showToast(isPublic ? 'Group is now public. Anyone with the link can view it.' : 'Group is now private. The share link no longer works.', 'success');
+  } catch (err) {
+    checkbox.checked = !isPublic;
+    showToast(`Failed to change sharing: ${err.message}`, 'error');
+  }
+  checkbox.disabled = false;
+}
+
+async function resetGroupShareLink() {
+  if (!confirm('Create a new share link? The current link will stop working for everyone who has it.')) return;
+  try {
+    await updateGroupSharing({ reset_public_token: true });
+    showToast('New share link created. The old link no longer works.', 'success');
+  } catch (err) {
+    showToast(`Failed to reset link: ${err.message}`, 'error');
+  }
+}
+
+async function copyGroupShareLink() {
+  const input = document.getElementById('groupShareLink');
+  try {
+    await navigator.clipboard.writeText(input.value);
+  } catch (e) {
+    // Clipboard API is unavailable on plain http (non localhost), fall back to selecting + copying.
+    input.select();
+    document.execCommand('copy');
+  }
+  showToast('Share link copied!', 'success');
 }
 
 function closeGroupModal() {

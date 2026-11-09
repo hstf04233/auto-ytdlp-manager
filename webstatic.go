@@ -30,10 +30,12 @@ var WebStatic_OGPathAssetInfo   = map[string]*WebStaticAssetInfo{}
 
 var WebStatic_INDEX_HTML []byte
 var WebStatic_LOGIN_HTML []byte
+var WebStatic_SHARE_HTML []byte
 
 var __FilesToManifest = []string{
 	//"js/app.js",
 	"js/core.js",
+	"js/pagination.js",
 	"js/format.js",
 	"js/config.js",
 	"js/channels.js",
@@ -44,6 +46,7 @@ var __FilesToManifest = []string{
 	
 	"js/login_app.js",
 	"js/chat.js",
+	"js/share.js",
 	
 	"css/style.css",
 }
@@ -90,6 +93,10 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		NeedsLogin = true
 	} else if strings.HasPrefix(path, "login") {
 		path = "login.html"
+	} else if strings.HasPrefix(path, "share/") {
+		// Public shared group page, no login required. The page itself is static,
+		// the share token in the url is checked by the public api.
+		path = "share.html"
 	} else {
 		if strings.HasPrefix(path, "static/") {
 			path = strings.TrimPrefix(path, "static/")
@@ -110,7 +117,7 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	if path == "index_gotemplate.html" || path == "login_gotemplate.html" {
+	if path == "index_gotemplate.html" || path == "login_gotemplate.html" || path == "share_gotemplate.html" {
 		// Bruh
 		http.Error(w, "Page not found.", http.StatusNotFound)
 		return
@@ -131,6 +138,15 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		}
 		case "login.html": {
 			webstatic_ServeLoginHtml(w, r)
+			return
+		}
+		case "share.html": {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+			// Don't leak the share token (in the page url) to other sites, and keep shared pages out of search engines.
+			w.Header().Set("Referrer-Policy", "no-referrer")
+			w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+			w.Write(WebStatic_SHARE_HTML)
 			return
 		}
 	}
@@ -225,6 +241,7 @@ func init() {
 	
 	IndexHtmlData := struct{
 		CoreJsPath     string
+		PaginationJsPath string
 		FormatJsPath   string
 		ConfigJsPath   string
 		ChannelsJsPath string
@@ -235,10 +252,12 @@ func init() {
 		
 		ChatJsPath      string
 		LoginAppJsPath  string
-		
+		ShareJsPath     string
+
 		StyleCssPath string
 	}{
 		CoreJsPath: webstatic_GetCacheBustedAsset("js/core.js"),
+		PaginationJsPath: webstatic_GetCacheBustedAsset("js/pagination.js"),
 		FormatJsPath: webstatic_GetCacheBustedAsset("js/format.js"),
 		ConfigJsPath: webstatic_GetCacheBustedAsset("js/config.js"),
 		ChannelsJsPath: webstatic_GetCacheBustedAsset("js/channels.js"),
@@ -249,6 +268,7 @@ func init() {
 		
 		ChatJsPath:     webstatic_GetCacheBustedAsset("js/chat.js"),
 		LoginAppJsPath: webstatic_GetCacheBustedAsset("js/login_app.js"),
+		ShareJsPath:    webstatic_GetCacheBustedAsset("js/share.js"),
 		
 		StyleCssPath: webstatic_GetCacheBustedAsset("css/style.css"),
 	}
@@ -259,6 +279,11 @@ func init() {
 		return
 	}
 	err = _webstatic_GenerateExecutedHtmlTemplate("static/login_gotemplate.html", IndexHtmlData, &WebStatic_LOGIN_HTML)
+	if err != nil {
+		panic(err)
+		return
+	}
+	err = _webstatic_GenerateExecutedHtmlTemplate("static/share_gotemplate.html", IndexHtmlData, &WebStatic_SHARE_HTML)
 	if err != nil {
 		panic(err)
 		return

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Shared videos</title>
+  <link rel="icon" href="/favicon.ico" type="image/png">
+  <link rel="stylesheet" href="/static/{{ .StyleCssPath }}">
+</head>
+<body class="share-body">
+  <div class="toast-container" id="toastContainer"></div>
+
+  <main class="share-page">
+    <header class="share-header">
+      <div class="share-eyebrow">Shared group &middot; view only</div>
+      <h1 id="shareTitle">Loading&hellip;</h1>
+      <div class="share-meta" id="shareMeta"></div>
+    </header>
+
+    <div id="shareContent" hidden>
+      <nav class="share-tabs" id="shareTabs" aria-label="Sub groups"></nav>
+
+      <div class="share-toolbar">
+        <div class="search-wrapper">
+          <input class="search-bar" type="text" id="shareSearch" maxlength="256" placeholder="Search videos..." aria-label="Search videos">
+        </div>
+        <select id="shareOrder" aria-label="Sort videos">
+          <option value="release_date:-1">Newest</option>
+          <option value="release_date:1">Oldest</option>
+          <option value="added_at:-1">Recently added</option>
+          <option value="file_size:-1">Largest</option>
+        </select>
+        <label class="share-check">
+          <input type="checkbox" id="shareDownloadedOnly">
+          <span>Downloaded only</span>
+        </label>
+      </div>
+
+      <div class="pagination share-pagination-top" id="sharePagination-top"></div>
+      <div class="share-grid" id="shareVideos"></div>
+      <div class="pagination" id="sharePagination-bottom"></div>
+    </div>
+
+    <div class="share-error" id="shareError" hidden></div>
+  </main>
+
+  <!-- VIDEO MODAL -->
+  <div class="modal-overlay" id="shareVideoModal">
+    <div class="modal share-video-modal" onclick="event.stopPropagation();">
+      <div class="modal-header">
+        <h2 id="shareVideoTitle">Video</h2>
+        <button class="modal-close" onclick="closeShareVideo()" aria-label="Close">&times;</button>
+      </div>
+      <div id="shareVideoBody"></div>
+    </div>
+  </div>
+
+  <script src="/static/{{ .FormatJsPath }}"></script>
+  <script src="/static/{{ .PaginationJsPath }}"></script>
+  <script src="/static/{{ .ShareJsPath }}"></script>
+
+  <noscript>
+    <div class="modal-overlay active">
+      <div class="modal">
+        <h2>This page requires JavaScript to be enabled!</h2>
+      </div>
+    </div>
+  </noscript>
+</body>
+</html>

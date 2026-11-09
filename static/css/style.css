@@ -675,6 +675,366 @@ body.no-transition .sidebar-bottom .btn {
   border-radius: 4px;
 }
 
+.channel-group-public {
+  align-self: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--success);
+  border: 1px solid var(--success);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+
+.group-share-link {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.group-share-link input {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: Consolas, monospace;
+  font-size: 0.8rem;
+}
+
+.group-share-link a.btn {
+  text-decoration: none;
+}
+
+/* ===== Public shared group page (/share/<token>) ===== */
+.share-body {
+  display: block;
+}
+
+.share-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+.share-header {
+  margin-bottom: 20px;
+}
+
+.share-eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.share-header h1 {
+  font-size: 1.9rem;
+  overflow-wrap: anywhere;
+}
+
+.share-meta {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
+.share-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.share-tab {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.share-tab:hover {
+  border-color: var(--text-secondary);
+}
+
+.share-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.share-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.share-toolbar input[type="text"],
+.share-toolbar select {
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.share-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.share-check input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+.share-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 18px;
+}
+
+.share-card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.share-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.share-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--bg-input);
+}
+
+.share-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.share-card.no-file .share-thumb img {
+  opacity: 0.45;
+}
+
+.share-duration {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 0.75rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.share-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(233, 69, 96, 0.9);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 4px;
+  font-size: 1.2rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.share-card:hover .share-play,
+.share-card:focus-visible .share-play {
+  opacity: 1;
+}
+
+.share-nofile {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.share-card-body {
+  padding: 10px 12px 12px;
+}
+
+.share-card-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.share-card-tags {
+  margin-top: 6px;
+}
+
+.share-card-meta {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  margin-top: 6px;
+}
+
+/* Availability label (public / unlisted / private / removed ...) */
+.share-avail {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 0 7px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.share-avail-ok      { color: var(--success); }
+.share-avail-info    { color: var(--info); }
+.share-avail-warn    { color: var(--warning); }
+.share-avail-danger  { color: var(--danger); }
+.share-avail-neutral { color: var(--text-secondary); }
+
+.share-muted {
+  color: var(--text-secondary);
+}
+
+.share-empty,
+.share-error {
+  color: var(--text-secondary);
+  padding: 30px 0;
+}
+
+/* Top page navigation sits between the toolbar and the videos. */
+.pagination.share-pagination-top {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.share-video-modal {
+  max-width: 1000px;
+}
+
+.share-video-modal h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+}
+
+.share-player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: black;
+  border-radius: 8px;
+  display: block;
+}
+
+.share-player-empty {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.share-player-empty img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.3;
+}
+
+.share-player-empty span {
+  position: relative;
+  color: var(--text-primary);
+}
+
+.share-video-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+}
+
+.share-video-actions a.btn {
+  text-decoration: none;
+}
+
+.share-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  font-size: 0.88rem;
+  margin-bottom: 14px;
+}
+
+.share-facts dt {
+  color: var(--text-secondary);
+}
+
+.share-facts a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.share-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
 /* Toggle switch */
 .toggle {
   position: relative;
@@ -2414,6 +2774,18 @@ details.modal-section > summary:hover {
   }
   .channel-group-toggle {
     flex-wrap: wrap;
+  }
+  .share-page {
+    padding: 20px 16px 36px;
+  }
+  .share-header h1 {
+    font-size: 1.5rem;
+  }
+  .share-grid {
+    grid-template-columns: 1fr;
+  }
+  .share-toolbar .search-wrapper {
+    flex-basis: 100%;
   }
 
   /* ---------- Videos: 2-col stats, vertical video cards ---------- */
