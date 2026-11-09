@@ -5,7 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <title>Shared videos</title>
+  <title>{{ .Meta.Title }}</title>
+  <meta name="description" content="{{ .Meta.Description }}">
+  <meta name="theme-color" content="#e94560">
+
+  <!-- Link previews (Discord, X, Slack, ...). Rendered by the server, crawlers don't run javascript. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="{{ .Meta.SiteName }}">
+  <meta property="og:title" content="{{ .Meta.Title }}">
+  <meta property="og:description" content="{{ .Meta.Description }}">
+  {{- if .Meta.Url }}
+  <meta property="og:url" content="{{ .Meta.Url }}">
+  {{- end }}
+  <meta name="twitter:title" content="{{ .Meta.Title }}">
+  <meta name="twitter:description" content="{{ .Meta.Description }}">
+  {{- if .Meta.ImageUrl }}
+  <meta property="og:image" content="{{ .Meta.ImageUrl }}">
+  <meta property="og:image:alt" content="{{ .Meta.ImageAlt }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ .Meta.ImageUrl }}">
+  {{- else }}
+  <meta name="twitter:card" content="summary">
+  {{- end }}
+
   <link rel="icon" href="/favicon.ico" type="image/png">
   <link rel="stylesheet" href="/static/{{ .StyleCssPath }}">
 </head>

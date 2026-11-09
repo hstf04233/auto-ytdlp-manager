@@ -30,7 +30,45 @@ var WebStatic_OGPathAssetInfo   = map[string]*WebStaticAssetInfo{}
 
 var WebStatic_INDEX_HTML []byte
 var WebStatic_LOGIN_HTML []byte
-var WebStatic_SHARE_HTML []byte
+
+// Cache busted paths of the static assets, used by the html templates.
+type WebStaticAssetPaths struct {
+	CoreJsPath       string
+	PaginationJsPath string
+	FormatJsPath     string
+	ConfigJsPath     string
+	ChannelsJsPath   string
+	GroupsJsPath     string
+	VideosJsPath     string
+	TasksJsPath      string
+	MainJsPath       string
+
+	ChatJsPath     string
+	LoginAppJsPath string
+	ShareJsPath    string
+
+	StyleCssPath string
+}
+
+var WebStatic_AssetPaths WebStaticAssetPaths
+var WebStatic_ShareTemplate *template.Template
+
+type webstatic_ShareHtmlData struct {
+	WebStaticAssetPaths
+	Meta ShareMeta
+}
+
+func webstatic_RenderSharePage(Meta ShareMeta) ([]byte, error) {
+	var Buffer bytes.Buffer
+	err := WebStatic_ShareTemplate.Execute(&Buffer, webstatic_ShareHtmlData{
+		WebStaticAssetPaths: WebStatic_AssetPaths,
+		Meta:                Meta,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return Buffer.Bytes(), nil
+}
 
 var __FilesToManifest = []string{
 	//"js/app.js",
@@ -146,7 +184,16 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 			// Don't leak the share token (in the page url) to other sites, and keep shared pages out of search engines.
 			w.Header().Set("Referrer-Policy", "no-referrer")
 			w.Header().Set("X-Robots-Tag", "noindex, nofollow")
-			w.Write(WebStatic_SHARE_HTML)
+
+			// Link preview (Discord, X, etc...) meta tags. Crawlers don't run javascript, so these are rendered here.
+			Token := strings.SplitN(strings.TrimPrefix(r.URL.Path, "/share/"), "/", 2)[0]
+			Page, err := webstatic_RenderSharePage(BuildShareMeta(r, Token))
+			if err != nil {
+				L_Printf("Failed to render share page: %v\n", err)
+				http.Error(w, "Internal server error.", http.StatusInternalServerError)
+				return
+			}
+			w.Write(Page)
 			return
 		}
 	}
@@ -239,23 +286,7 @@ func init() {
 		_webstatic_AddToManifest(FilePath)
 	}
 	
-	IndexHtmlData := struct{
-		CoreJsPath     string
-		PaginationJsPath string
-		FormatJsPath   string
-		ConfigJsPath   string
-		ChannelsJsPath string
-		GroupsJsPath   string
-		VideosJsPath   string
-		TasksJsPath    string
-		MainJsPath     string
-		
-		ChatJsPath      string
-		LoginAppJsPath  string
-		ShareJsPath     string
-
-		StyleCssPath string
-	}{
+	IndexHtmlData := WebStaticAssetPaths{
 		CoreJsPath: webstatic_GetCacheBustedAsset("js/core.js"),
 		PaginationJsPath: webstatic_GetCacheBustedAsset("js/pagination.js"),
 		FormatJsPath: webstatic_GetCacheBustedAsset("js/format.js"),
@@ -283,9 +314,15 @@ func init() {
 		panic(err)
 		return
 	}
-	err = _webstatic_GenerateExecutedHtmlTemplate("static/share_gotemplate.html", IndexHtmlData, &WebStatic_SHARE_HTML)
+	// The share page is rendered per request (link preview meta tags), so only parse it here.
+	WebStatic_AssetPaths = IndexHtmlData
+	WebStatic_ShareTemplate, err = template.ParseFS(WebStaticContent, "static/share_gotemplate.html")
 	if err != nil {
+		L_Printf("ERROR: Could not read 'static/share_gotemplate.html' !!!!!! PLEASE MAKE SURE YOU BUILT THE PROGRAM CORRECTLY!!!!\n")
 		panic(err)
-		return
+	}
+	// Make sure the template actually executes, so a broken template fails at startup and not per request.
+	if _, err = webstatic_RenderSharePage(ShareMeta{}); err != nil {
+		panic(err)
 	}
 }

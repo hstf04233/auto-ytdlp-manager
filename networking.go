@@ -312,6 +312,51 @@ func GetIpAddressFromRequest(r *http.Request) string {
 	return host
 }
 
+// Was the request made over https? Either directly (TLS) or through a proxy that terminated TLS
+// (X-Forwarded-Proto: https).
+func IsRequestHttps(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}
+
+// Returns the host (and port, if any) the client used to reach the server, e.g. "example.com" or "localhost:8867".
+// X-Forwarded-Host is only trusted when the server is configured to sit behind a proxy (IpStrategy is not 'direct').
+// Returns '' if the host looks invalid, so it's safe to put into urls/html.
+func GetRequestHost(r *http.Request) string {
+	Host := r.Host
+	if G_Config != nil && G_Config.IpStrategy != IP_STRATEGY_DIRECT {
+		if ForwardedHost := r.Header.Get("X-Forwarded-Host"); ForwardedHost != "" {
+			Host = strings.TrimSpace(strings.Split(ForwardedHost, ",")[0])
+		}
+	}
+
+	if Host == "" || len(Host) > 255 {
+		return ""
+	}
+	// Only allow sane host characters (hostname, ipv4/ipv6, port).
+	for _, c := range(Host) {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || strings.ContainsRune(".-:[]", c)) {
+			return ""
+		}
+	}
+
+	return Host
+}
+
+// Returns the absolute base url the client used to reach the server, e.g. "https://example.com".
+// Useful for building absolute links (link previews, emails, etc...). Returns '' if the host looks invalid.
+func GetRequestBaseUrl(r *http.Request) string {
+	Host := GetRequestHost(r)
+	if Host == "" {
+		return ""
+	}
+
+	Scheme := "http"
+	if IsRequestHttps(r) {
+		Scheme = "https"
+	}
+	return Scheme + "://" + Host
+}
+
 func IsIpAddressLocal(Ip string) bool {
 	// Chat gpt vibed ts up... Hopefully it's correct 😭
 	ParsedIp := net.ParseIP(Ip)

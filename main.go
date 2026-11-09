@@ -55,7 +55,7 @@ func SecurityMiddleware(next http.Handler) http.Handler {
 			*/
 		}
 		
-		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		if IsRequestHttps(r) {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		

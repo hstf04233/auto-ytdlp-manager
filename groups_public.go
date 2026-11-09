@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -314,6 +315,133 @@ func ServePublicApi(w http.ResponseWriter, r *http.Request, Path string) bool {
 		http.NotFound(w, r)
 	}
 	return true
+}
+
+// ========== Link previews ==========
+// Open Graph / Twitter card data for /share/<token>, so pasting a share link
+// into Discord, X, Slack, etc... shows a little card.
+
+type ShareMeta struct {
+	Title       string
+	Description string
+	Url         string  // Absolute url of the share page.
+	ImageUrl    string  // Absolute url (or '' for no image).
+	ImageAlt    string
+	SiteName    string
+}
+
+func shareTruncate(Str string, Max int) string {
+	Runes := []rune(Str)
+	if len(Runes) <= Max {
+		return Str
+	}
+	return strings.TrimSpace(string(Runes[:Max-1])) + "…"
+}
+
+// Joins names like "A, B, C and 2 more".
+func shareJoinNames(Names []string, Max int) string {
+	if len(Names) <= Max {
+		return strings.Join(Names, ", ")
+	}
+	return fmt.Sprintf("%s and %d more", strings.Join(Names[:Max], ", "), len(Names)-Max)
+}
+
+func BuildShareMeta(r *http.Request, Token string) ShareMeta {
+	Meta := ShareMeta{
+		Title:       "Shared videos",
+		Description: "A shared video archive.",
+		SiteName:    "Auto yt-dlp Manager",
+	}
+	BaseUrl := GetRequestBaseUrl(r)
+
+	// Unknown, private or revoked links get the generic card, never any group details.
+	Group, err := DB_GetPublicChannelGroupByToken(Token)
+	if err != nil || Group == nil {
+		return Meta
+	}
+
+	ChannelIds, Found, err := GetChannelIdsInGroup(Group.Id)
+	if err != nil || !Found {
+		return Meta
+	}
+
+	Meta.Title = shareTruncate(Group.Name, 100)
+	if BaseUrl != "" {
+		Meta.Url = BaseUrl + "/share/" + Token
+	}
+
+	Query := ListVideosQuery{
+		RefreshState: -1,
+		QueuedAction: -1,
+		VideoType:    -1,
+		Status:       -1,
+
+		UseFromChannelIds: true,
+		FromChannelIds:    ChannelIds,
+
+		OrderBy:        DB_VIDEO_ORDERBY_ReleaseDate,
+		OrderDirection: -1,
+
+		ExcludeDescription: true,
+	}
+
+	// Description: "412 videos (9 downloaded) from ExampleChannel, ExampleChannel2"
+	TotalVideos, TotalDownloaded := 0, 0
+	if Stats, err := DB_GetVideoStatsFromQuery(Query); err == nil && Stats != nil {
+		TotalVideos, TotalDownloaded = Stats.Total, Stats.TotalDownloaded
+	}
+	VideoCount := fmt.Sprintf("%d video", TotalVideos)
+	if TotalVideos != 1 {
+		VideoCount += "s"
+	}
+	if TotalDownloaded > 0 && TotalDownloaded != TotalVideos {
+		VideoCount += fmt.Sprintf(" (%d downloaded)", TotalDownloaded)
+	}
+
+	// Name the sub groups if there are any, otherwise the channels.
+	Names := []string{}
+	if Groups, err := DB_ListChannelGroups(); err == nil {
+		for _, G := range(Groups) {
+			if G.ParentId == Group.Id {
+				Names = append(Names, G.Name)
+			}
+		}
+	}
+	if len(Names) == 0 {
+		G_ArchiveChannels.ChannelsLock.RLock()
+		for _, AChannel := range(G_ArchiveChannels.Channels) {
+			AChannel.Lock.RLock()
+			if slices.Contains(ChannelIds, AChannel.Id) && !AChannel.Hidden {
+				Names = append(Names, AChannel.Name)
+			}
+			AChannel.Lock.RUnlock()
+		}
+		G_ArchiveChannels.ChannelsLock.RUnlock()
+	}
+	Meta.Description = VideoCount
+	if len(Names) > 0 {
+		Meta.Description += " from " + shareJoinNames(Names, 3)
+	}
+	Meta.Description = shareTruncate(Meta.Description, 200)
+
+	// Image: thumbnail of the newest video that has one.
+	if Videos, err := DB_ListVideos(20, 0, Query); err == nil {
+		for _, Video := range(Videos) {
+			ImageUrl := ""
+			if Video.Thumbnail != "" && BaseUrl != "" {
+				ImageUrl = BaseUrl + "/db-image/" + url.PathEscape(Video.Thumbnail)
+			} else if strings.HasPrefix(Video.OriginThumbnail, "https://") {
+				ImageUrl = Video.OriginThumbnail
+			}
+			if ImageUrl != "" {
+				Meta.ImageUrl = ImageUrl
+				Meta.ImageAlt = shareTruncate("Thumbnail of: "+Video.Title, 200)
+				break
+			}
+		}
+	}
+
+	return Meta
 }
 
 // GET /share-file/<token>/<video id>[?download=1]
