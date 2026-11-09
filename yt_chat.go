@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	YT_CHAT_DEBUG_HTML = true
+	YT_CHAT_DEBUG_HTML = false
 	YT_CHAT_UPDATE_MS = 1500
 
 	// Resilience tuning for long live streams. A single transient failure

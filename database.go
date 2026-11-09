@@ -466,16 +466,41 @@ func DB_DeleteVideo(Video *VideoInfo) error {
 func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 	VideoDBLock.RLock()
 	defer VideoDBLock.RUnlock()
-	VideoInfo := &VideoInfo{}
-	VideoRow := GDB.QueryRow(`
-	SELECT FromChannel, Id, Title, Description, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, StreamedDirectory, Status, QueuedAction, ReleaseDate, Duration,
+	VideoRow := GDB.QueryRow(`SELECT `+db_VideoFullColumns(false)+` FROM Videos WHERE Id = ?`, VideoId)
+
+	VideoInfo, err := db_ScanFullVideo(VideoRow)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return VideoInfo, nil
+}
+
+type db_RowScanner interface {
+	Scan(dest ...any) error
+}
+
+// Column list matching db_ScanFullVideo.
+func db_VideoFullColumns(ExcludeDescription bool) string {
+	DescriptionColumn := "Description"
+	if ExcludeDescription {
+		DescriptionColumn = "'' AS Description"
+	}
+	return `FromChannel, Id, Title, ` + DescriptionColumn + `, Url, Availability, Resolution, Thumbnail, StoredThumbnail, Filename, FileSize, StreamedDirectory, Status, QueuedAction, ReleaseDate, Duration,
 	UploaderName, UploaderUrl,
 	VideoType,
-	AddedAt, UpdatedAt, RefreshState FROM Videos WHERE Id = ?
-	`, VideoId)
-	
+	AddedAt, UpdatedAt, RefreshState`
+}
+
+// Scans a row selected with db_VideoFullColumns.
+func db_ScanFullVideo(Row db_RowScanner) (*VideoInfo, error) {
+	VideoInfo := &VideoInfo{}
+
 	var rawAddedAt, rawUpdatedAt any
-	err := VideoRow.Scan(
+	err := Row.Scan(
 		&VideoInfo.FromChannel,
 		&VideoInfo.Id,
 		&VideoInfo.Title,
@@ -504,9 +529,6 @@ func DB_GetVideo(VideoId string) (*VideoInfo, error) {
 		&VideoInfo.RefreshState,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
 		return nil, err
 	}
 	VideoInfo.AddedAt = parseDBTime(rawAddedAt)
@@ -533,10 +555,13 @@ type ListVideosQuery struct {
 	OrderBy int
 	OrderDirection int
 	
+	// Only Id, Title, Availability, UploaderName and Status will be populated.
 	IgnoreFullInformation bool
+	// Don't read the (potentially large) description from the database.
+	ExcludeDescription bool
 }
 
-func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, Statement *string, Args *[]interface{}) {
+func DB_ConstructWhere_ListVideos(Query ListVideosQuery, Statement *string, Args *[]interface{}) {
 	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 || Query.QueuedAction != -1 || Query.VideoType != -1 {
 		*Statement += " WHERE "
 		AddAnd := false
@@ -578,7 +603,11 @@ func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, 
 			AddAnd = true
 		}
 	}
-	
+}
+
+func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, Statement *string, Args *[]interface{}) {
+	DB_ConstructWhere_ListVideos(Query, Statement, Args)
+
 	OrderBy := "AddedAt"
 	switch Query.OrderBy {
 	case DB_VIDEO_ORDERBY_ReleaseDate:
@@ -601,67 +630,59 @@ func DB_ConstructQuery_ListVideos(Limit int, Offset int, Query ListVideosQuery, 
 	*Args = append(*Args, Limit, Offset)
 }
 
-func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, error) {
-	Args := []interface{}{}
-	
-	Statement := `SELECT Id, Title, Description, Availability, UploaderName, Status FROM Videos`
-	
-	QLimit := Limit
-	QOffset := Offset
-	
-	IsSearching := false
+// Splits the search query into unique lowercase words.
+func db_GetVideoSearchWords(SearchQuery string) []string {
 	SearchWords := []string{}
-	if Query.SearchQuery != "" {
-		QLimit = -1
-		QOffset = 0
-		IsSearching = true
-		SplitSearchQuery := strings.Split(Query.SearchQuery, " ")
-		for i := 0; i < len(SplitSearchQuery); i++ {
-			SearchWord := strings.ToLower(SplitSearchQuery[i])
-			if !slices.Contains(SearchWords, SearchWord) {
-				SearchWords = append(SearchWords, SearchWord)
-			}
+	for _, Word := range(strings.Fields(SearchQuery)) {
+		Word = strings.ToLower(Word)
+		if !slices.Contains(SearchWords, Word) {
+			SearchWords = append(SearchWords, Word)
 		}
 	}
-	DB_ConstructQuery_ListVideos(QLimit, QOffset, Query, &Statement, &Args)
-	
+
+	return SearchWords
+}
+
+// Returns minimal video infos (Id, Title, Availability, UploaderName, Status) for every video that matches the query.
+// If the query has a search query, only the videos that contain every search word are returned.
+// The (potentially large) description is never read.
+func db_ListMinimalVideos(Query ListVideosQuery) ([]*VideoInfo, error) {
+	Args := []interface{}{}
+	Statement := `SELECT Id, Title, Availability, UploaderName, Status FROM Videos`
+	DB_ConstructQuery_ListVideos(-1, 0, Query, &Statement, &Args)
+
+	SearchWords := db_GetVideoSearchWords(Query.SearchQuery)
+
 	Rows, err := GDB.Query(Statement, Args...)
 	if err != nil {
 		return nil, err
 	}
 	defer Rows.Close()
-	
+
 	VideosList := []*VideoInfo{}
-	
-	Si := 0
-	
 	for Rows.Next() {
 		TinyVideoInfo := &VideoInfo{}
 		err := Rows.Scan(
 			&TinyVideoInfo.Id,
 			&TinyVideoInfo.Title,
-			&TinyVideoInfo.Description,
 			&TinyVideoInfo.Availability,
 			&TinyVideoInfo.UploaderName,
-			
+
 			&TinyVideoInfo.Status,
 		)
 		if err != nil {
 			return nil, err
 		}
-		
-		if IsSearching {
-			IsWhatWeAreLookingFor := true
-			
+
+		if len(SearchWords) > 0 {
 			// Simple search!
 			TitleLowercase        := strings.ToLower(TinyVideoInfo.Title)
 			AvailabilityLowercase := strings.ToLower(TinyVideoInfo.Availability)
 			IdLowercase           := strings.ToLower(TinyVideoInfo.Id)
 			UploaderNameLowercase := strings.ToLower(TinyVideoInfo.UploaderName)
-			
-			//for _, Word := range(SearchWords) {
-			for i := 0; i < len(SearchWords); i++ {
-				Word := SearchWords[i]
+
+			IsWhatWeAreLookingFor := true
+			for _, Word := range(SearchWords) {
 				if !strings.Contains(TitleLowercase, Word) &&
 				   !strings.Contains(AvailabilityLowercase, Word) &&
 				   !strings.Contains(IdLowercase, Word) &&
@@ -671,41 +692,145 @@ func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, 
 					break
 				}
 			}
-			
 			if !IsWhatWeAreLookingFor {
 				continue
 			}
-			// This video contains words from the search query!
-			if Si < Offset {
-				Si += 1
-				continue
-			}
 		}
-		
+
 		VideosList = append(VideosList, TinyVideoInfo)
-		if IsSearching {
-			if Limit != -1 && len(VideosList) >= Limit {
-				break
+	}
+	if err := Rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return VideosList, nil
+}
+
+// Gets the full video infos for the video ids, in the same order as VideoIds.
+func db_GetFullVideosFromIds(VideoIds []string, ExcludeDescription bool) ([]*VideoInfo, error) {
+	const ChunkSize = 500
+
+	VideosById := make(map[string]*VideoInfo, len(VideoIds))
+	for Start := 0; Start < len(VideoIds); Start += ChunkSize {
+		Chunk := VideoIds[Start:min(Start+ChunkSize, len(VideoIds))]
+
+		Args := make([]interface{}, 0, len(Chunk))
+		for _, Id := range(Chunk) {
+			Args = append(Args, Id)
+		}
+		Statement := `SELECT ` + db_VideoFullColumns(ExcludeDescription) + ` FROM Videos WHERE Id IN (?` + strings.Repeat(", ?", len(Chunk)-1) + `)`
+
+		Rows, err := GDB.Query(Statement, Args...)
+		if err != nil {
+			return nil, err
+		}
+		for Rows.Next() {
+			Video, err := db_ScanFullVideo(Rows)
+			if err != nil {
+				Rows.Close()
+				return nil, err
 			}
+			VideosById[Video.Id] = Video
+		}
+		err = Rows.Err()
+		Rows.Close()
+		if err != nil {
+			return nil, err
 		}
 	}
-	
+
+	VideosList := make([]*VideoInfo, 0, len(VideoIds))
+	for _, Id := range(VideoIds) {
+		if Video, ok := VideosById[Id]; ok {
+			VideosList = append(VideosList, Video)
+		}
+	}
+
+	return VideosList, nil
+}
+
+func DB_ListVideos(Limit int, Offset int, Query ListVideosQuery) ([]*VideoInfo, error) {
+	if Offset < 0 {
+		Offset = 0
+	}
+
+	if Query.SearchQuery != "" {
+		// Searching is done on the minimal video infos, then only the requested page gets the full information.
+		MatchingVideos, err := db_ListMinimalVideos(Query)
+		if err != nil {
+			return nil, err
+		}
+
+		if Offset >= len(MatchingVideos) {
+			return []*VideoInfo{}, nil
+		}
+		MatchingVideos = MatchingVideos[Offset:]
+		if Limit >= 0 && Limit < len(MatchingVideos) {
+			MatchingVideos = MatchingVideos[:Limit]
+		}
+
+		if Query.IgnoreFullInformation {
+			return MatchingVideos, nil
+		}
+
+		VideoIds := make([]string, 0, len(MatchingVideos))
+		for _, Video := range(MatchingVideos) {
+			VideoIds = append(VideoIds, Video.Id)
+		}
+		return db_GetFullVideosFromIds(VideoIds, Query.ExcludeDescription)
+	}
+
+	Args := []interface{}{}
+
+	Columns := `Id, Title, '' AS Description, Availability, UploaderName, Status`
 	if !Query.IgnoreFullInformation {
-		// We found the videos we want!
-		for _, VideoInfo := range(VideosList) {
-			FullVideoInfo, err := DB_GetVideo(VideoInfo.Id)
-			if err == nil && FullVideoInfo != nil {
-				*VideoInfo = *FullVideoInfo
-			}
-		}
+		Columns = db_VideoFullColumns(Query.ExcludeDescription)
 	}
-	
+	Statement := `SELECT ` + Columns + ` FROM Videos`
+	DB_ConstructQuery_ListVideos(Limit, Offset, Query, &Statement, &Args)
+
+	Rows, err := GDB.Query(Statement, Args...)
+	if err != nil {
+		return nil, err
+	}
+	defer Rows.Close()
+
+	VideosList := []*VideoInfo{}
+	for Rows.Next() {
+		if Query.IgnoreFullInformation {
+			TinyVideoInfo := &VideoInfo{}
+			err := Rows.Scan(
+				&TinyVideoInfo.Id,
+				&TinyVideoInfo.Title,
+				&TinyVideoInfo.Description,
+				&TinyVideoInfo.Availability,
+				&TinyVideoInfo.UploaderName,
+
+				&TinyVideoInfo.Status,
+			)
+			if err != nil {
+				return nil, err
+			}
+			VideosList = append(VideosList, TinyVideoInfo)
+			continue
+		}
+
+		Video, err := db_ScanFullVideo(Rows)
+		if err != nil {
+			return nil, err
+		}
+		VideosList = append(VideosList, Video)
+	}
+	if err := Rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return VideosList, nil
 }
 
 type DB_VideoListStats struct{
 	Total int `json:"total"`
-	
+
 	TotalQueued      int `json:"total_queued"`
 	TotalDownloading int `json:"total_downloading"`
 	TotalDownloaded  int `json:"total_downloaded"`
@@ -713,40 +838,72 @@ type DB_VideoListStats struct{
 	TotalIgnored     int `json:"total_ignored"`
 }
 
+func (Stats *DB_VideoListStats) Add(Status int, Count int) {
+	Stats.Total += Count
+	switch Status {
+		case VIDEO_STATUS_QUEUED:      Stats.TotalQueued      += Count
+		case VIDEO_STATUS_DOWNLOADING: Stats.TotalDownloading += Count
+		case VIDEO_STATUS_DOWNLOADED:  Stats.TotalDownloaded  += Count
+		case VIDEO_STATUS_FAILED:      Stats.TotalFailed      += Count
+		case VIDEO_STATUS_IGNORED:     Stats.TotalIgnored     += Count
+	}
+}
+
 var DB_VideoStatsCache = NewCache(time.Second * 4)
 
-func DB_GetVideoStatsFromQuery(Query ListVideosQuery) (*DB_VideoListStats, error) {
-	CacheKey := fmt.Sprintf("%s %s %d", Query.FromChannelId, Query.SearchQuery, Query.Status)
-	
-	Query.IgnoreFullInformation = true
-	
-	DB_VideoStatsCache.CleanUp()
+func db_CountVideoStats(Query ListVideosQuery) (*DB_VideoListStats, error) {
 	Stats := &DB_VideoListStats{}
+
+	if Query.SearchQuery != "" {
+		MatchingVideos, err := db_ListMinimalVideos(Query)
+		if err != nil {
+			return Stats, err
+		}
+		for _, Video := range(MatchingVideos) {
+			Stats.Add(Video.Status, 1)
+		}
+		return Stats, nil
+	}
+
+	Args := []interface{}{}
+	Statement := `SELECT Status, COUNT(*) FROM Videos`
+	DB_ConstructWhere_ListVideos(Query, &Statement, &Args)
+	Statement += " GROUP BY Status"
+
+	Rows, err := GDB.Query(Statement, Args...)
+	if err != nil {
+		return Stats, err
+	}
+	defer Rows.Close()
+
+	for Rows.Next() {
+		var Status, Count int
+		if err := Rows.Scan(&Status, &Count); err != nil {
+			return Stats, err
+		}
+		Stats.Add(Status, Count)
+	}
+
+	return Stats, Rows.Err()
+}
+
+func DB_GetVideoStatsFromQuery(Query ListVideosQuery) (*DB_VideoListStats, error) {
+	CacheKey := fmt.Sprintf("%s %s %d %d %d %d", Query.FromChannelId, Query.SearchQuery, Query.Status, Query.VideoType, Query.RefreshState, Query.QueuedAction)
+
+	DB_VideoStatsCache.CleanUp()
 	StatsC, CacheExists := DB_VideoStatsCache.Get(CacheKey)
 	if CacheExists {
-		Stats = StatsC.(*DB_VideoListStats)
-	} else {
-		VideosListStats, err := DB_ListVideos(-1, 0, Query)
-		if err != nil {
-			L_Printf("Failed to get videos list for stats... Err: %v\n", err)
-		}
-		
-		Stats = &DB_VideoListStats{
-			Total: len(VideosListStats),
-		}
-		for _, Video := range(VideosListStats) {
-			switch Video.Status {
-				case VIDEO_STATUS_QUEUED:      Stats.TotalQueued++
-				case VIDEO_STATUS_DOWNLOADING: Stats.TotalDownloading++
-				case VIDEO_STATUS_DOWNLOADED:  Stats.TotalDownloaded++
-				case VIDEO_STATUS_FAILED:      Stats.TotalFailed++
-				case VIDEO_STATUS_IGNORED:     Stats.TotalIgnored++
-			}
-		}
-		
-		DB_VideoStatsCache.Set(CacheKey, Stats)
+		return StatsC.(*DB_VideoListStats), nil
 	}
-	
+
+	Stats, err := db_CountVideoStats(Query)
+	if err != nil {
+		L_Printf("Failed to get videos stats... Err: %v\n", err)
+		return Stats, nil
+	}
+
+	DB_VideoStatsCache.Set(CacheKey, Stats)
+
 	return Stats, nil
 }
 
@@ -1001,7 +1158,7 @@ type ListCommandTasksQuery struct {
 	OrderDirection int
 }
 
-func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery, Statement *string, Args *[]interface{}) {
+func DB_ConstructWhere_ListCommandTasks(Query ListCommandTasksQuery, Statement *string, Args *[]interface{}) {
 	WhereAdded := false
 	if Query.Status == -2 && Query.Type == -1 && Query.FromVideoId == "" && Query.FromChannelId == "" {
 		if !WhereAdded {
@@ -1052,7 +1209,11 @@ func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommand
 			AddAnd = true
 		}
 	}
-	
+}
+
+func DB_ConstructQuery_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery, Statement *string, Args *[]interface{}) {
+	DB_ConstructWhere_ListCommandTasks(Query, Statement, Args)
+
 	OrderBy := "EndTime"
 	switch Query.OrderBy {
 	case DB_CTASK_ORDERBY_StartTime:
@@ -1121,6 +1282,98 @@ func DB_ListCommandTasks(Limit int, Offset int, Query ListCommandTasksQuery) ([]
 	}
 	
 	return TasksList, nil
+}
+
+// Counts the tasks matching the query. If MaxCount > 0 then counting stops at MaxCount.
+func DB_CountCommandTasks(Query ListCommandTasksQuery, MaxCount int) (int, error) {
+	Args := []interface{}{}
+
+	Inner := `SELECT 1 FROM CommandTasks`
+	DB_ConstructWhere_ListCommandTasks(Query, &Inner, &Args)
+	if MaxCount > 0 {
+		Inner += " LIMIT ?"
+		Args = append(Args, MaxCount)
+	}
+
+	var Count int
+	err := GDB.QueryRow("SELECT COUNT(*) FROM ("+Inner+")", Args...).Scan(&Count)
+	if err != nil {
+		return 0, err
+	}
+
+	return Count, nil
+}
+
+type DB_CommandTaskStats struct {
+	Total int `json:"total"`
+
+	TotalRunning  int `json:"total_running"`
+	TotalFailed   int `json:"total_failed"`
+	TotalFinished int `json:"total_finished"`
+	TotalCanceled int `json:"total_canceled"`
+}
+
+func DB_GetCommandTaskStats(Query ListCommandTasksQuery) (*DB_CommandTaskStats, error) {
+	Args := []interface{}{}
+
+	Statement := `SELECT Status, COUNT(*) FROM CommandTasks`
+	DB_ConstructWhere_ListCommandTasks(Query, &Statement, &Args)
+	Statement += " GROUP BY Status"
+
+	Rows, err := GDB.Query(Statement, Args...)
+	if err != nil {
+		return nil, err
+	}
+	defer Rows.Close()
+
+	Stats := &DB_CommandTaskStats{}
+	for Rows.Next() {
+		var Status, Count int
+		if err := Rows.Scan(&Status, &Count); err != nil {
+			return nil, err
+		}
+
+		Stats.Total += Count
+		switch Status {
+			case TASK_STATUS_RUNNING:  Stats.TotalRunning  += Count
+			case TASK_STATUS_FAILED:   Stats.TotalFailed   += Count
+			case TASK_STATUS_FINISHED: Stats.TotalFinished += Count
+			case TASK_STATUS_CANCELED: Stats.TotalCanceled += Count
+		}
+	}
+
+	return Stats, Rows.Err()
+}
+
+// Deletes finished tasks whose EndTime is older than OlderThan.
+// If OnlyListing is true then only listing tasks are deleted, otherwise only non listing tasks are deleted.
+// Tasks with an id in ExcludeIds are never deleted.
+func DB_DeleteOldCommandTasks(OlderThan time.Time, OnlyListing bool, ExcludeIds []string) (int64, error) {
+	Args := []interface{}{}
+
+	Statement := `DELETE FROM CommandTasks WHERE unixepoch(EndTime) < ?`
+	Args = append(Args, OlderThan.UTC().Unix())
+
+	if OnlyListing {
+		Statement += " AND Type = ?"
+	} else {
+		Statement += " AND Type != ?"
+	}
+	Args = append(Args, TASK_TYPE_LISTING)
+
+	if len(ExcludeIds) > 0 {
+		Statement += " AND Id NOT IN (?" + strings.Repeat(", ?", len(ExcludeIds)-1) + ")"
+		for _, Id := range(ExcludeIds) {
+			Args = append(Args, Id)
+		}
+	}
+
+	Result, err := GDB.Exec(Statement, Args...)
+	if err != nil {
+		return 0, err
+	}
+
+	return Result.RowsAffected()
 }
 
 func DB_DeleteCommandTask(TaskId string) error {
@@ -1220,7 +1473,13 @@ func OpenDB() error {
 		DatabaseFilePath = DATABASE_FILE_DEBUG
 	}
 	
-	db, err := sql.Open("sqlite3", DatabaseFilePath)
+	// PRAGMAs are per connection, pass them in the DSN so every pooled connection gets them.
+	DSN := "file:" + DatabaseFilePath +
+		"?_pragma=busy_timeout(5000)" +
+		"&_pragma=foreign_keys(1)" +
+		"&_pragma=journal_mode(wal)" +
+		"&_pragma=synchronous(normal)"
+	db, err := sql.Open("sqlite3", DSN)
 	if err != nil {
 		return fmt.Errorf("Failed to open database '%s' Error: %v\n", DatabaseFilePath, err)
 	}

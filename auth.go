@@ -768,7 +768,13 @@ func DoesAdminAccountExist() (bool, error) {
 
 
 func OpenAuthDB() error {
-	db, err := sql.Open("sqlite3", AUTH_DB_FILENAME)
+	// PRAGMAs are per connection, pass them in the DSN so every pooled connection gets them.
+	DSN := "file:" + AUTH_DB_FILENAME +
+		"?_pragma=busy_timeout(5000)" +
+		"&_pragma=foreign_keys(1)" +
+		"&_pragma=secure_delete(1)" +
+		"&_pragma=synchronous(normal)"
+	db, err := sql.Open("sqlite3", DSN)
 	if err != nil {
 		return fmt.Errorf("Failed to open auth database '%s' Error: %v\n", AUTH_DB_FILENAME, err)
 	}

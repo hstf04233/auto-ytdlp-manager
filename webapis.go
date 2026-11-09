@@ -333,21 +333,18 @@ func API_DeleteChannel(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_SpiceUpChannelInfo(w http.ResponseWriter, r *http.Request, AChannel *ArchiveChannel) {
-	TasksList, err := CL_ListCommandTasks(100, 0, ListCommandTasksQuery{
+	// The web ui only displays up to "99+" tasks, no need to count past 100.
+	TasksCount, err := DB_CountCommandTasks(ListCommandTasksQuery{
 		FromChannelId: AChannel.Id,
 		Status: -1,
 		Type: -1,
-		OrderDirection: -1,
-	})
-	if err == nil && TasksList != nil {
-		AChannel.FORAPI_TasksCount = len(TasksList)
-		for _, Task := range(TasksList) {
-			if Task.Status == TASK_STATUS_RUNNING {
-				AChannel.FORAPI_ActiveTaskId = Task.Id
-				break
-			}
-		}
+	}, 100)
+	if err == nil {
+		AChannel.FORAPI_TasksCount = TasksCount
+	} else {
+		L_Printf("API_SpiceUpChannelInfo failed to count tasks, error: %v\n", err)
 	}
+	AChannel.FORAPI_ActiveTaskId = CL_GetActiveTaskId(AChannel.Id, "")
 }
 
 func API_GetChannels(w http.ResponseWriter, r *http.Request) {
@@ -375,11 +372,14 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
+	// Copy the channel list and release the lock before doing any database work.
 	G_ArchiveChannels.ChannelsLock.RLock()
-	
-	SendChannels := []*ArchiveChannel{}
-	
-	Channels := G_ArchiveChannels.Channels
+	Channels := make([]*ArchiveChannel, len(G_ArchiveChannels.Channels))
+	copy(Channels, G_ArchiveChannels.Channels)
+	G_ArchiveChannels.ChannelsLock.RUnlock()
+
+	SendChannels := make([]*ArchiveChannel, 0, len(Channels))
+
 	for _, AChannel := range(Channels) {
 		NewChannel := &ArchiveChannel{}
 		*NewChannel = *AChannel
@@ -388,7 +388,6 @@ func API_GetChannels(w http.ResponseWriter, r *http.Request) {
 		
 		SendChannels = append(SendChannels, NewChannel)
 	}
-	G_ArchiveChannels.ChannelsLock.RUnlock()
 	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -423,20 +422,17 @@ func API_SpiceUpVideoInfo(w http.ResponseWriter, r *http.Request, Video *VideoIn
 		Video.FileSize = 0   // This is for the web ui, this doesn't save into the database.
 	}
 	
-	TasksList, err := CL_ListCommandTasks(-1, 0, ListCommandTasksQuery{
+	TasksCount, err := DB_CountCommandTasks(ListCommandTasksQuery{
 		FromVideoId: Video.Id,
 		Status: -1,
 		Type: -1,
-	})
-	if err == nil && TasksList != nil {
-		Video.TasksCount = len(TasksList)
-		for _, Task := range(TasksList) {
-			if Task.Status == TASK_STATUS_RUNNING {
-				Video.ActiveTaskId = Task.Id
-				break
-			}
-		}
+	}, 0)
+	if err == nil {
+		Video.TasksCount = TasksCount
+	} else {
+		L_Printf("API_SpiceUpVideoInfo failed to count tasks, error: %v\n", err)
 	}
+	Video.ActiveTaskId = CL_GetActiveTaskId("", Video.Id)
 }
 
 func API_AddVideos(w http.ResponseWriter, r *http.Request) {
@@ -636,8 +632,11 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		
 		OrderBy: OrderBy,
 		OrderDirection: OrderDirection,
+
+		// Don't share description when listing... (Cut down on the amount of data read and sent)
+		ExcludeDescription: true,
 	}
-	
+
 	VideosList, err := DB_ListVideos(Limit, Offset, Query)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("DB_ListVideos ERROR! | %s", err.Error()), http.StatusInternalServerError)
@@ -1022,37 +1021,13 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	TasksListStats := TasksList
-	if (len(TasksList) >= Limit || Offset > 0) {
-		// TODO: DON'T DO THIS!!! Use a specially crafted database query instead of getting every task...
-		// (Or maybe cache the results aswell...)
-		TasksListAll, err := DB_ListCommandTasks(-1, 0, Query)
-		if err == nil {
-			TasksListStats = TasksListAll
-		} else if err != nil {
-			L_Printf("Failed to get tasks list for stats... Err: %v\n", err)
-		}
+	Stats, err := DB_GetCommandTaskStats(Query)
+	if err != nil {
+		L_Printf("Failed to get tasks stats... Err: %v\n", err)
+		Stats = &DB_CommandTaskStats{}
 	}
-	
-	Stats := struct{
-		Total int `json:"total"`
-		
-		TotalRunning  int `json:"total_running"`
-		TotalFailed   int `json:"total_failed"`
-		TotalFinished int `json:"total_finished"`
-		TotalCanceled int `json:"total_canceled"`
-	}{
-		Total: len(TasksListStats),
-	}
-	for _, Task := range(TasksListStats) {
-		switch Task.Status {
-			case TASK_STATUS_RUNNING:  Stats.TotalRunning++
-			case TASK_STATUS_FAILED:   Stats.TotalFailed++
-			case TASK_STATUS_FINISHED: Stats.TotalFinished++
-			case TASK_STATUS_CANCELED: Stats.TotalCanceled++
-		}
-	}
-	
+
+	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(map[string]interface{}{
 		"count": len(TasksList),
 		"tasks": TasksList,
@@ -1063,7 +1038,6 @@ func API_GetTasks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error when trying to list tasks, err: %v", err), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
 }
 
 func API_GetTaskOutput(w http.ResponseWriter, r *http.Request) {

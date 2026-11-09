@@ -82,6 +82,33 @@ func TruncateOutput(Output string) string {
 	return Output
 }
 
+// Output kept in memory is bounded to this size, anything older gets cut off from the start.
+// (It gets truncated to MAX_TASK_OUTPUT_LOG anyways when it's saved or sent out.)
+const MAX_TASK_OUTPUT_MEMORY = MAX_TASK_OUTPUT_LOG * 2
+
+// Returns the end of the output if it's larger than MAX_TASK_OUTPUT_MEMORY, cut on a line boundary when possible.
+func CapTaskOutputBytes(Output []byte) []byte {
+	if len(Output) <= MAX_TASK_OUTPUT_MEMORY {
+		return Output
+	}
+	Cut := len(Output) - MAX_TASK_OUTPUT_LOG
+	if Newline := bytes.IndexByte(Output[Cut:], '\n'); Newline >= 0 && Newline < 1024 {
+		Cut += Newline + 1
+	}
+	return Output[Cut:]
+}
+func CapTaskOutput(Output string) string {
+	if len(Output) <= MAX_TASK_OUTPUT_MEMORY {
+		return Output
+	}
+	Cut := len(Output) - MAX_TASK_OUTPUT_LOG
+	if Newline := strings.IndexByte(Output[Cut:], '\n'); Newline >= 0 && Newline < 1024 {
+		Cut += Newline + 1
+	}
+	// Copy so the old (large) string can be garbage collected.
+	return strings.Clone(Output[Cut:])
+}
+
 func watchStd(std io.ReadCloser, buf *[]byte, nout *int, Mutex *sync.RWMutex) {
 	var n int
 	var err error
@@ -139,6 +166,7 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 	// TODO: Rewrite this so it doesn't use strings. Currently this creates a ton of garbage strings.
 	
 	CarriageReturn := false
+	var writeLine []byte
 	EndWait := time.Now().UnixMilli()
 	
 	for {
@@ -167,21 +195,30 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 		if n > 0 {
 			Task.Lock.Lock()
 			
+			// Work on a byte buffer for the whole chunk instead of rebuilding the output string for every line / carriage return.
 			chunk := (*buf)[:n]
 			inEscapeSequence := 0
-			var writeLine bytes.Buffer
+			outBuf := make([]byte, 0, len(Task.RealtimeOutput)+n)
+			outBuf = append(outBuf, Task.RealtimeOutput...)
+			writeLine = writeLine[:0]
+
+			// Removes the last (unfinished) line of the output.
+			trimToLastLine := func() {
+				if idx := bytes.LastIndexByte(outBuf, '\n'); idx >= 0 {
+					outBuf = outBuf[:idx+1]
+				} else {
+					outBuf = outBuf[:0]
+				}
+			}
+
 			for _, b := range(chunk) {
 				if inEscapeSequence != 0 {
 					inEscapeSequence += 1
 					if b == byte('K') {
 						// Clear the line!
-						VisibleOutput_Lines := strings.Split(Task.RealtimeOutput, "\n")
-						if len(VisibleOutput_Lines) >= 2 {
-							Task.RealtimeOutput = strings.Join(VisibleOutput_Lines[0:len(VisibleOutput_Lines)-1], "\n") + "\n" + writeLine.String()
-						} else {
-							Task.RealtimeOutput = writeLine.String()
-						}
-						writeLine.Reset()
+						trimToLastLine()
+						outBuf = append(outBuf, writeLine...)
+						writeLine = writeLine[:0]
 					}
 					if inEscapeSequence >= 3 {
 						inEscapeSequence = 0
@@ -192,31 +229,34 @@ func monitorTaskCmdOutput(Task *CommandTask, stdout io.ReadCloser, stderr io.Rea
 					inEscapeSequence = 1
 					continue
 				}
-				
-				writeLine.WriteByte(b)
-				
+
+				writeLine = append(writeLine, b)
+
 				if b == byte('\n') {
 					CarriageReturn = false
-					Task.RealtimeOutput += writeLine.String()
-					writeLine.Reset()
+					outBuf = append(outBuf, writeLine...)
+					writeLine = writeLine[:0]
 				} else {
 					if CarriageReturn {
 						CarriageReturn = false
-						VisibleOutput_Lines := strings.Split(Task.RealtimeOutput, "\n")
-						if len(VisibleOutput_Lines) >= 2 {
-							Task.RealtimeOutput = strings.Join(VisibleOutput_Lines[0:len(VisibleOutput_Lines)-1], "\n") + "\n" + string(b)
+						if bytes.IndexByte(outBuf, '\n') >= 0 {
+							trimToLastLine()
 						} else {
-							Task.RealtimeOutput = "\n" + string(b)
+							outBuf = append(outBuf[:0], '\n')
 						}
-						writeLine.Reset()
+						outBuf = append(outBuf, b)
+						writeLine = writeLine[:0]
 					}
 				}
 				if b == byte('\r') {
 					CarriageReturn = true
 				}
 			}
-			Task.RealtimeOutput += writeLine.String()
-			
+			outBuf = append(outBuf, writeLine...)
+			writeLine = writeLine[:0]
+
+			Task.RealtimeOutput = string(CapTaskOutputBytes(outBuf))
+
 			Task.Lock.Unlock()
 			
 			_c_out = c_out
@@ -568,8 +608,8 @@ func CL_Logf(Task *CommandTask, format string, a ... any) {
 	Msg := fmt.Sprintf(format, a ...)
 	
 	Task.Lock.Lock()
-	Task.Output += Msg
-	Task.RealtimeOutput += Msg
+	Task.Output = CapTaskOutput(Task.Output + Msg)
+	Task.RealtimeOutput = CapTaskOutput(Task.RealtimeOutput + Msg)
 	Task.UpdatedAt = time.Now().UTC()
 	Task.Lock.Unlock()
 	
@@ -582,56 +622,56 @@ func CleanUpTasksInDatabase() {
 		return
 	}
 	
-	// TODO: Limit the amount of tasks it searches!
-	TasksList, err := DB_ListCommandTasks(-1, 0, ListCommandTasksQuery{
-		Type: -1,
-		Status: -1,
-		
-		OrderBy: DB_CTASK_ORDERBY_EndTime,
-		OrderDirection: 1,
-	})
-	if err != nil {
-		L_Printf("CleanUpTasksInDatabase error: %v\n", err)
-		return
-	}
-	
 	TaskLog_AutoDelete_Seconds      := G_Config.TaskLog_AutoDelete_Seconds
 	TaskLog_List_AutoDelete_Seconds := G_Config.TaskLog_List_AutoDelete_Seconds
-	
+
 	DeleteTime         := time.Now().UTC().Add(time.Second * -time.Duration(TaskLog_AutoDelete_Seconds))
 	Listing_DeleteTime := time.Now().UTC().Add(time.Second * -time.Duration(TaskLog_List_AutoDelete_Seconds))
-	
-	DeleteCount := 0
-	
+
+	// Running tasks must never be deleted.
 	ARCT_Lock.RLock()
-	defer ARCT_Lock.RUnlock()
-	
-	for _, Task := range(TasksList) {
-		if _, ok := AllRunningCommandTasks[Task.Id]; ok {
-			continue  // This task is running! don't delete
-		}
-		Task.Lock.RLock()
-		TaskId := Task.Id
-		DeleteThis := false
-		
-		if Task.Type == TASK_TYPE_LISTING {
-			if TaskLog_List_AutoDelete_Seconds > 0 && Listing_DeleteTime.Unix() > Task.EndTime.Unix() {
-				DeleteThis = true
-			}
-		} else {
-			if TaskLog_AutoDelete_Seconds > 0 && DeleteTime.Unix() > Task.EndTime.Unix() {
-				DeleteThis = true
-			}
-		}
-		Task.Lock.RUnlock()
-		
-		if DeleteThis {
-			err := DB_DeleteCommandTask(TaskId)
-			if err != nil {
-				L_Printf("Could not delete task '%s', error: %v\n", TaskId, err)
-				continue
-			}
-			DeleteCount += 1
+	RunningTaskIds := make([]string, 0, len(AllRunningCommandTasks))
+	for TaskId := range(AllRunningCommandTasks) {
+		RunningTaskIds = append(RunningTaskIds, TaskId)
+	}
+	ARCT_Lock.RUnlock()
+
+	if TaskLog_List_AutoDelete_Seconds > 0 {
+		_, err := DB_DeleteOldCommandTasks(Listing_DeleteTime, true, RunningTaskIds)
+		if err != nil {
+			L_Printf("CleanUpTasksInDatabase could not delete old listing tasks, error: %v\n", err)
 		}
 	}
+	if TaskLog_AutoDelete_Seconds > 0 {
+		_, err := DB_DeleteOldCommandTasks(DeleteTime, false, RunningTaskIds)
+		if err != nil {
+			L_Printf("CleanUpTasksInDatabase could not delete old tasks, error: %v\n", err)
+		}
+	}
+}
+
+// Returns the id of the most recent running task that belongs to the channel / video. (Empty string if none)
+// Pass an empty string to ChannelId or VideoId to not filter by it.
+func CL_GetActiveTaskId(ChannelId string, VideoId string) string {
+	ARCT_Lock.RLock()
+	defer ARCT_Lock.RUnlock()
+
+	ActiveTaskId := ""
+	var ActiveEndTime time.Time
+	for _, Task := range(AllRunningCommandTasks) {
+		Task.Lock.RLock()
+		Matches := Task.Status == TASK_STATUS_RUNNING &&
+		           (ChannelId == "" || Task.FromChannelId == ChannelId) &&
+		           (VideoId   == "" || Task.FromVideoId   == VideoId)
+		EndTime := Task.EndTime
+		Id := Task.Id
+		Task.Lock.RUnlock()
+
+		if Matches && (ActiveTaskId == "" || EndTime.After(ActiveEndTime)) {
+			ActiveTaskId = Id
+			ActiveEndTime = EndTime
+		}
+	}
+
+	return ActiveTaskId
 }
