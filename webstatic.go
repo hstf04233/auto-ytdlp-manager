@@ -148,7 +148,7 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	w.Header().Set("Cache-Control", "Cache-Control: public, max-age=86400")  // 1 day
+	w.Header().Set("Cache-Control", "public, max-age=86400")  // 1 day
 	
 	http.ServeContent(w, r, filepath.Base(path), ProgramStartTime, FileSeeker)
 	//w.Write(FileContent)
