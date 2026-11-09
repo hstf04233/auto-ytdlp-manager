@@ -43,9 +43,22 @@ CREATE TABLE IF NOT EXISTS ArchiveChannels (
 	DownloadLiveChat BOOLEAN NOT NULL DEFAULT 1,
 	LiveChatDownloadDir TEXT NOT NULL DEFAULT '',
 
+	GroupId TEXT NOT NULL DEFAULT '',
+
 	Type    INTEGER NOT NULL,
 	Enabled BOOLEAN,
 	
+	CreatedAt DATETIME NOT NULL DEFAULT (datetime('now')),
+	UpdatedAt DATETIME
+);
+
+/* Channel groups are purely visual. ParentId = '' means a top level group. */
+CREATE TABLE IF NOT EXISTS ChannelGroups (
+	Id        TEXT PRIMARY KEY,
+	Name      TEXT NOT NULL,
+	ParentId  TEXT NOT NULL DEFAULT '',
+	SortOrder INTEGER NOT NULL DEFAULT 0,
+
 	CreatedAt DATETIME NOT NULL DEFAULT (datetime('now')),
 	UpdatedAt DATETIME
 );
@@ -219,8 +232,8 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	defer AChannel.Lock.RUnlock()
 	TimeNow := time.Now().UTC()
 	_, err := GDB.Exec(`
-	INSERT INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, PreferredVideoFormat, PreferredAudioFormat, DownloadLiveChat, LiveChatDownloadDir, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
+	INSERT INTO ArchiveChannels(Id, Name, Url, DownloadDir, OutputTemplate, QualitySelect, PreferredVideoFormat, PreferredAudioFormat, DownloadLiveChat, LiveChatDownloadDir, GroupId, CheckInterval, FullCheckInterval, Type, PlaylistEnd, Enabled, UpdatedAt, CreatedAt)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(Id)
 	DO UPDATE SET
 	Name=excluded.Name,
 	Url=excluded.Url,
@@ -233,6 +246,7 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 
 	DownloadLiveChat=excluded.DownloadLiveChat,
 	LiveChatDownloadDir=excluded.LiveChatDownloadDir,
+	GroupId=excluded.GroupId,
 
 	CheckInterval=excluded.CheckInterval,
 	FullCheckInterval=excluded.FullCheckInterval,
@@ -240,7 +254,7 @@ func DB_UpdateArchiveChannel(AChannel *ArchiveChannel) error {
 	PlaylistEnd=excluded.PlaylistEnd,
 	Enabled=excluded.Enabled,
 	UpdatedAt=excluded.UpdatedAt
-	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.PreferredVideoFormat, AChannel.PreferredAudioFormat, AChannel.DownloadLiveChat, AChannel.LiveChatDownloadDir, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.PlaylistEnd, AChannel.Enabled, TimeNow, TimeNow)
+	`, AChannel.Id, AChannel.Name, AChannel.Url, AChannel.DownloadDir, AChannel.OutputTemplate, AChannel.QualitySelect, AChannel.PreferredVideoFormat, AChannel.PreferredAudioFormat, AChannel.DownloadLiveChat, AChannel.LiveChatDownloadDir, AChannel.GroupId, AChannel.CheckInterval, AChannel.FullCheckInterval, AChannel.Type, AChannel.PlaylistEnd, AChannel.Enabled, TimeNow, TimeNow)
 	
 	if err != nil {
 		L_Printf("DB_UpdateArchiveChannel ERR: %v\n", err)
@@ -278,6 +292,7 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 
 	DownloadLiveChat,
 	LiveChatDownloadDir,
+	GroupId,
 
 	Type, PlaylistEnd,
 	Enabled FROM ArchiveChannels %s`, Condition))
@@ -300,6 +315,7 @@ func DB_ListChannels(Condition string) ([]*ArchiveChannel, error) {
 
 			&Channel.DownloadLiveChat,
 			&Channel.LiveChatDownloadDir,
+			&Channel.GroupId,
 
 			&Channel.Type,
 			&Channel.PlaylistEnd,
@@ -547,6 +563,9 @@ const (
 type ListVideosQuery struct {
 	Status int
 	FromChannelId string
+	// When UseFromChannelIds is true, only videos from these channels are listed (used for channel groups).
+	UseFromChannelIds bool
+	FromChannelIds    []string
 	SearchQuery string
 	VideoType   int
 	RefreshState int
@@ -562,10 +581,25 @@ type ListVideosQuery struct {
 }
 
 func DB_ConstructWhere_ListVideos(Query ListVideosQuery, Statement *string, Args *[]interface{}) {
-	if Query.Status != -1 || Query.FromChannelId != "" || Query.RefreshState != -1 || Query.QueuedAction != -1 || Query.VideoType != -1 {
+	if Query.Status != -1 || Query.FromChannelId != "" || Query.UseFromChannelIds || Query.RefreshState != -1 || Query.QueuedAction != -1 || Query.VideoType != -1 {
 		*Statement += " WHERE "
 		AddAnd := false
+		if Query.UseFromChannelIds {
+			if len(Query.FromChannelIds) == 0 {
+				// Group without any channels, match nothing.
+				*Statement += " 1 = 0"
+			} else {
+				*Statement += " FromChannel IN (?" + strings.Repeat(", ?", len(Query.FromChannelIds)-1) + ")"
+				for _, Id := range(Query.FromChannelIds) {
+					*Args = append(*Args, Id)
+				}
+			}
+			AddAnd = true
+		}
 		if Query.Status != -1 {
+			if AddAnd {
+				*Statement += " AND "
+			}
 			*Statement += " Status = ?"
 			*Args = append(*Args, Query.Status)
 			AddAnd = true
@@ -888,7 +922,11 @@ func db_CountVideoStats(Query ListVideosQuery) (*DB_VideoListStats, error) {
 }
 
 func DB_GetVideoStatsFromQuery(Query ListVideosQuery) (*DB_VideoListStats, error) {
-	CacheKey := fmt.Sprintf("%s %s %d %d %d %d", Query.FromChannelId, Query.SearchQuery, Query.Status, Query.VideoType, Query.RefreshState, Query.QueuedAction)
+	ChannelIdsKey := "-"
+	if Query.UseFromChannelIds {
+		ChannelIdsKey = strings.Join(Query.FromChannelIds, ",")
+	}
+	CacheKey := fmt.Sprintf("%s [%s] %s %d %d %d %d", Query.FromChannelId, ChannelIdsKey, Query.SearchQuery, Query.Status, Query.VideoType, Query.RefreshState, Query.QueuedAction)
 
 	DB_VideoStatsCache.CleanUp()
 	StatsC, CacheExists := DB_VideoStatsCache.Get(CacheKey)
@@ -1511,6 +1549,9 @@ func OpenDB() error {
 		// v0.30
 		"ALTER TABLE ArchiveChannels ADD COLUMN DownloadLiveChat BOOLEAN NOT NULL DEFAULT 1",
 		"ALTER TABLE ArchiveChannels ADD COLUMN LiveChatDownloadDir TEXT NOT NULL DEFAULT ''",
+
+		// Channel groups
+		"ALTER TABLE ArchiveChannels ADD COLUMN GroupId TEXT NOT NULL DEFAULT ''",
 	}
 	
 	_, err = db.Exec(db_SQL_Header)

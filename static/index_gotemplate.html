@@ -52,7 +52,10 @@
     <div class="page" id="page-channels">
       <div class="page-header">
         <h2>Channels</h2>
-        <button class="btn btn-primary" onclick="openAddChannelModal()">+ Add Channel</button>
+        <div class="page-header-actions">
+          <button class="btn btn-secondary" onclick="openNewGroupModal()" title="Groups only organize channels, they don't change how channels download">+ New Group</button>
+          <button class="btn btn-primary" onclick="openAddChannelModal()">+ Add Channel</button>
+        </div>
       </div>
        
       <!-- <div class="stats-row" id="channelStats"></div> -->
@@ -379,6 +382,11 @@
             <label for="channelUrl">Channel / Playlist URL</label>
             <input type="url" id="channelUrl" placeholder="https://www.youtube.com/channel/..." maxlength="8192" required>
           </div>
+
+          <div class="form-group" title="Groups only organize channels in the web ui">
+            <label for="channelGroup">Group</label>
+            <select id="channelGroup"></select>
+          </div>
           <details class="modal-details">
             <summary>Make sure you have the correct url!</summary>
             <ul>
@@ -517,6 +525,40 @@
     </div>
   </div>
   
+  <!-- ADD/EDIT GROUP MODAL -->
+  <div class="modal-overlay" id="groupModal">
+    <div class="modal modal-col modal-group" onclick="event.stopPropagation();">
+      <h2 id="groupModalTitle">New Group</h2>
+      <form id="groupForm" onsubmit="saveGroup(event)" autocomplete="off">
+        <input type="hidden" id="groupId">
+
+        <div class="modal-section">
+          <div class="modal-section-title">Group</div>
+          <div class="form-group">
+            <label for="groupName">Name</label>
+            <input type="text" id="groupName" placeholder="ExampleChannel" maxlength="128" required>
+          </div>
+          <div class="form-group">
+            <label for="groupParent">Inside group</label>
+            <select id="groupParent"></select>
+          </div>
+          <div class="modal-hint" id="groupParentHint" hidden></div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title">Channels <span class="group-channels-count" id="groupChannelsCount"></span></div>
+          <div class="modal-hint">Pick the channels shown in this group. Sub groups' channels are included automatically when viewing this group.</div>
+          <input type="text" class="group-channel-search" id="groupChannelSearch" placeholder="Filter channels..." maxlength="256" oninput="renderGroupChannelPicker()">
+          <div class="group-channel-picker" id="groupChannelPicker"></div>
+        </div>
+      </form>
+      <div class="modal-actions modal-actions-sticky">
+        <button type="button" class="btn btn-secondary" onclick="closeGroupModal()">Cancel</button>
+        <button type="submit" form="groupForm" class="btn btn-primary" id="groupSubmitBtn">Create Group</button>
+      </div>
+    </div>
+  </div>
+
     <!-- START CHANNEL MODAL (What should this channel do?) -->
   <div class="modal-overlay" id="channelStartModal">
     <div class="modal" onclick="event.stopPropagation();">
@@ -636,6 +678,7 @@
   <script src="/static/{{ .FormatJsPath }}"></script>
   <script src="/static/{{ .ConfigJsPath }}"></script>
   <script src="/static/{{ .ChannelsJsPath }}"></script>
+  <script src="/static/{{ .GroupsJsPath }}"></script>
   <script src="/static/{{ .VideosJsPath }}"></script>
   <script src="/static/{{ .TasksJsPath }}"></script>
   <script src="/static/{{ .MainJsPath }}"></script>

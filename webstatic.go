@@ -37,6 +37,7 @@ var __FilesToManifest = []string{
 	"js/format.js",
 	"js/config.js",
 	"js/channels.js",
+	"js/groups.js",
 	"js/videos.js",
 	"js/tasks.js",
 	"js/main.js",
@@ -119,7 +120,7 @@ func webstatic_ServeStaticContent(w http.ResponseWriter, r *http.Request) {
 	
 	ManifestAssetInfo, ok := WebStatic_HashPathAssetInfo[path]
 	if ok {
-		// Replace files like 'js/index-********.js' to just 'js/index.js'
+		// Replace paths like 'js/index-********.js' to 'js/index.js'
 		path = ManifestAssetInfo.OriginalPath
 	}
 	
@@ -227,6 +228,7 @@ func init() {
 		FormatJsPath   string
 		ConfigJsPath   string
 		ChannelsJsPath string
+		GroupsJsPath   string
 		VideosJsPath   string
 		TasksJsPath    string
 		MainJsPath     string
@@ -240,6 +242,7 @@ func init() {
 		FormatJsPath: webstatic_GetCacheBustedAsset("js/format.js"),
 		ConfigJsPath: webstatic_GetCacheBustedAsset("js/config.js"),
 		ChannelsJsPath: webstatic_GetCacheBustedAsset("js/channels.js"),
+		GroupsJsPath: webstatic_GetCacheBustedAsset("js/groups.js"),
 		VideosJsPath: webstatic_GetCacheBustedAsset("js/videos.js"),
 		TasksJsPath: webstatic_GetCacheBustedAsset("js/tasks.js"),
 		MainJsPath: webstatic_GetCacheBustedAsset("js/main.js"),

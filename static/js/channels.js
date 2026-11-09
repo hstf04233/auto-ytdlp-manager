@@ -1,15 +1,21 @@
 // channels.js - channels list, channel modals, add-videos form.
 // ========== Channels ==========
-let lastChannelsCount = -1;
+let lastChannelsSig = null;
 async function loadChannels(softUpdateOnly) {
   areChannelsLoading = true;
   try {
-    const data = await API.get('/api/channels');
+    const [data, groupsData] = await Promise.all([
+      API.get('/api/channels'),
+      API.get('/api/groups'),
+    ]);
     allChannels = data.channels || data;
-    if (!softUpdateOnly || allChannels.length !== lastChannelsCount) {
+    allGroups = groupsData.groups || [];
+    // Rebuild when channels/groups were added, removed, renamed or moved; otherwise just patch.
+    const sig = channelsRenderSig();
+    if (!softUpdateOnly || sig !== lastChannelsSig) {
       renderChannels();
       updateChannelFilters();
-      lastChannelsCount = allChannels.length
+      lastChannelsSig = sig;
     } else {
       // Soft update
       softRenderChannels();
@@ -100,16 +106,20 @@ function renderChannels() {
   `;
   */
   
-  container.innerHTML = '';
-  
-  let visibleChannelsCount = 0;
-  
+  const hasAnything = renderGroupedChannels(container);
+
+  if (!hasAnything) {
+    container.innerHTML = '<div class="loading">No channels yet. Add one to get started!</div>';
+    return;
+  }
+
   for (const ch of allChannels) {
-    if (ch.hidden) continue;
-    
-    visibleChannelsCount += 1;
-    
-    channelHtml = `
+    if (!ch.hidden) renderUpdateChannel(ch);
+  }
+}
+
+function channelCardHTML(ch) {
+  return `
       <div class="card channel-card" id="channel-${ch.id}">
         <div class="channel-info">
           <h3>${escHtml(ch.name)}</h3>
@@ -133,15 +143,6 @@ function renderChannels() {
         </div>
       </div>
     `;
-    container.insertAdjacentHTML("beforeend", channelHtml);
-    
-    renderUpdateChannel(ch);
-  }
-  
-  if (visibleChannelsCount === 0) {
-    container.innerHTML = '<div class="loading">No channels yet. Add one to get started!</div>';
-    return;
-  }
 }
 
 async function enableChannel(id, enabled) {
@@ -392,12 +393,20 @@ function setChannelModalSections(outputOpen) {
 }
 
 // ========== Channel Modal ==========
-function openAddChannelModal() {
+function fillChannelGroupSelect(selectedGroupId) {
+  fillGroupSelect(document.getElementById('channelGroup'), {
+    noneLabel: 'No group',
+    selected: selectedGroupId || '',
+  });
+}
+
+function openAddChannelModal(groupId) {
 
   document.getElementById('channelModalTitle').textContent = 'Add Channel';
   document.getElementById('channelId').value = '';
   document.getElementById('channelName').value = '';
   document.getElementById('channelUrl').value = '';
+  fillChannelGroupSelect(groupId);
   document.getElementById('channelType').value = '0';
   document.getElementById('channelDownloadDir').value = '';
   document.getElementById('channelOutputTemplate').value = '';
@@ -435,6 +444,7 @@ function openEditChannelModal(id) {
   document.getElementById('channelId').value = ch.id;
   document.getElementById('channelName').value = ch.name;
   document.getElementById('channelUrl').value = ch.url;
+  fillChannelGroupSelect(ch.group_id);
   document.getElementById('channelType').value = ch.type;
   
   document.getElementById('channelQuality').value = ch.quality_select;
@@ -553,7 +563,8 @@ async function saveChannel(e) {
   const name = document.getElementById('channelName').value.trim();
   const url  = document.getElementById('channelUrl').value.trim();
   const type = parseInt(document.getElementById('channelType').value);
-  
+  const groupId = document.getElementById('channelGroup').value;
+
   const quality = parseInt(document.getElementById('channelQuality').value);
   const preferredVideoFormat = document.getElementById('channelPreferredVideoFormat').value;
   const preferredAudioFormat = document.getElementById('channelPreferredAudioFormat').value;
@@ -571,6 +582,7 @@ async function saveChannel(e) {
     download_dir: downloadDir,
     output_template: outputTemplate,
     type,
+    group_id: groupId,
 
     quality_select: quality,
     preferred_video_format: preferredVideoFormat,
@@ -593,6 +605,7 @@ async function saveChannel(e) {
       patch.download_dir = downloadDir;
       patch.output_template = outputTemplate;
       patch.type = type;
+      patch.group_id = groupId;
 
       patch.quality_select = quality;
       patch.preferred_video_format = preferredVideoFormat;

@@ -37,6 +37,24 @@ type API_RequestChannelBody struct{
 	PlaylistEnd       int   `json:"playlist_end"`
 
 	Enabled *bool `json:"enabled"`
+
+	// '' = ungrouped.
+	GroupId *string `json:"group_id"`
+}
+
+// Returns an error message if the requested group id is not usable.
+func api_CheckChannelBodyGroup(Body API_RequestChannelBody) (int, string) {
+	if Body.GroupId == nil {
+		return 0, ""
+	}
+	IsValid, err := IsValidChannelGroupId(*Body.GroupId)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Sprintf("Failed to check group: %v", err)
+	}
+	if !IsValid {
+		return http.StatusBadRequest, "Group not found."
+	}
+	return 0, ""
 }
 
 func Verify_API_RequestChannelBody(Body API_RequestChannelBody) (bool, string) {
@@ -82,6 +100,10 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, Reason, http.StatusBadRequest)
 		return
 	}
+	if Code, Reason := api_CheckChannelBodyGroup(Body); Code != 0 {
+		http.Error(w, Reason, Code)
+		return
+	}
 	if Body.Name == "" {
 		Body.Name = "New Channel"
 	}
@@ -124,7 +146,10 @@ func API_NewChannel(w http.ResponseWriter, r *http.Request) {
 	if Body.LiveChatDownloadDir != nil {
 		NewChannel.LiveChatDownloadDir = *Body.LiveChatDownloadDir
 	}
-	
+	if Body.GroupId != nil {
+		NewChannel.GroupId = *Body.GroupId
+	}
+
 	if NewChannel.CheckInterval < 0 {
 		NewChannel.CheckInterval = 0
 	}
@@ -179,8 +204,16 @@ func API_UpdateChannel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, Reason, http.StatusBadRequest)
 		return
 	}
-	
+	if Code, Reason := api_CheckChannelBodyGroup(Body); Code != 0 {
+		http.Error(w, Reason, Code)
+		return
+	}
+
 	AChannel.Lock.Lock()
+
+	if Body.GroupId != nil {
+		AChannel.GroupId = *Body.GroupId
+	}
 	
 	if Body.Name != "" {
 		AChannel.Name = Body.Name
@@ -629,12 +662,30 @@ func API_GetVideos(w http.ResponseWriter, r *http.Request) {
 		Status: Status,
 		FromChannelId: FromChannelId,
 		SearchQuery:   SearchQuery,
-		
+
 		OrderBy: OrderBy,
 		OrderDirection: OrderDirection,
 
 		// Don't share description when listing... (Cut down on the amount of data read and sent)
 		ExcludeDescription: true,
+	}
+
+	if fg := r.URL.Query().Get("from_group"); fg != "" {
+		if len(fg) > API_MAX_REQUEST_ID {
+			http.Error(w, "Invalid group id.", http.StatusBadRequest)
+			return
+		}
+		ChannelIds, Found, err := GetChannelIdsInGroup(fg)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Failed to get group channels: %v", err), http.StatusInternalServerError)
+			return
+		}
+		if !Found {
+			http.Error(w, "Group not found.", http.StatusNotFound)
+			return
+		}
+		Query.UseFromChannelIds = true
+		Query.FromChannelIds = ChannelIds
 	}
 
 	VideosList, err := DB_ListVideos(Limit, Offset, Query)
@@ -1316,6 +1367,30 @@ func ServeApi(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		API_GetChannels(w, r)
+	} else if Path == "groups" && Method == "GET" {
+		if !IsReadOnlyAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
+		API_GetGroups(w, r)
+	} else if Path == "groups" && Method == "POST" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
+		API_NewGroup(w, r)
+	} else if strings.HasPrefix(Path, "groups/") && Method == "PATCH" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
+		API_UpdateGroup(w, r)
+	} else if strings.HasPrefix(Path, "groups/") && Method == "DELETE" {
+		if !IsAdminAuthorized {
+			http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+			return
+		}
+		API_DeleteGroup(w, r)
 	} else if strings.HasPrefix(Path, "check-channel-now/") && Method == "POST" {
 		if !IsAdminAuthorized {
 			http.Error(w, "Unauthorized.", http.StatusUnauthorized)

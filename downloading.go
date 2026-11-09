@@ -70,7 +70,10 @@ type ArchiveChannel struct {
 	
 	Enabled bool `json:"enabled"`
 	Hidden  bool `json:"hidden"`
-	
+
+	// Visual only: the channel group this channel is shown under ('' = ungrouped).
+	GroupId string `json:"group_id"`
+
 	IsBeingChecked bool  `json:"is_being_checked"`
 	NextCheckMSEC  int64 `json:"_nextCheckMsec"`
 	NextFullChannelCheckMSEC int64 `json:"_nextFullChannelCheckMsec"`

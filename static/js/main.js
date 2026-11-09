@@ -27,6 +27,7 @@ setupModalClickExit("channelModal", closeChannelModal)
 setupModalClickExit("videoDetailsModal", closeVideoDetailsModal)
 setupModalClickExit("videoHistoryModal", closeVideoHistoryModal)
 setupModalClickExit("addVideosModal", closeAddVideosModal)
+setupModalClickExit("groupModal", closeGroupModal)
 
 window.addEventListener('popstate', function (e) {
   const tab = window.location.pathname.replace(/^\//, '') || '';
@@ -54,6 +55,7 @@ document.addEventListener('keydown', (e) => {
     closeVideoDetailsModal();
     closeChannelModal();
     closeAddVideosModal();
+    closeGroupModal();
   }
 });
 

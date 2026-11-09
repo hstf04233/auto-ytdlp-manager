@@ -589,8 +589,10 @@ async function loadVideos(softUpdateOnly) {
       if (statusFilter !== '') {
         url += `&status=${statusFilter}`;
       }
-      if (channelFilter !== '') {
-        url += `&from_channel=${channelFilter}`;
+      if (isGroupFilterValue(channelFilter)) {
+        url += `&from_group=${encodeURIComponent(groupIdFromFilterValue(channelFilter))}`;
+      } else if (channelFilter !== '') {
+        url += `&from_channel=${encodeURIComponent(channelFilter)}`;
       }
       if (orderBy) {
         url += `&order_by=${orderBy}`;
@@ -1265,7 +1267,9 @@ function getVideoFilterStateFromUI() {
 function buildVideosUrl(state) {
   const s = state || getVideoFilterStateFromUI();
   const params = new URLSearchParams();
-  if (s.channel && s.channel !== VIDEO_FILTER_DEFAULTS.channel) {
+  if (isGroupFilterValue(s.channel)) {
+    params.set('group', groupIdFromFilterValue(s.channel));
+  } else if (s.channel && s.channel !== VIDEO_FILTER_DEFAULTS.channel) {
     params.set('channel', s.channel);
   }
   if (s.search && s.search.trim() !== '') {
@@ -1308,7 +1312,10 @@ function applyVideosUrlParamsToUI(urlParams) {
   const validOrderBy = new Set(['release_date', 'added_at', 'updated_at', 'file_size']);
   const validOrderDir = new Set(['-1', '1']);
 
-  const channelId = urlParams.get('channel') || VIDEO_FILTER_DEFAULTS.channel;
+  let channelId = urlParams.get('channel') || VIDEO_FILTER_DEFAULTS.channel;
+  if (urlParams.get('group')) {
+    channelId = VIDEO_GROUP_FILTER_PREFIX + urlParams.get('group');
+  }
   ensureVideoChannelOption(channelId);
   document.getElementById('videoChannelFilter').value = channelId;
   updateVideoChannelActions();
@@ -1342,9 +1349,12 @@ function updateVideosTabTitle() {
   if (lastPageOpen != "videos") return;
   
   const channelId = document.getElementById('videoChannelFilter').value
-  
+
   const channel = getChannelFromId(channelId);
-  if (channel) {
+  const group = getGroupFromId(groupIdFromFilterValue(channelId));
+  if (group) {
+    setTitle(`Videos: ${group.name}`)
+  } else if (channel) {
     setTitle(`Videos: ${channel.name}`)
   } else {
     setTitle("Videos")
@@ -1457,16 +1467,21 @@ function updateVideoStats() {
 // channel is selected, so you don't have to hop to the channels tab.
 function updateVideoChannelActions() {
   const channelId = document.getElementById('videoChannelFilter').value;
-  const hasChannel = !!channelId;
-  for (const id of ['videoChannelCheckBtn', 'videoChannelEditBtn']) {
-    const btn = document.getElementById(id);
-    if (btn) btn.hidden = !hasChannel;
+  const isGroup = isGroupFilterValue(channelId);
+  const checkBtn = document.getElementById('videoChannelCheckBtn');
+  const editBtn = document.getElementById('videoChannelEditBtn');
+  // "Check videos now" only makes sense for a single channel, groups get "Edit group".
+  if (checkBtn) checkBtn.hidden = !channelId || isGroup;
+  if (editBtn) {
+    editBtn.hidden = !channelId;
+    editBtn.textContent = isGroup ? 'Edit group' : 'Edit';
+    editBtn.title = isGroup ? 'Edit this group' : 'Edit this channel';
   }
 }
 
 function runSelectedVideoChannelCheck() {
   const channelId = document.getElementById('videoChannelFilter').value;
-  if (!channelId) return;
+  if (!channelId || isGroupFilterValue(channelId)) return;
   runChannelCheck(channelId);
   showToast('Channel check started', 'success');
 }
@@ -1474,6 +1489,10 @@ function runSelectedVideoChannelCheck() {
 function openSelectedVideoChannelEditor() {
   const channelId = document.getElementById('videoChannelFilter').value;
   if (!channelId) return;
+  if (isGroupFilterValue(channelId)) {
+    openEditGroupModal(groupIdFromFilterValue(channelId));
+    return;
+  }
   if (!getChannelFromId(channelId)) {
     showToast('Channel data not loaded yet, try again in a moment', 'error');
     return;
@@ -1485,14 +1504,25 @@ function updateChannelFilters() {
   const videoSelect = document.getElementById('videoChannelFilter');
   
   let current = videoSelect.value;
-  videoSelect.innerHTML = '<option value="">All</option><hr>';
+  videoSelect.innerHTML = '<option value="">All</option>';
+  const groupsInOrder = getGroupsInDisplayOrder();
+  if (groupsInOrder.length > 0) {
+    const groupsEl = document.createElement('optgroup');
+    groupsEl.label = 'Groups';
+    for (const { group, depth } of groupsInOrder) {
+      const prefix = depth > 0 ? '   ↳ ' : '';
+      groupsEl.appendChild(new Option(prefix + group.name, VIDEO_GROUP_FILTER_PREFIX + group.id));
+    }
+    videoSelect.appendChild(groupsEl);
+  }
+  const channelsEl = document.createElement('optgroup');
+  channelsEl.label = 'Channels';
   allChannels.forEach(ch => {
-    const opt = document.createElement('option');
-    opt.value = ch.id;
-    opt.textContent = ch.name;
-    if (ch.id === current) opt.selected = true;
-    videoSelect.appendChild(opt);
+    channelsEl.appendChild(new Option(ch.name, ch.id));
   });
+  videoSelect.appendChild(channelsEl);
+  ensureVideoChannelOption(current);
+  videoSelect.value = current;
   
   const taskSelect = document.getElementById('taskChannelFilter');
   
